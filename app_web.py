@@ -85,7 +85,7 @@ def set_security_headers(response):
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
         "font-src 'self' https://fonts.gstatic.com; "
         "img-src 'self' data: https:; "
-        "connect-src 'self';"
+        "connect-src 'self' https://cdn.jsdelivr.net;"
     )
     return response
 
@@ -135,11 +135,14 @@ def inicializar_todo():
         )
     """)
     for col, ddl in [
-        ("usuario_id", "INT"),
-        ("prioridad",  "INT DEFAULT 2"),
-        ("favorita",   "INT DEFAULT 0"),
-        ("notas",      "TEXT"),
-        ("usuario",    "VARCHAR(100)"),
+        ("usuario_id",      "INT"),
+        ("prioridad",       "INT DEFAULT 2"),
+        ("favorita",        "INT DEFAULT 0"),
+        ("notas",           "TEXT"),
+        ("usuario",         "VARCHAR(100)"),
+        ("fecha_creacion",  "DATETIME DEFAULT CURRENT_TIMESTAMP"),
+        ("fecha_completada","DATETIME DEFAULT NULL"),
+        ("fecha_inicio",    "DATE DEFAULT NULL"),
     ]:
         if not column_exists(cursor, 'tareas', col):
             cursor.execute(f"ALTER TABLE tareas ADD COLUMN {col} {ddl}")
@@ -294,12 +297,13 @@ def index():
 def agregar():
     conn = get_connection()
     conn.execute("""
-        INSERT INTO tareas (codigo, descripcion, categoria, fecha, completada, usuario_id, prioridad, favorita, notas)
-        VALUES (?,?,?,?,0,?,?,0,?)
+        INSERT INTO tareas (codigo, descripcion, categoria, fecha, completada, usuario_id, prioridad, favorita, notas, fecha_inicio)
+        VALUES (?,?,?,?,0,?,?,0,?,?)
     """, (request.form.get("codigo"), request.form.get("descripcion"),
           request.form.get("categoria"), request.form.get("fecha"),
           session["user_id"], int(request.form.get("prioridad", 2)),
-          request.form.get("notas", "")))
+          request.form.get("notas", ""),
+          request.form.get("fecha_inicio") or None))
     conn.commit(); conn.close()
     return redirect("/")
 
@@ -386,6 +390,97 @@ def admin():
     )
 
 
+# ── INFORME DE USUARIOS ────────────────────────────────────────────────────────
+
+@app.route("/informe_usuarios")
+@admin_required
+def informe_usuarios():
+    conn = get_connection()
+
+    # ── KPIs globales
+    kpi = conn.execute("""
+        SELECT
+            COUNT(*)                                               AS total,
+            SUM(CASE WHEN completada=1 THEN 1 ELSE 0 END)         AS completadas,
+            SUM(CASE WHEN completada=0 THEN 1 ELSE 0 END)         AS pendientes,
+            AVG(CASE WHEN completada=1 AND fecha_completada IS NOT NULL AND fecha_inicio IS NOT NULL
+                THEN DATEDIFF(fecha_completada, fecha_inicio) END) AS avg_dias
+        FROM tareas
+    """).fetchone()
+
+    # ── Por usuario: stats + tiempos
+    por_usuario = conn.execute("""
+        SELECT
+            u.username,
+            u.perfil,
+            COUNT(t.id)                                                          AS total,
+            SUM(CASE WHEN t.completada=1 THEN 1 ELSE 0 END)                     AS completadas,
+            SUM(CASE WHEN t.completada=0 THEN 1 ELSE 0 END)                     AS pendientes,
+            MIN(t.fecha_inicio)                                                  AS primera_tarea,
+            MAX(t.fecha_completada)                                              AS ultima_completada,
+            AVG(CASE WHEN t.completada=1
+                      AND t.fecha_completada IS NOT NULL
+                      AND t.fecha_inicio     IS NOT NULL
+                THEN DATEDIFF(t.fecha_completada, t.fecha_inicio)
+                END)                                                             AS avg_dias
+        FROM usuarios u
+        LEFT JOIN tareas t ON t.usuario_id = u.id
+        GROUP BY u.id, u.username, u.perfil
+        ORDER BY completadas DESC, total DESC
+    """).fetchall()
+
+    # ── Actividad por día (últimos 30 días)
+    actividad = conn.execute("""
+        SELECT
+            DATE(fecha_creacion)   AS dia,
+            COUNT(*)               AS creadas,
+            SUM(completada)        AS completadas_dia
+        FROM tareas
+        WHERE fecha_creacion >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        GROUP BY DATE(fecha_creacion)
+        ORDER BY dia ASC
+    """).fetchall()
+
+    # ── Tareas por categoría y usuario (para heatmap)
+    por_categoria = conn.execute("""
+        SELECT
+            COALESCE(NULLIF(TRIM(categoria),''), 'General') AS categoria,
+            COUNT(*)                                         AS total,
+            SUM(completada)                                  AS completadas
+        FROM tareas
+        GROUP BY categoria
+        ORDER BY total DESC
+        LIMIT 10
+    """).fetchall()
+
+    conn.close()
+
+    # Convertir fechas a string para evitar problemas con strftime en Jinja
+    por_usuario_clean = []
+    for r in por_usuario:
+        row = dict(r)
+        row["primera_tarea"]     = str(row["primera_tarea"])[:10]    if row.get("primera_tarea")     else ""
+        row["ultima_completada"] = str(row["ultima_completada"])[:10] if row.get("ultima_completada") else ""
+        row["avg_dias"]          = round(float(row["avg_dias"]), 1)   if row.get("avg_dias")          else None
+        por_usuario_clean.append(row)
+
+    actividad_clean = []
+    for r in actividad:
+        row = dict(r)
+        row["dia"] = str(row["dia"])[:10] if row.get("dia") else ""
+        actividad_clean.append(row)
+
+    kpi_dict = dict(kpi)
+    kpi_dict["avg_dias"] = round(float(kpi_dict["avg_dias"]), 1) if kpi_dict.get("avg_dias") else None
+
+    return render_template("informe_usuarios.html",
+        kpi=kpi_dict,
+        por_usuario=por_usuario_clean,
+        actividad=actividad_clean,
+        por_categoria=[dict(r) for r in por_categoria],
+    )
+
+
 # ── GESTIÓN DE USUARIOS ────────────────────────────────────────────────────────
 
 @app.route("/usuarios")
@@ -394,11 +489,12 @@ def usuarios():
     conn = get_connection()
     usuarios_lista = conn.execute("""
         SELECT u.id, u.username, u.email, u.es_admin, u.perfil,
-               COUNT(t.id)                                      AS total_tareas,
-               SUM(CASE WHEN t.completada=1 THEN 1 ELSE 0 END) AS completadas,
-               SUM(CASE WHEN t.completada=0 THEN 1 ELSE 0 END) AS pendientes
+               COALESCE(u.pw_format, 0)                          AS pw_format,
+               COUNT(t.id)                                        AS total_tareas,
+               SUM(CASE WHEN t.completada=1 THEN 1 ELSE 0 END)   AS completadas,
+               SUM(CASE WHEN t.completada=0 THEN 1 ELSE 0 END)   AS pendientes
         FROM usuarios u LEFT JOIN tareas t ON t.usuario_id = u.id
-        GROUP BY u.id, u.username, u.email, u.es_admin, u.perfil
+        GROUP BY u.id, u.username, u.email, u.es_admin, u.perfil, u.pw_format
         ORDER BY u.perfil DESC, u.username
     """).fetchall()
     cats = conn.execute("""
@@ -406,12 +502,17 @@ def usuarios():
     """).fetchall()
     categorias = [r["cat"] for r in cats]
     conn.close()
+
+    # Usuarios que necesitan reset (pw_format=0 → no pueden entrar)
+    necesitan_reset = [u for u in usuarios_lista if (u["pw_format"] or 0) == 0]
+
     return render_template(
         "usuarios.html",
         usuarios=usuarios_lista,
         categorias=categorias,
         perfiles=PERFILES_TODOS,
         perfil_labels=PERFIL_LABELS,
+        necesitan_reset=necesitan_reset,
     )
 
 
@@ -487,7 +588,10 @@ def admin_toggle_completada(tid):
         conn.close()
         return jsonify({"ok": False}), 404
     nuevo = 0 if row["completada"] == 1 else 1
-    conn.execute("UPDATE tareas SET completada=? WHERE id=?", (nuevo, tid))
+    if nuevo == 1:
+        conn.execute("UPDATE tareas SET completada=1, fecha_completada=NOW() WHERE id=?", (tid,))
+    else:
+        conn.execute("UPDATE tareas SET completada=0, fecha_completada=NULL WHERE id=?", (tid,))
     conn.commit()
     conn.close()
     return jsonify({"ok": True, "completada": nuevo})
@@ -498,9 +602,9 @@ def admin_toggle_completada(tid):
 def completar(id):
     conn = get_connection()
     if session.get("es_admin", 0) >= 1:
-        conn.execute("UPDATE tareas SET completada=1 WHERE id=?", (id,))
+        conn.execute("UPDATE tareas SET completada=1, fecha_completada=NOW() WHERE id=?", (id,))
     else:
-        conn.execute("UPDATE tareas SET completada=1 WHERE id=? AND usuario_id=?", (id, session["user_id"]))
+        conn.execute("UPDATE tareas SET completada=1, fecha_completada=NOW() WHERE id=? AND usuario_id=?", (id, session["user_id"]))
     conn.commit(); conn.close()
     return redirect("/")
 
@@ -551,11 +655,12 @@ def editar(id):
     conn = get_connection()
     if request.method == "POST":
         conn.execute(
-            "UPDATE tareas SET codigo=?,descripcion=?,categoria=?,fecha=?,completada=?,prioridad=?,notas=? WHERE id=?",
+            "UPDATE tareas SET codigo=?,descripcion=?,categoria=?,fecha=?,completada=?,prioridad=?,notas=?,fecha_inicio=? WHERE id=?",
             (request.form.get("codigo"), request.form.get("descripcion"),
              request.form.get("categoria"), request.form.get("fecha"),
              request.form.get("completada"), int(request.form.get("prioridad", 2)),
-             request.form.get("notas",""), id)
+             request.form.get("notas",""),
+             request.form.get("fecha_inicio") or None, id)
         )
         conn.commit(); conn.close()
         return redirect("/")
@@ -914,4 +1019,4 @@ def debug_login():
 if __name__ == "__main__":
     inicializar_todo()
     inicializar_formacion()
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000, use_reloader=False)
