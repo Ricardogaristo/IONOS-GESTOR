@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, redirect, session, send_file, url_for
+from flask import Flask, render_template, request, redirect, session, send_file, url_for, jsonify
 import mysql.connector.errors
-from functools import wraps
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
+import os
+import secrets
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -14,14 +15,83 @@ from openpyxl.cell.cell import MergedCell
 from db_mysql import get_tareas_conn, column_exists
 from formacion import formacion_bp, inicializar_formacion
 from cursos import cursos_bp
+from auth import (
+    auth_bp,
+    init_oauth,
+    login_required,
+    admin_required,
+    superadmin_required,
+    formacion_required,
+    tareas_required,
+    coordinador_required,
+    puede_ver_formacion,
+    puede_ver_tareas,
+    PERFIL_TAREAS,
+    PERFIL_ADMIN,
+    PERFIL_SUPERADMIN,
+    PERFIL_LABELS,
+    PERFILES_TODOS,
+)
 
 app = Flask(__name__)
-app.secret_key = "clave_secreta_muy_segura"
+
+# ── Seguridad de sesión ────────────────────────────────────────────────────────
+# La clave debe ser estable entre reinicios del watchdog.
+# Lee de .env; si no existe, genera UNA vez y la guarda en un fichero local.
+_SK_FILE = os.path.join(os.path.dirname(__file__), ".secret_key")
+def _load_or_create_secret_key() -> str:
+    env_key = os.environ.get("FLASK_SECRET_KEY", "")
+    if env_key:
+        return env_key
+    if os.path.exists(_SK_FILE):
+        with open(_SK_FILE, "r") as f:
+            return f.read().strip()
+    key = secrets.token_hex(32)
+    with open(_SK_FILE, "w") as f:
+        f.write(key)
+    return key
+
+app.secret_key = _load_or_create_secret_key()
+
+app.config.update(
+    SESSION_COOKIE_HTTPONLY  = True,   # JS no puede leer la cookie de sesión
+    SESSION_COOKIE_SAMESITE  = "Lax",  # Protección básica CSRF en cookies
+    SESSION_COOKIE_SECURE    = False,  # Cambiar a True cuando uses HTTPS en producción
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=8),
+)
+
 app.register_blueprint(formacion_bp)
 app.register_blueprint(cursos_bp)
+app.register_blueprint(auth_bp)
+init_oauth(app)
+
+# ── Cabeceras de seguridad HTTP ────────────────────────────────────────────────
+@app.after_request
+def set_security_headers(response):
+    # Evita que el navegador cargue la app dentro de un iframe (clickjacking)
+    response.headers["X-Frame-Options"] = "DENY"
+    # Evita que el navegador "adivine" el tipo MIME
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    # No envía Referer al salir del sitio
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Desactiva la caché en respuestas con datos sensibles
+    if request.path.startswith(("/login", "/registro", "/perfil")):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+        response.headers["Pragma"]        = "no-cache"
+    # Content Security Policy: solo permite recursos del propio origen + CDNs usadas
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self';"
+    )
+    return response
 
 # ── Perfiles ───────────────────────────────────────────────────────────────────
-# 0 = Usuario  |  1 = Admin  |  2 = SuperAdmin
+# Gestionados en auth.py:
+# 1=Formador | 2=Tareas | 3=Formador+Tareas | 4=Coordinador | 10=Admin | 20=SuperAdmin
 
 # ── Conexión ───────────────────────────────────────────────────────────────────
 def get_connection():
@@ -42,8 +112,12 @@ def inicializar_todo():
         )
     """)
     for col, ddl in [
-        ("email",    "VARCHAR(150)"),
-        ("es_admin", "INT DEFAULT 0"),
+        ("email",     "VARCHAR(150)"),
+        ("es_admin",  "INT DEFAULT 0"),
+        ("perfil",    "INT DEFAULT 2"),
+        ("google_id", "VARCHAR(128)"),
+        ("avatar",    "VARCHAR(512)"),
+        ("pw_format", "INT DEFAULT 0"),
     ]:
         if not column_exists(cursor, 'usuarios', col):
             cursor.execute(f"ALTER TABLE usuarios ADD COLUMN {col} {ddl}")
@@ -85,9 +159,11 @@ def inicializar_todo():
         "SELECT id FROM usuarios WHERE username='admin'"
     ).fetchone()
     if not row:
+        import hashlib as _hl
+        _sha = _hl.sha256("1234".encode()).hexdigest()
         conn.execute(
-            "INSERT INTO usuarios (username, email, password, es_admin) VALUES (?,?,?,?)",
-            ("admin", "admin@correo.com", generate_password_hash("Admin1234!"), 2)
+            "INSERT INTO usuarios (username, email, password, es_admin, perfil) VALUES (?,?,?,?,?)",
+            ("admin", "admin@correo.com", generate_password_hash(_sha), 2, 20)
         )
 
     conn.commit()
@@ -113,99 +189,31 @@ def _hashear_passwords():
                 (generate_password_hash(pw), u["id"])
             )
     cursor.execute("UPDATE usuarios SET es_admin=2 WHERE username=?", ("admin",))
+    # Sincronizar columna perfil con es_admin para usuarios existentes
+    cursor.execute("UPDATE usuarios SET perfil=2  WHERE es_admin=0 AND (perfil IS NULL OR perfil=0)")
+    cursor.execute("UPDATE usuarios SET perfil=10 WHERE es_admin=1")
+    cursor.execute("UPDATE usuarios SET perfil=20 WHERE es_admin=2")
     conn.commit()
     conn.close()
 
-# ── Decoradores ────────────────────────────────────────────────────────────────
-def login_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if "user_id" not in session:
-            return redirect(url_for("login"))
-        return f(*args, **kwargs)
-    return decorated
+# ── LOGIN / REGISTRO / LOGOUT — gestionados por auth_v2 (Blueprint auth_bp) ──
 
-def admin_required(f):
-    """Admin (1) y SuperAdmin (2)"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if "user_id" not in session:
-            return redirect(url_for("login"))
-        if session.get("es_admin", 0) < 1:
-            return redirect("/")
-        return f(*args, **kwargs)
-    return decorated
-
-def superadmin_required(f):
-    """Solo SuperAdmin (2)"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if "user_id" not in session:
-            return redirect(url_for("login"))
-        if session.get("es_admin", 0) != 2:
-            return redirect("/")
-        return f(*args, **kwargs)
-    return decorated
-
-# ── LOGIN / REGISTRO / LOGOUT ──────────────────────────────────────────────────
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    error = None
-    if request.method == "POST":
-        ident    = request.form.get("username", "").strip()
-        password = request.form.get("password", "").strip()
-        conn     = get_connection()
-        usuario  = conn.execute(
-            "SELECT id, username, es_admin, password FROM usuarios WHERE username=? OR email=?",
-            (ident, ident)
-        ).fetchone()
-        conn.close()
-        if usuario and check_password_hash(dict(usuario)["password"], password):
-            session["user_id"]  = usuario["id"]
-            session["user"]     = usuario["username"]
-            session["es_admin"] = usuario["es_admin"]
-            return redirect("/")
-        error = "Usuario o contraseña incorrectos."
-    return render_template("login.html", error=error)
-
-
-@app.route("/registro", methods=["GET", "POST"])
-def registro():
-    error = None
-    if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        email    = request.form.get("email",    "").strip()
-        password = request.form.get("password", "").strip()
-        if not username:
-            error = "El nombre de usuario es obligatorio."
-        elif len(password) < 6:
-            error = "La contraseña debe tener al menos 6 caracteres."
-        else:
-            conn = get_connection()
-            try:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "INSERT INTO usuarios (username, email, password, es_admin) VALUES (?,?,?,0)",
-                    (username, email, generate_password_hash(password))
-                )
-                conn.commit()
-                conn.close()
-                return redirect(url_for("login") + "?registered=1")
-            except Exception as e:
-                conn.close()
-                err_str = str(e).lower()
-                if "duplicate" in err_str or "unique" in err_str:
-                    error = "El usuario o email ya existe."
-                else:
-                    error = f"Error al registrar: {e}"
-    return render_template("registro.html", error=error)
-
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("login"))
+# ══════════════════════════════════════════════════════════════════════════════
+# RUTA TEMPORAL — Resetear contraseña de admin a 1234  (BORRAR DESPUÉS DE USAR)
+# Visita: http://localhost:5000/reset_admin_now
+# ══════════════════════════════════════════════════════════════════════════════
+@app.route("/reset_admin_now")
+def reset_admin_now():
+    import hashlib as _hl
+    sha = _hl.sha256("1234".encode()).hexdigest()
+    conn = get_connection()
+    conn.execute(
+        "UPDATE usuarios SET password=?, perfil=20, es_admin=2 WHERE username='admin'",
+        (generate_password_hash(sha),)
+    )
+    conn.commit()
+    conn.close()
+    return "<h2>✅ Contraseña de admin reseteada a: <code>1234</code></h2><p><a href='/login'>Ir al login</a></p><p><strong>⚠ Borra esta ruta de app_web.py cuando termines.</strong></p>"
 
 
 # ── RUTAS PRINCIPALES ──────────────────────────────────────────────────────────
@@ -299,30 +307,57 @@ def agregar():
 @app.route("/admin")
 @admin_required
 def admin():
-    filtro_cat = request.args.get("categoria", "").strip()
-    filtro_est = request.args.get("estado", "").strip()
-    page       = max(request.args.get("page", 1, type=int), 1)
-    per_page   = 10
+    filtro_cat    = request.args.get("categoria", "").strip()
+    filtro_est    = request.args.get("estado",    "").strip()
+    filtro_user   = request.args.get("usuario",   "").strip()
+    filtro_q      = request.args.get("q",         "").strip()
+    page          = max(request.args.get("page", 1, type=int), 1)
+    per_page      = 20
 
     filtros, params = [], []
     if filtro_cat:
-        filtros.append("LOWER(TRIM(categoria)) = LOWER(TRIM(?))"); params.append(filtro_cat)
+        filtros.append("LOWER(TRIM(t.categoria)) = LOWER(TRIM(?))"); params.append(filtro_cat)
     if filtro_est == "Completada":
-        filtros.append("completada = 1")
+        filtros.append("t.completada = 1")
     elif filtro_est == "Pendiente":
-        filtros.append("completada = 0")
+        filtros.append("t.completada = 0")
+    if filtro_user:
+        filtros.append("u.username = ?"); params.append(filtro_user)
+    if filtro_q:
+        filtros.append("(LOWER(t.descripcion) LIKE ? OR LOWER(COALESCE(t.codigo,'')) LIKE ?)")
+        like = f"%{filtro_q.lower()}%"; params.extend([like, like])
+
     where = ("WHERE " + " AND ".join(filtros)) if filtros else ""
 
     with get_connection() as conn:
-        total_row = conn.execute(f"SELECT COUNT(*) AS cnt FROM tareas {where}", params).fetchone()
+        # KPIs globales (sin filtro)
+        kpi = conn.execute("""
+            SELECT
+                COUNT(*)                                      AS total,
+                SUM(CASE WHEN completada=1 THEN 1 ELSE 0 END) AS completadas,
+                SUM(CASE WHEN completada=0 THEN 1 ELSE 0 END) AS pendientes,
+                COUNT(DISTINCT usuario_id)                    AS n_usuarios
+            FROM tareas
+        """).fetchone()
+
+        # Total filtrado
+        total_row      = conn.execute(
+            f"SELECT COUNT(*) AS cnt FROM tareas t LEFT JOIN usuarios u ON t.usuario_id=u.id {where}", params
+        ).fetchone()
         total_filtrado = total_row["cnt"] if total_row else 0
-        total_pages = max((total_filtrado + per_page - 1) // per_page, 1)
-        page   = min(page, total_pages)
-        offset = (page - 1) * per_page
+        total_pages    = max((total_filtrado + per_page - 1) // per_page, 1)
+        page           = min(page, total_pages)
+        offset         = (page - 1) * per_page
 
         tareas = conn.execute(f"""
-            SELECT id, descripcion, categoria, fecha, completada, codigo, usuario_id
-            FROM tareas {where} ORDER BY id DESC LIMIT ? OFFSET ?
+            SELECT t.id, t.descripcion, t.categoria, t.fecha, t.completada,
+                   t.codigo, t.usuario_id, t.prioridad, t.notas,
+                   u.username
+            FROM tareas t
+            LEFT JOIN usuarios u ON t.usuario_id = u.id
+            {where}
+            ORDER BY t.completada ASC, t.prioridad ASC, t.id DESC
+            LIMIT ? OFFSET ?
         """, params + [per_page, offset]).fetchall()
 
         cats = conn.execute("""
@@ -331,9 +366,24 @@ def admin():
         """).fetchall()
         categorias_lista = [r["categoria"] for r in cats]
 
-    return render_template("admin.html", tareas=tareas, page=page, total_pages=total_pages,
-                           total=total_filtrado, categorias=categorias_lista,
-                           filtro_cat=filtro_cat, filtro_est=filtro_est)
+        usuarios_lista = conn.execute("""
+            SELECT DISTINCT u.username FROM usuarios u
+            INNER JOIN tareas t ON t.usuario_id = u.id
+            ORDER BY u.username
+        """).fetchall()
+        usuarios_nombres = [r["username"] for r in usuarios_lista]
+
+    return render_template("admin.html",
+        tareas=tareas, page=page, total_pages=total_pages,
+        total=total_filtrado, categorias=categorias_lista,
+        filtro_cat=filtro_cat, filtro_est=filtro_est,
+        filtro_user=filtro_user, filtro_q=filtro_q,
+        usuarios_nombres=usuarios_nombres,
+        kpi_total=kpi["total"] or 0,
+        kpi_completadas=kpi["completadas"] or 0,
+        kpi_pendientes=kpi["pendientes"] or 0,
+        kpi_usuarios=kpi["n_usuarios"] or 0,
+    )
 
 
 # ── GESTIÓN DE USUARIOS ────────────────────────────────────────────────────────
@@ -343,20 +393,26 @@ def admin():
 def usuarios():
     conn = get_connection()
     usuarios_lista = conn.execute("""
-        SELECT u.id, u.username, u.email, u.es_admin,
+        SELECT u.id, u.username, u.email, u.es_admin, u.perfil,
                COUNT(t.id)                                      AS total_tareas,
                SUM(CASE WHEN t.completada=1 THEN 1 ELSE 0 END) AS completadas,
                SUM(CASE WHEN t.completada=0 THEN 1 ELSE 0 END) AS pendientes
         FROM usuarios u LEFT JOIN tareas t ON t.usuario_id = u.id
-        GROUP BY u.id, u.username, u.email, u.es_admin
-        ORDER BY u.es_admin DESC, u.username
+        GROUP BY u.id, u.username, u.email, u.es_admin, u.perfil
+        ORDER BY u.perfil DESC, u.username
     """).fetchall()
     cats = conn.execute("""
         SELECT DISTINCT COALESCE(NULLIF(TRIM(categoria),''),'General') AS cat FROM tareas ORDER BY cat
     """).fetchall()
     categorias = [r["cat"] for r in cats]
     conn.close()
-    return render_template("usuarios.html", usuarios=usuarios_lista, categorias=categorias)
+    return render_template(
+        "usuarios.html",
+        usuarios=usuarios_lista,
+        categorias=categorias,
+        perfiles=PERFILES_TODOS,
+        perfil_labels=PERFIL_LABELS,
+    )
 
 
 @app.route("/usuarios/eliminar/<int:uid>", methods=["POST"])
@@ -388,18 +444,54 @@ def usuario_asignar_tarea(uid):
     return redirect("/usuarios")
 
 
-@app.route("/usuarios/toggle_admin/<int:uid>", methods=["POST"])
-@superadmin_required
-def usuario_toggle_admin(uid):
-    if uid == session["user_id"]:
-        return redirect("/usuarios")
+@app.route("/usuarios/cambiar_perfil/<int:uid>", methods=["POST"])
+@admin_required
+def usuario_cambiar_perfil(uid):
+    """Admin cambia el perfil de cualquier usuario. Solo SuperAdmin puede asignar perfil 20."""
+    from flask import jsonify
+    data         = request.get_json(force=True) or {}
+    nuevo_perfil = int(data.get("perfil", 2))
+
+    perfil_admin = session.get("perfil", 0)
+
+    # Solo SuperAdmin puede elevar a SuperAdmin (20)
+    if nuevo_perfil == 20 and perfil_admin != 20:
+        return jsonify({"ok": False, "error": "Solo el SuperAdmin puede asignar ese perfil."}), 403
+
+    perfiles_validos = [1, 2, 3, 4, 10, 20]
+    if nuevo_perfil not in perfiles_validos:
+        return jsonify({"ok": False, "error": "Perfil no válido."}), 400
+
+    # Sincronizar es_admin para compatibilidad
+    es_admin_val = 2 if nuevo_perfil == 20 else (1 if nuevo_perfil == 10 else 0)
+
     conn = get_connection()
-    conn.execute("UPDATE usuarios SET es_admin = 1 - es_admin WHERE id=?", (uid,))
-    conn.commit(); conn.close()
-    return redirect("/usuarios")
+    conn.execute(
+        "UPDATE usuarios SET perfil=?, es_admin=? WHERE id=?",
+        (nuevo_perfil, es_admin_val, uid)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
 
 
 # ── OPERACIONES TAREAS ─────────────────────────────────────────────────────────
+
+@app.route("/admin/toggle_completada/<int:tid>", methods=["POST"])
+@admin_required
+def admin_toggle_completada(tid):
+    """Toggle completada vía AJAX desde el panel admin."""
+    conn = get_connection()
+    row  = conn.execute("SELECT completada FROM tareas WHERE id=?", (tid,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"ok": False}), 404
+    nuevo = 0 if row["completada"] == 1 else 1
+    conn.execute("UPDATE tareas SET completada=? WHERE id=?", (nuevo, tid))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "completada": nuevo})
+
 
 @app.route("/completar/<int:id>")
 @login_required

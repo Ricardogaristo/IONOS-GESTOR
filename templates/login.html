@@ -197,7 +197,7 @@
 
   <h1>Bienvenido<br>de <em>vuelta.</em></h1>
   <h2>Gestor Práctico para tus tareas</h2>
-  <p class="sub">¿No tienes cuenta? <a href="{{ url_for('registro') }}">Regístrate</a></p>
+  <p class="sub">¿No tienes cuenta? <a href="{{ url_for('auth.registro') }}">Regístrate</a></p>
 
   <div class="divider"></div>
 
@@ -208,19 +208,61 @@
   <div class="alert alert-error">✖ {{ error }}</div>
   {% endif %}
 
-  <form method="POST" action="{{ url_for('login') }}">
+  <form id="login-form" method="POST" action="{{ url_for('auth.login') }}" autocomplete="off">
+
     <div class="field">
       <label>Usuario o Email</label>
-      <input type="text" name="username" placeholder="nombre o correo" required autocomplete="username">
+      <input id="f-user" type="text" name="username"
+             placeholder="nombre o correo" required
+             autocomplete="username"
+             spellcheck="false" autocorrect="off" autocapitalize="off">
     </div>
-    <div class="field">
+
+    <div class="field" style="position:relative;">
       <label>Contraseña</label>
-      <input type="password" name="password" placeholder="••••••••" required autocomplete="current-password">
+      <input id="f-pass" type="password" name="password"
+             placeholder="••••••••" required
+             autocomplete="current-password"
+             spellcheck="false">
+      <!-- Botón mostrar/ocultar contraseña -->
+      <button type="button" id="toggle-pass"
+              style="position:absolute; right:.8rem; bottom:.72rem;
+                     background:none; border:none; cursor:pointer;
+                     color:var(--ink2); font-size:.85rem; padding:0; line-height:1;"
+              onclick="togglePass()" title="Mostrar / ocultar contraseña">
+        👁
+      </button>
     </div>
-    <button type="submit" class="btn">
+
+    {% if bloqueado %}
+    <p style="font-size:.78rem; color:#f87171; margin-top:.5rem; text-align:center;">
+      ⏳ Vuelve a intentarlo en 10 minutos.
+    </p>
+    {% endif %}
+
+    <button type="submit" class="btn" id="btn-submit">
       Entrar <span class="arr">→</span>
     </button>
   </form>
+
+  <script>
+    async function sha256hex(str) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+    document.getElementById('login-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const btn  = document.getElementById('btn-submit');
+      const pass = document.getElementById('f-pass');
+      btn.disabled = true;
+      pass.value   = await sha256hex(pass.value);
+      this.submit();
+    });
+    function togglePass() {
+      const f = document.getElementById('f-pass');
+      f.type  = f.type === 'password' ? 'text' : 'password';
+    }
+  </script>
 
   <div class="foot">© 2026 Ricardo Garisto</div>
 </div>

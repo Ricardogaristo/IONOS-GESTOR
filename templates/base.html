@@ -43,6 +43,8 @@
     <div class="collapse navbar-collapse" id="navMain">
       {% set path = request.path %}
       <ul class="navbar-nav me-auto gap-1 mt-2 mt-lg-0">
+
+        {% if session.get('puede_tareas') %}
         <li class="nav-item">
           <a class="nav-link{{ ' active' if path == '/' else '' }}" href="/">
             ⊞ Tareas
@@ -53,6 +55,8 @@
             ◈ Dashboard Tareas
           </a>
         </li>
+        {% endif %}
+
         {% if session.get('es_admin', 0) == 2 %}
         <li class="nav-item">
           <a class="nav-link{{ ' active' if path == '/admin' else '' }}" href="/admin">
@@ -60,6 +64,7 @@
           </a>
         </li>
         {% endif %}
+
         {% if session.get('es_admin', 0) >= 1 %}
         <li class="nav-item">
           <a class="nav-link{{ ' active' if path == '/usuarios' else '' }}" href="/usuarios">
@@ -68,12 +73,14 @@
         </li>
         {% endif %}
 
+        {% if session.get('puede_formacion') %}
         <li class="nav-item">
           <a class="nav-link{{ ' active' if path.startswith('/formacion') else '' }}" href="/formacion">
             🎓 Formación
           </a>
         </li>
-        
+        {% endif %}
+
         {% if session.get('es_admin', 0) >= 1 %}
         <li class="nav-item">
           <a class="nav-link{{ ' active' if path == '/accesos_rapidos' else '' }}" href="/accesos_rapidos">
@@ -81,6 +88,7 @@
           </a>
         </li>
         {% endif %}
+
         {% if session.get('es_admin', 0) == 2 %}
         <li class="nav-item">
           <a class="nav-link{{ ' active' if path == '/superadmin' else '' }}" href="/superadmin">
