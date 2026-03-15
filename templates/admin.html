@@ -1,79 +1,99 @@
 {% extends "base.html" %}
-{% block title %}Admin — Gestor{% endblock %}
+{% block title %}Admin Tareas — Gestor{% endblock %}
 
 {% block content %}
 
+<!-- ══ HEADER ══════════════════════════════════════════════════════════════ -->
 <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
-  <h4 style="font-weight:700; margin:0;">⚙ Panel Admin</h4>
-  <span style="font-family:var(--mono); font-size:.78rem; color:var(--text-muted);">
-    {{ total }} tarea{{ 's' if total != 1 else '' }} encontrada{{ 's' if total != 1 else '' }}
-  </span>
-</div>
-
-<!-- ── KPI row ─────────────────────────── -->
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
-    <div class="stat-card blue">
-      <div class="stat-label">Total filtrado</div>
-      <div class="stat-value">{{ total }}</div>
+  <div>
+    <h4 style="font-weight:700; margin:0;">⚙ Panel de Tareas</h4>
+    <div style="font-size:.75rem; color:var(--text-muted); margin-top:.15rem; font-family:var(--mono);">
+      Vista global · todos los usuarios
     </div>
   </div>
+  <a href="/admin/nueva" class="btn btn-g-primary btn-sm" style="gap:.4rem;">
+    ＋ Nueva tarea
+  </a>
+</div>
+
+<!-- ══ KPI GLOBALES ════════════════════════════════════════════════════════ -->
+<div class="row g-3 mb-4">
+
+  <div class="col-6 col-md-3">
+    <div class="stat-card blue">
+      <div class="stat-label">Total tareas</div>
+      <div class="stat-value">{{ kpi_total }}</div>
+      <div style="font-size:.72rem; color:var(--text-muted);">{{ kpi_usuarios }} usuario{{ 's' if kpi_usuarios!=1 else '' }}</div>
+    </div>
+  </div>
+
   <div class="col-6 col-md-3">
     <div class="stat-card green">
       <div class="stat-label">Completadas</div>
-      <div class="stat-value" style="color:var(--accent);">
-        {{ tareas | selectattr(4, 'equalto', 1) | list | length if tareas else 0 }}
+      <div class="stat-value" style="color:var(--accent);">{{ kpi_completadas }}</div>
+      <div style="font-size:.72rem; color:var(--text-muted);">
+        {{ ((kpi_completadas / kpi_total)*100)|round(1) if kpi_total else 0 }}%
       </div>
     </div>
   </div>
+
   <div class="col-6 col-md-3">
     <div class="stat-card amber">
       <div class="stat-label">Pendientes</div>
-      <div class="stat-value" style="color:var(--amber);">
-        {{ tareas | selectattr(4, 'equalto', 0) | list | length if tareas else 0 }}
+      <div class="stat-value" style="color:var(--amber);">{{ kpi_pendientes }}</div>
+      <div style="font-size:.72rem; color:var(--text-muted);">
+        {{ ((kpi_pendientes / kpi_total)*100)|round(1) if kpi_total else 0 }}%
       </div>
     </div>
   </div>
+
   <div class="col-6 col-md-3">
     <div class="stat-card red">
-      <div class="stat-label">Página</div>
-      <div class="stat-value" style="font-size:1.5rem;">{{ page }}/{{ total_pages }}</div>
+      <div class="stat-label">Progreso global</div>
+      {% set pct_g = ((kpi_completadas / kpi_total)*100)|round(1) if kpi_total else 0 %}
+      <div class="stat-value" style="font-size:1.5rem; color:var(--accent);">{{ pct_g }}%</div>
+      <div style="margin-top:.35rem; height:5px; background:var(--bg3); border-radius:99px; overflow:hidden;">
+        <div style="height:100%; width:{{ pct_g }}%; background:var(--accent); border-radius:99px; transition:width .6s;"></div>
+      </div>
     </div>
   </div>
+
 </div>
 
-<!-- ── Filters ────────────────────────── -->
+<!-- ══ FILTROS ══════════════════════════════════════════════════════════════ -->
 <div class="gcard mb-4">
   <div class="gcard-header">
-    <span style="color:var(--text-muted)">⊟</span>
+    <span style="color:var(--text-muted);">⊟</span>
     <span class="gcard-title">Filtros</span>
+    {% if filtro_cat or filtro_est or filtro_user or filtro_q %}
+    <a href="/admin" class="badge-g ms-auto" style="cursor:pointer; color:var(--red); border-color:var(--red); background:var(--red-dim);">✕ Limpiar</a>
+    {% endif %}
   </div>
   <div class="gcard-body">
     <div class="row g-2 align-items-end">
 
-      <!-- Client-side search -->
       <div class="col-sm-6 col-md-3">
-        <label class="form-label">Búsqueda rápida</label>
+        <label class="form-label">Buscar</label>
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
-          <input type="text" id="buscador" class="form-control" placeholder="Texto libre…">
+          <input type="text" id="fil-q" class="form-control"
+                 placeholder="Descripción o código…"
+                 value="{{ filtro_q }}">
         </div>
       </div>
 
-      <!-- State filter (server) -->
       <div class="col-sm-6 col-md-2">
         <label class="form-label">Estado</label>
-        <select id="sel-estado" class="form-select">
+        <select id="fil-estado" class="form-select">
           <option value="">Todos</option>
-          <option value="Completada" {% if filtro_est=='Completada' %}selected{% endif %}>Completada</option>
           <option value="Pendiente"  {% if filtro_est=='Pendiente'  %}selected{% endif %}>Pendiente</option>
+          <option value="Completada" {% if filtro_est=='Completada' %}selected{% endif %}>Completada</option>
         </select>
       </div>
 
-      <!-- Category filter (server) -->
-      <div class="col-sm-6 col-md-3">
+      <div class="col-sm-6 col-md-2">
         <label class="form-label">Categoría</label>
-        <select id="sel-cat" class="form-select">
+        <select id="fil-cat" class="form-select">
           <option value="">Todas</option>
           {% for cat in categorias %}
           <option value="{{ cat }}" {% if filtro_cat==cat %}selected{% endif %}>{{ cat }}</option>
@@ -81,180 +101,319 @@
         </select>
       </div>
 
-      <!-- Code filter (client) -->
       <div class="col-sm-6 col-md-2">
-        <label class="form-label">Código</label>
-        <input type="text" id="fil-codigo" class="form-control" placeholder="Filtrar…">
+        <label class="form-label">Usuario</label>
+        <select id="fil-user" class="form-select">
+          <option value="">Todos</option>
+          {% for u in usuarios_nombres %}
+          <option value="{{ u }}" {% if filtro_user==u %}selected{% endif %}>{{ u }}</option>
+          {% endfor %}
+        </select>
       </div>
 
-      <div class="col-md-2 d-flex gap-2">
-        <button onclick="applyServerFilters()" class="btn btn-g-primary flex-fill">Filtrar</button>
+      <div class="col-md-3 d-flex gap-2">
+        <button onclick="filtrar()" class="btn btn-g-primary flex-fill">Filtrar</button>
         <a href="/admin" class="btn btn-g-ghost">✕</a>
       </div>
+
     </div>
   </div>
 </div>
 
-<!-- ── Table ──────────────────────────── -->
+<!-- ══ LISTA DE TAREAS ══════════════════════════════════════════════════════ -->
 <div class="gcard">
+  <div class="gcard-header">
+    <span style="color:var(--blue);">☰</span>
+    <span class="gcard-title">Tareas</span>
+    <span style="margin-left:auto; font-family:var(--mono); font-size:.72rem; color:var(--text-muted);">
+      {{ total }} resultado{{ 's' if total!=1 else '' }}
+    </span>
+  </div>
+
   <div class="gcard-body p-0">
-    <div class="table-responsive">
-      <table class="gtable">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Código</th>
-            <th>Descripción</th>
-            <th>Categoría</th>
-            <th>Fecha</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for t in tareas %}
-          {#
-            t[0]=id  t[1]=descripcion  t[2]=categoria
-            t[3]=fecha  t[4]=completada  t[5]=codigo  t[6]=usuario_id
-          #}
-          <tr class="{{ 'row-done' if t[4]==1 else '' }}"
-              data-search="{{ t[0] }} {{ (t[5] or '') }} {{ t[1] }} {{ (t[2] or '') }}"
-              data-codigo="{{ (t[5] or '') | lower }}">
 
-            <td data-label="ID" style="font-family:var(--mono); font-size:.75rem; color:var(--text-muted);">
-              #{{ t[0] }}
-            </td>
-            <td data-label="Código" style="font-family:var(--mono); font-size:.78rem; color:var(--text-muted);">
-              {{ t[5] if t[5] else '—' }}
-            </td>
-            <td data-label="Descripción">
-              <span class=""
-                    data-real="{{ t[1] | e }}"
-                    onclick="revealPriv(event, this)"
-                    title="Clic para revelar">{{ t[1] }}</span>
-            </td>
-            <td data-label="Categoría">
-              <span class="badge-g badge-cat">{{ t[2] if t[2] else 'General' }}</span>
-            </td>
-            <td data-label="Fecha" style="font-family:var(--mono); font-size:.78rem; white-space:nowrap;">
-              {{ t[3] if t[3] else '—' }}
-            </td>
-            <td data-label="Estado">
-              {% if t[4]==1 %}
-                <span class="badge-g badge-done">✔ Completada</span>
-              {% else %}
-                <span class="badge-g badge-pending">● Pendiente</span>
-              {% endif %}
-            </td>
-            <td data-label="Acciones" style="white-space:nowrap;">
-              {% if t[4]==0 %}
-                <a href="/completar/{{ t[0] }}" class="btn btn-g-success btn-sm">✔</a>
-              {% else %}
-                <span class="btn btn-g-ghost btn-sm" style="cursor:default; opacity:.4;">✔</span>
-              {% endif %}
-              <a href="/editar/{{ t[0] }}" class="btn btn-g-warning btn-sm">✏</a>
-              <a href="/eliminar/{{ t[0] }}" class="btn btn-g-danger btn-sm"
-                 onclick="return confirm('¿Eliminar esta tarea?')">🗑</a>
-            </td>
-          </tr>
+    {% if tareas %}
+    <div class="task-admin-list">
+      {% for t in tareas %}
+      {% set done = t["completada"] == 1 %}
+      {% set prio_color = 'var(--red)' if t["prioridad"]==1 else ('var(--amber)' if t["prioridad"]==2 else 'var(--accent)') %}
+      {% set prio_label = '🔴' if t["prioridad"]==1 else ('🟡' if t["prioridad"]==2 else '🟢') %}
+
+      <div class="task-admin-row {{ 'task-done' if done else '' }}" id="row-{{ t['id'] }}">
+
+        <!-- Checkbox -->
+        <label class="task-checkbox-wrap" title="{{ 'Marcar pendiente' if done else 'Marcar completada' }}">
+          <input type="checkbox" class="task-check"
+                 data-id="{{ t['id'] }}"
+                 {{ 'checked' if done else '' }}>
+          <span class="task-checkmark">
+            <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <polyline points="2,7 6,11 12,3" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </label>
+
+        <!-- Prioridad stripe -->
+        <div class="task-prio-stripe" style="background:{{ prio_color }};"></div>
+
+        <!-- Contenido principal -->
+        <div class="task-main">
+          <div class="task-desc {{ 'text-muted-strike' if done else '' }}">
+            {{ t["descripcion"] }}
+          </div>
+          <div class="task-meta">
+            {% if t["codigo"] %}
+            <span class="meta-chip mono">{{ t["codigo"] }}</span>
+            {% endif %}
+            <span class="meta-chip">
+              {{ t["categoria"] or "General" }}
+            </span>
+            {% if t["fecha"] %}
+            <span class="meta-chip mono">📅 {{ t["fecha"] }}</span>
+            {% endif %}
+            <span class="meta-chip user-chip">
+              👤 {{ t["username"] or "—" }}
+            </span>
+            <span class="meta-chip" style="color:{{ prio_color }}; border-color:{{ prio_color }}; background:transparent;">
+              {{ prio_label }} {{ 'Alta' if t["prioridad"]==1 else ('Media' if t["prioridad"]==2 else 'Baja') }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Estado badge -->
+        <div class="task-status-col">
+          {% if done %}
+          <span class="badge-g badge-done" id="badge-{{ t['id'] }}">✔ Hecha</span>
           {% else %}
-          <tr>
-            <td colspan="7" style="text-align:center; padding:3rem; color:var(--text-muted);">
-              <div style="font-size:1.8rem; margin-bottom:.5rem;">🔍</div>
-              No hay tareas con los filtros seleccionados.
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+          <span class="badge-g badge-pending" id="badge-{{ t['id'] }}">● Pendiente</span>
+          {% endif %}
+        </div>
 
-      <div id="no-results" style="display:none; text-align:center; padding:2.5rem; color:var(--text-muted);">
-        <div style="font-size:1.8rem; margin-bottom:.5rem;">🔍</div>
-        Sin resultados para la búsqueda.
+        <!-- Acciones -->
+        <div class="task-actions">
+          <a href="/editar/{{ t['id'] }}" class="btn btn-g-warning btn-sm" title="Editar">✏</a>
+          <a href="/eliminar/{{ t['id'] }}" class="btn btn-g-danger btn-sm" title="Eliminar"
+             onclick="return confirm('¿Eliminar esta tarea?')">🗑</a>
+        </div>
+
       </div>
+      {% endfor %}
     </div>
 
-    <!-- Pagination -->
+    {% else %}
+    <div style="text-align:center; padding:4rem; color:var(--text-muted);">
+      <div style="font-size:2.5rem; margin-bottom:.75rem;">🔍</div>
+      <div style="font-size:.9rem;">No hay tareas con los filtros seleccionados.</div>
+    </div>
+    {% endif %}
+
+    <!-- Paginación -->
     {% if total_pages > 1 %}
-    <div class="py-3 px-3 border-top" style="border-color:var(--border)!important;">
+    <div class="py-3 px-3" style="border-top:1px solid var(--border);">
       <ul class="gpagination">
         <li class="{{ 'disabled' if page<=1 else '' }}">
-          <a class="gpage-link" href="?page={{ page-1 }}&categoria={{ filtro_cat }}&estado={{ filtro_est }}">← Ant</a>
+          <a class="gpage-link" href="?page={{ page-1 }}&categoria={{ filtro_cat }}&estado={{ filtro_est }}&usuario={{ filtro_user }}&q={{ filtro_q }}">← Ant</a>
         </li>
         {% for p in range(1, total_pages+1) %}
+        {% if p == page or p <= 2 or p >= total_pages-1 or (p >= page-1 and p <= page+1) %}
         <li class="{{ 'active' if p==page else '' }}">
-          <a class="gpage-link" href="?page={{ p }}&categoria={{ filtro_cat }}&estado={{ filtro_est }}">{{ p }}</a>
+          <a class="gpage-link" href="?page={{ p }}&categoria={{ filtro_cat }}&estado={{ filtro_est }}&usuario={{ filtro_user }}&q={{ filtro_q }}">{{ p }}</a>
         </li>
+        {% elif p == 3 or p == total_pages-2 %}
+        <li><span class="gpage-link" style="opacity:.4;">…</span></li>
+        {% endif %}
         {% endfor %}
         <li class="{{ 'disabled' if page>=total_pages else '' }}">
-          <a class="gpage-link" href="?page={{ page+1 }}&categoria={{ filtro_cat }}&estado={{ filtro_est }}">Sig →</a>
+          <a class="gpage-link" href="?page={{ page+1 }}&categoria={{ filtro_cat }}&estado={{ filtro_est }}&usuario={{ filtro_user }}&q={{ filtro_q }}">Sig →</a>
         </li>
       </ul>
     </div>
     {% endif %}
+
   </div>
 </div>
+
+<!-- ══ ESTILOS ══════════════════════════════════════════════════════════════ -->
+<style>
+/* Lista de tareas admin */
+.task-admin-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.task-admin-row {
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  padding: .85rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+  transition: background .15s;
+  position: relative;
+}
+.task-admin-row:last-child { border-bottom: none; }
+.task-admin-row:hover { background: var(--bg2, rgba(255,255,255,.02)); }
+.task-admin-row.task-done { opacity: .55; }
+
+/* Checkbox visual */
+.task-checkbox-wrap {
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.task-checkbox-wrap input[type=checkbox] {
+  position: absolute;
+  opacity: 0;
+  width: 0; height: 0;
+}
+.task-checkmark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 22px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  transition: all .15s;
+  color: transparent;
+}
+.task-checkmark svg { width: 13px; height: 13px; }
+.task-checkbox-wrap input:checked + .task-checkmark {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.task-checkbox-wrap:hover .task-checkmark {
+  border-color: var(--accent);
+}
+
+/* Barra de prioridad */
+.task-prio-stripe {
+  width: 3px;
+  height: 36px;
+  border-radius: 99px;
+  flex-shrink: 0;
+  opacity: .7;
+}
+
+/* Contenido */
+.task-main {
+  flex: 1;
+  min-width: 0;
+}
+.task-desc {
+  font-size: .88rem;
+  font-weight: 500;
+  color: var(--text, var(--ink));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: .3rem;
+}
+.text-muted-strike {
+  text-decoration: line-through;
+  color: var(--text-muted) !important;
+}
+.task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+  align-items: center;
+}
+.meta-chip {
+  font-size: .67rem;
+  padding: .15rem .45rem;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  background: var(--bg3, var(--surface));
+  white-space: nowrap;
+}
+.meta-chip.mono { font-family: var(--mono); }
+.user-chip { color: var(--blue) !important; border-color: var(--blue) !important; background: var(--blue-dim) !important; }
+
+/* Status y acciones */
+.task-status-col { flex-shrink: 0; min-width: 90px; }
+.task-actions {
+  display: flex;
+  gap: .3rem;
+  flex-shrink: 0;
+}
+
+/* Animación de toggle */
+@keyframes check-pop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+.check-animate { animation: check-pop .2s ease; }
+
+@media (max-width: 640px) {
+  .task-status-col { display: none; }
+  .task-admin-row { padding: .7rem .75rem; gap: .6rem; }
+  .task-desc { font-size: .82rem; }
+}
+</style>
 
 {% endblock %}
 
 {% block scripts %}
-<style>
-.priv-field {
-  filter: blur(4px);
-  transition: filter .2s ease;
-  cursor: pointer;
-  user-select: none;
-}
-.priv-field.revealed {
-  filter: none;
-  cursor: default;
-}
-</style>
 <script>
-  window.revealPriv = function (e, el) {
-    e.stopPropagation();
-    if (el.classList.contains('revealed')) return;
-    const real = el.dataset.real || '';
-    if (real) el.textContent = real;
-    el.classList.add('revealed');
-    el.title = '';
-    setTimeout(() => {
-      el.classList.remove('revealed');
-      if (real) el.textContent = real;
-      el.title = 'Clic para revelar';
-    }, 10000);
-  };
+// ── Filtros servidor ──────────────────────────────────────────────────────
+function filtrar() {
+  const url = new URL(window.location.href);
+  const q      = document.getElementById('fil-q').value.trim();
+  const estado = document.getElementById('fil-estado').value;
+  const cat    = document.getElementById('fil-cat').value;
+  const user   = document.getElementById('fil-user').value;
+  q      ? url.searchParams.set('q',         q)      : url.searchParams.delete('q');
+  estado ? url.searchParams.set('estado',    estado) : url.searchParams.delete('estado');
+  cat    ? url.searchParams.set('categoria', cat)    : url.searchParams.delete('categoria');
+  user   ? url.searchParams.set('usuario',   user)   : url.searchParams.delete('usuario');
+  url.searchParams.set('page', 1);
+  window.location.href = url.toString();
+}
+// Filtrar al cambiar selects
+['fil-estado','fil-cat','fil-user'].forEach(id =>
+  document.getElementById(id)?.addEventListener('change', filtrar)
+);
+// Filtrar con Enter en el buscador
+document.getElementById('fil-q')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') filtrar();
+});
 
-  // ── Server-side filter (category + state) ──
-  function applyServerFilters(){
-    const estado = document.getElementById('sel-estado').value;
-    const cat    = document.getElementById('sel-cat').value;
-    const url    = new URL(window.location.href);
-    estado ? url.searchParams.set('estado', estado) : url.searchParams.delete('estado');
-    cat    ? url.searchParams.set('categoria', cat)  : url.searchParams.delete('categoria');
-    url.searchParams.set('page', 1);
-    window.location.href = url.toString();
-  }
-  // Trigger on select change too
-  document.getElementById('sel-estado').addEventListener('change', applyServerFilters);
-  document.getElementById('sel-cat').addEventListener('change', applyServerFilters);
+// ── Toggle completada via AJAX ────────────────────────────────────────────
+document.querySelectorAll('.task-check').forEach(cb => {
+  cb.addEventListener('change', async function () {
+    const id      = this.dataset.id;
+    const row     = document.getElementById('row-' + id);
+    const badge   = document.getElementById('badge-' + id);
+    const check   = this.nextElementSibling; // .task-checkmark
 
-  // ── Client-side search (text + code) ──
-  function clientFilter(){
-    const q    = document.getElementById('buscador').value.toLowerCase().trim();
-    const cod  = document.getElementById('fil-codigo').value.toLowerCase().trim();
-    const rows = document.querySelectorAll('tbody tr[data-search]');
-    let vis = 0;
-    rows.forEach(tr => {
-      const matchQ   = !q   || tr.dataset.search.toLowerCase().includes(q);
-      const matchCod = !cod || tr.dataset.codigo.includes(cod);
-      const show = matchQ && matchCod;
-      tr.style.display = show ? '' : 'none';
-      if(show) vis++;
-    });
-    document.getElementById('no-results').style.display = (vis===0 && (q||cod)) ? '' : 'none';
-  }
-  document.getElementById('buscador').addEventListener('input', clientFilter);
-  document.getElementById('fil-codigo').addEventListener('input', clientFilter);
+    try {
+      const res  = await fetch(`/admin/toggle_completada/${id}`, { method: 'POST' });
+      const data = await res.json();
+      if (!data.ok) { this.checked = !this.checked; return; }
+
+      // Animación
+      check.classList.add('check-animate');
+      setTimeout(() => check.classList.remove('check-animate'), 200);
+
+      if (data.completada === 1) {
+        row.classList.add('task-done');
+        row.querySelector('.task-desc').classList.add('text-muted-strike');
+        badge.className = 'badge-g badge-done';
+        badge.textContent = '✔ Hecha';
+      } else {
+        row.classList.remove('task-done');
+        row.querySelector('.task-desc').classList.remove('text-muted-strike');
+        badge.className = 'badge-g badge-pending';
+        badge.textContent = '● Pendiente';
+      }
+    } catch(e) {
+      this.checked = !this.checked; // revert si error
+    }
+  });
+});
 </script>
 {% endblock %}

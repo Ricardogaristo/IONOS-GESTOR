@@ -16,7 +16,7 @@
 <!-- ── KPI strip ───────────────────────────────────────────────────────── -->
 <div class="row g-3 mb-4">
   {% set total_u   = usuarios | length %}
-  {% set admins    = usuarios | selectattr('es_admin', 'equalto', 1) | list | length %}
+  {% set admins    = usuarios | selectattr('perfil', 'ge', 10) | list | length %}
   {% set normales  = total_u - admins %}
   {% set total_t   = usuarios | sum(attribute='total_tareas') %}
   {% set total_p   = usuarios | sum(attribute='pendientes') %}
@@ -73,7 +73,7 @@
           <tr>
             <th>Usuario</th>
             <th>Email</th>
-            <th>Rol</th>
+            <th>Perfil</th>
             <th>Tareas</th>
             <th>Progreso</th>
             <th>Acciones</th>
@@ -82,6 +82,7 @@
         <tbody>
           {% for u in usuarios %}
           {% set pct_u = ((u.completadas / u.total_tareas) * 100) | round(1) if u.total_tareas > 0 else 0 %}
+          {% set p = u.perfil if u.perfil is defined else 2 %}
           <tr data-search="{{ u.username }} {{ u.email or '' }}">
 
             <td style="font-weight:700;">
@@ -100,11 +101,20 @@
               {{ u.email or '—' }}
             </td>
 
+            <!-- ── Columna Perfil ── -->
             <td>
-              {% if u.es_admin == 1 %}
-                <span class="badge-g" style="background:var(--amber-dim); border-color:var(--amber); color:var(--amber);">⚙ Admin</span>
+              {% if p == 20 %}
+                <span class="badge-perfil badge-superadmin">👑 SuperAdmin</span>
+              {% elif p == 10 %}
+                <span class="badge-perfil badge-admin">⚙ Admin</span>
+              {% elif p == 4 %}
+                <span class="badge-perfil badge-coord">🏢 Coordinador</span>
+              {% elif p == 3 %}
+                <span class="badge-perfil badge-ft">🎓✅ Form+Tareas</span>
+              {% elif p == 1 %}
+                <span class="badge-perfil badge-form">🎓 Formador</span>
               {% else %}
-                <span class="badge-g" style="background:var(--bg3); border-color:var(--border); color:var(--text-muted);">👤 Usuario</span>
+                <span class="badge-perfil badge-tareas">✅ Tareas</span>
               {% endif %}
             </td>
 
@@ -134,18 +144,22 @@
                 ＋ Tarea
               </button>
 
-              <!-- Toggle admin (no sobre sí mismo) -->
               {% if u.id != session.get('user_id') %}
-              <form method="POST" action="/usuarios/toggle_admin/{{ u.id }}"
-                    style="display:inline;"
-                    onsubmit="return confirm('{{ '¿Quitar permisos de admin a ' if u.es_admin==1 else '¿Dar permisos de admin a ' }}{{ u.username }}?')">
-                <button type="submit" class="btn btn-g-warning btn-sm"
-                        title="{{ 'Quitar admin' if u.es_admin==1 else 'Hacer admin' }}">
-                  {{ '▽ Admin' if u.es_admin==1 else '△ Admin' }}
-                </button>
-              </form>
+              <!-- Cambiar perfil -->
+              <button type="button" class="btn btn-g-warning btn-sm"
+                      onclick="abrirCambiarPerfil({{ u.id }}, '{{ u.username }}', {{ p }})"
+                      title="Cambiar perfil de {{ u.username }}">
+                ✎ Perfil
+              </button>
 
-              <!-- Eliminar (no sobre sí mismo) -->
+              <!-- Cambiar contraseña -->
+              <button type="button" class="btn btn-g-ghost btn-sm"
+                      onclick="abrirCambiarPassword({{ u.id }}, '{{ u.username }}')"
+                      title="Cambiar contraseña de {{ u.username }}">
+                🔑
+              </button>
+
+              <!-- Eliminar -->
               <form method="POST" action="/usuarios/eliminar/{{ u.id }}"
                     style="display:inline;"
                     onsubmit="return confirm('¿Eliminar a {{ u.username }}? Se borrarán también todas sus tareas.')">
@@ -234,6 +248,173 @@
   </div>
 </div>
 
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     MODAL — Cambiar perfil de usuario
+══════════════════════════════════════════════════════════════════════ -->
+<div id="modal-perfil" class="modal-overlay" style="display:none;" onclick="cerrarModalPerfil(event)">
+  <div class="modal-box" style="max-width:400px;">
+    <div class="modal-header">
+      <span>✎ Cambiar perfil —</span>
+      <span id="perfil-username" style="color:var(--accent); font-weight:700;"></span>
+      <button type="button" class="modal-close" onclick="cerrarModalPerfilBtn()">×</button>
+    </div>
+    <div class="modal-body">
+
+      <p style="font-size:.8rem; color:var(--text-muted); margin-bottom:1.1rem;">
+        Selecciona el nuevo perfil de acceso para este usuario.
+      </p>
+
+      <div id="perfil-opciones" style="display:flex; flex-direction:column; gap:.5rem;">
+
+        <label class="perfil-radio-row" data-val="1">
+          <input type="radio" name="nuevo_perfil" value="1" style="display:none;">
+          <span class="p-ico">🎓</span>
+          <span class="p-info">
+            <span class="p-nombre">Formador</span>
+            <span class="p-desc">Solo accede a la sección de Formación.</span>
+          </span>
+          <span class="p-check">✓</span>
+        </label>
+
+        <label class="perfil-radio-row" data-val="2">
+          <input type="radio" name="nuevo_perfil" value="2" style="display:none;">
+          <span class="p-ico">✅</span>
+          <span class="p-info">
+            <span class="p-nombre">Tareas</span>
+            <span class="p-desc">Solo accede a la sección de Tareas.</span>
+          </span>
+          <span class="p-check">✓</span>
+        </label>
+
+        <label class="perfil-radio-row" data-val="3">
+          <input type="radio" name="nuevo_perfil" value="3" style="display:none;">
+          <span class="p-ico">🎓✅</span>
+          <span class="p-info">
+            <span class="p-nombre">Formador y Tareas</span>
+            <span class="p-desc">Accede a Formación y a Tareas.</span>
+          </span>
+          <span class="p-check">✓</span>
+        </label>
+
+        <label class="perfil-radio-row" data-val="4">
+          <input type="radio" name="nuevo_perfil" value="4" style="display:none;">
+          <span class="p-ico">🏢</span>
+          <span class="p-info">
+            <span class="p-nombre">Coordinador</span>
+            <span class="p-desc">Tareas con visión de equipo.</span>
+          </span>
+          <span class="p-check">✓</span>
+        </label>
+
+        <label class="perfil-radio-row" data-val="10">
+          <input type="radio" name="nuevo_perfil" value="10" style="display:none;">
+          <span class="p-ico">⚙</span>
+          <span class="p-info">
+            <span class="p-nombre">Admin</span>
+            <span class="p-desc">Gestión de usuarios, tareas y formación.</span>
+          </span>
+          <span class="p-check">✓</span>
+        </label>
+
+        {% if session.get('es_admin') == 2 %}
+        <label class="perfil-radio-row" data-val="20">
+          <input type="radio" name="nuevo_perfil" value="20" style="display:none;">
+          <span class="p-ico">👑</span>
+          <span class="p-info">
+            <span class="p-nombre">SuperAdmin</span>
+            <span class="p-desc">Acceso total y gráficos globales.</span>
+          </span>
+          <span class="p-check">✓</span>
+        </label>
+        {% endif %}
+
+      </div>
+
+      <button type="button" class="btn btn-g-primary w-100 mt-3"
+              onclick="guardarPerfil()" style="justify-content:center;">
+        💾 Guardar perfil
+      </button>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── Estilos badges perfil + modal ──────────────────────────────────── -->
+<style>
+.badge-perfil {
+  display: inline-flex; align-items: center; gap: .25rem;
+  font-size: .68rem; font-weight: 600;
+  padding: .22rem .55rem; border-radius: 6px;
+  border: 1px solid transparent; white-space: nowrap;
+}
+.badge-superadmin { background:rgba(168,85,247,.15); border-color:rgba(168,85,247,.4); color:#c084fc; }
+.badge-admin      { background:var(--amber-dim);     border-color:var(--amber);        color:var(--amber); }
+.badge-coord      { background:rgba(59,130,246,.12); border-color:rgba(59,130,246,.4); color:#60a5fa; }
+.badge-ft         { background:rgba(20,184,166,.12); border-color:rgba(20,184,166,.4); color:#2dd4bf; }
+.badge-form       { background:rgba(99,102,241,.12); border-color:rgba(99,102,241,.4); color:#a5b4fc; }
+.badge-tareas     { background:var(--bg3); border-color:var(--border); color:var(--text-muted); }
+
+.perfil-radio-row {
+  display:flex; align-items:center; gap:.7rem;
+  padding:.65rem .85rem;
+  border:1px solid var(--border); border-radius:10px;
+  background:var(--bg2, var(--surface));
+  cursor:pointer;
+  transition:border-color .15s, background .15s;
+  user-select:none;
+}
+.perfil-radio-row:hover    { border-color:var(--accent); background:var(--accent-dim,rgba(230,161,90,.07)); }
+.perfil-radio-row.selected { border-color:var(--accent); background:var(--accent-dim,rgba(230,161,90,.1)); }
+.p-ico   { font-size:1.2rem; min-width:1.6rem; text-align:center; }
+.p-info  { display:flex; flex-direction:column; flex:1; }
+.p-nombre { font-size:.85rem; font-weight:600; color:var(--text,var(--ink)); }
+.p-desc   { font-size:.72rem; color:var(--text-muted); }
+.p-check  { font-size:.9rem; color:var(--accent); opacity:0; transition:opacity .15s; min-width:1rem; }
+.perfil-radio-row.selected .p-check { opacity:1; }
+</style>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     MODAL — Cambiar contraseña de usuario
+══════════════════════════════════════════════════════════════════════ -->
+<div id="modal-password" class="modal-overlay" style="display:none;" onclick="cerrarModalPasswordOverlay(event)">
+  <div class="modal-box" style="max-width:380px;">
+    <div class="modal-header">
+      <span>🔑 Cambiar contraseña —</span>
+      <span id="pw-username" style="color:var(--accent); font-weight:700;"></span>
+      <button type="button" class="modal-close" onclick="cerrarModalPassword()">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.8rem; color:var(--text-muted); margin-bottom:1.1rem;">
+        La nueva contraseña se aplicará inmediatamente.
+      </p>
+
+      <div class="field" style="margin-bottom:.9rem;">
+        <label style="font-size:.67rem; font-weight:500; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); display:block; margin-bottom:.35rem;">
+          Nueva contraseña
+        </label>
+        <div style="position:relative;">
+          <input id="pw-nueva" type="password" class="form-control"
+                 placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+          <button type="button" onclick="togglePwNueva()"
+                  style="position:absolute; right:.75rem; top:50%; transform:translateY(-50%);
+                         background:none; border:none; cursor:pointer; color:var(--text-muted); padding:0; font-size:.85rem;">
+            👁
+          </button>
+        </div>
+      </div>
+
+      <div id="pw-error" style="display:none; font-size:.78rem; color:var(--red); margin-bottom:.75rem;"></div>
+      <div id="pw-ok"    style="display:none; font-size:.78rem; color:var(--accent); margin-bottom:.75rem;">✔ Contraseña actualizada correctamente.</div>
+
+      <button type="button" class="btn btn-g-primary w-100"
+              onclick="guardarPassword()" style="justify-content:center;">
+        💾 Guardar contraseña
+      </button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -251,20 +432,150 @@ function abrirAsignar(uid, username) {
   document.getElementById('modal-username').textContent = username;
   document.getElementById('form-asignar').action = '/usuarios/asignar_tarea/' + uid;
   document.getElementById('modal-asignar').style.display = 'flex';
-  // Focus en descripción
   setTimeout(() => document.querySelector('#form-asignar [name=descripcion]').focus(), 80);
 }
-
 function cerrarModalBtn() {
   document.getElementById('modal-asignar').style.display = 'none';
 }
-
 function cerrarModal(e) {
   if (e.target.id === 'modal-asignar') cerrarModalBtn();
 }
 
+// ── Modal cambiar perfil ───────────────────────────────────────────────────
+let _perfilUid = null;
+
+function abrirCambiarPerfil(uid, username, perfilActual) {
+  _perfilUid = uid;
+  document.getElementById('perfil-username').textContent = username;
+
+  // Marcar opción actual
+  document.querySelectorAll('.perfil-radio-row').forEach(row => {
+    const val = parseInt(row.dataset.val);
+    const radio = row.querySelector('input[type=radio]');
+    if (val === perfilActual) {
+      row.classList.add('selected');
+      radio.checked = true;
+    } else {
+      row.classList.remove('selected');
+      radio.checked = false;
+    }
+    // Click handler
+    row.onclick = () => {
+      document.querySelectorAll('.perfil-radio-row').forEach(r => r.classList.remove('selected'));
+      row.classList.add('selected');
+      radio.checked = true;
+    };
+  });
+
+  document.getElementById('modal-perfil').style.display = 'flex';
+}
+
+function cerrarModalPerfilBtn() {
+  document.getElementById('modal-perfil').style.display = 'none';
+  _perfilUid = null;
+}
+function cerrarModalPerfil(e) {
+  if (e.target.id === 'modal-perfil') cerrarModalPerfilBtn();
+}
+
+async function guardarPerfil() {
+  const selected = document.querySelector('.perfil-radio-row.selected input');
+  if (!selected || !_perfilUid) return;
+  const nuevoPerfil = parseInt(selected.value);
+
+  try {
+    const res = await fetch(`/usuarios/cambiar_perfil/${_perfilUid}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ perfil: nuevoPerfil })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      cerrarModalPerfilBtn();
+      location.reload();
+    } else {
+      alert('Error: ' + (data.error || 'No se pudo cambiar el perfil.'));
+    }
+  } catch (err) {
+    alert('Error de conexión.');
+  }
+}
+
+// ── Cerrar con Escape ──────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') cerrarModalBtn();
+  if (e.key === 'Escape') {
+    cerrarModalBtn();
+    cerrarModalPerfilBtn();
+    cerrarModalPassword();
+  }
 });
+
+// ── Modal cambiar contraseña ───────────────────────────────────────────────
+let _pwUid = null;
+
+async function sha256hex(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function abrirCambiarPassword(uid, username) {
+  _pwUid = uid;
+  document.getElementById('pw-username').textContent = username;
+  document.getElementById('pw-nueva').value = '';
+  document.getElementById('pw-error').style.display = 'none';
+  document.getElementById('pw-ok').style.display    = 'none';
+  document.getElementById('modal-password').style.display = 'flex';
+  setTimeout(() => document.getElementById('pw-nueva').focus(), 80);
+}
+
+function cerrarModalPassword() {
+  document.getElementById('modal-password').style.display = 'none';
+  _pwUid = null;
+}
+function cerrarModalPasswordOverlay(e) {
+  if (e.target.id === 'modal-password') cerrarModalPassword();
+}
+
+function togglePwNueva() {
+  const f = document.getElementById('pw-nueva');
+  f.type  = f.type === 'password' ? 'text' : 'password';
+}
+
+async function guardarPassword() {
+  const nueva    = document.getElementById('pw-nueva').value;
+  const errEl    = document.getElementById('pw-error');
+  const okEl     = document.getElementById('pw-ok');
+  errEl.style.display = 'none';
+  okEl.style.display  = 'none';
+
+  if (!nueva || nueva.length < 6) {
+    errEl.textContent    = 'La contraseña debe tener al menos 6 caracteres.';
+    errEl.style.display  = 'block';
+    return;
+  }
+
+  // Hashear antes de enviar
+  const sha = await sha256hex(nueva);
+
+  try {
+    const res  = await fetch(`/usuarios/cambiar_password/${_pwUid}`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ nueva: sha })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      okEl.style.display  = 'block';
+      document.getElementById('pw-nueva').value = '';
+      setTimeout(() => cerrarModalPassword(), 1500);
+    } else {
+      errEl.textContent   = data.error || 'No se pudo cambiar la contraseña.';
+      errEl.style.display = 'block';
+    }
+  } catch(e) {
+    errEl.textContent   = 'Error de conexión.';
+    errEl.style.display = 'block';
+  }
+}
 </script>
 {% endblock %}
