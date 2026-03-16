@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E3A5F"/>
+      <stop offset="100%" style="stop-color:#2D6A9F"/>
+    </linearGradient>
+    <linearGradient id="cap" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F5C842"/>
+      <stop offset="100%" style="stop-color:#E8A020"/>
+    </linearGradient>
+  </defs>
+  <!-- Fondo redondeado -->
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <!-- Birrete - ala -->
+  <polygon points="32,14 56,26 32,36 8,26" fill="url(#cap)"/>
+  <!-- Birrete - cuerpo cúbico -->
+  <polygon points="32,36 48,29 48,42 32,50" fill="#C8881A"/>
+  <polygon points="32,36 16,29 16,42 32,50" fill="#E8A020"/>
+  <!-- Cordón del birrete -->
+  <line x1="56" y1="26" x2="56" y2="36" stroke="#F5C842" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="56" cy="38" r="3" fill="#F5C842"/>
+  <!-- Barra de progreso -->
+  <rect x="12" y="55" width="40" height="4" rx="2" fill="rgba(255,255,255,0.15)"/>
+  <rect x="12" y="55" width="28" height="4" rx="2" fill="#2D9D78"/>
+</svg>
