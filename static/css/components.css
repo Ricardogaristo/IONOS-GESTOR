@@ -434,7 +434,7 @@
        LIGHT MODE
     ══════════════════════════════════════ */
     body.light {
-      --bg:          #d7d7d7;
+      --bg:          #ffffff;
       --bg2:         #ffffff;
       --bg3:         #f0f2f5;
       --border:      #d0d7de;
