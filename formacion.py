@@ -30,7 +30,7 @@ def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if "user_id" not in session:
-            return redirect(url_for("login"))
+            return redirect(url_for("auth.login"))
         return f(*args, **kwargs)
     return decorated
 
@@ -598,6 +598,17 @@ def formacion():
             try:
                 fecha_import = datetime.now().strftime("%Y-%m-%d")
 
+                # ── Leer el archivo a memoria de inmediato ─────────────────
+                # (evita [Errno 5] por ficheros temporales cerrados en Windows)
+                try:
+                    arch.stream.seek(0)
+                    arch_bytes = arch.stream.read()
+                except Exception:
+                    arch_bytes = arch.read()
+                if not arch_bytes:
+                    errores.append("El archivo subido está vacío o no se pudo leer.")
+                    raise ValueError("empty")
+
                 # ── normalización ──────────────────────────────────────────
                 def norm(s):
                     return ''.join(c for c in unicodedata.normalize('NFD', str(s))
@@ -612,7 +623,7 @@ def formacion():
                     return None
 
                 # ── Único Excel: todas las columnas en una sola hoja ─────
-                wb2  = openpyxl.load_workbook(io.BytesIO(arch.read()), data_only=True)
+                wb2  = openpyxl.load_workbook(io.BytesIO(arch_bytes), data_only=True)
                 ws2  = wb2.active
                 hn2  = [norm(c.value) if c.value else "" for c in next(ws2.iter_rows(min_row=1, max_row=1))]
                 i2_c  = get_col(hn2, ["del curso","curso","materia","asignatura"])
@@ -1764,8 +1775,11 @@ def importar_telefonos():
         return jsonify({"error": "No se recibió ningún archivo."}), 400
     if not arch.filename.lower().endswith((".xlsx", ".xls")):
         return jsonify({"error": "El archivo debe ser .xlsx o .xls"}), 400
-    arch.seek(0)
-    datos = arch.read()
+    try:
+        arch.stream.seek(0)
+        datos = arch.stream.read()
+    except Exception:
+        datos = arch.read()
     if len(datos) < 100:
         return jsonify({"error": "El archivo parece estar vacío o dañado."}), 400
     resultado = importar_telefonos_excel(datos, tutor_id, FORM_DB)
