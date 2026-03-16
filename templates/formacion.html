@@ -1074,11 +1074,34 @@ async function generarIA() {
 }
 
 /* ── Copiar helpers ────────────────────────────────────────────── */
+function _copiar(txt) {
+  return new Promise((resolve, reject) => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(resolve).catch(() => {
+        _copiarFallback(txt) ? resolve() : reject();
+      });
+    } else {
+      _copiarFallback(txt) ? resolve() : reject();
+    }
+  });
+}
+function _copiarFallback(txt) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = txt;
+    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch(e) { return false; }
+}
 function copiarTexto(inputId, spanEl) {
   const el  = document.getElementById(inputId);
   const txt = el.value.trim();
   if (!txt) return;
-  navigator.clipboard.writeText(txt).then(() => {
+  _copiar(txt).then(() => {
     const orig = spanEl.textContent;
     spanEl.textContent = '✔ Copiado';
     setTimeout(() => { spanEl.textContent = orig; }, 1500);
@@ -1089,7 +1112,7 @@ function copiarTodo() {
   const asunto  = document.getElementById('input-asunto').value.trim();
   const mensaje = document.getElementById('input-mensaje').value.trim();
   const full    = (asunto ? `Asunto: ${asunto}\n${'─'.repeat(40)}\n` : '') + mensaje;
-  navigator.clipboard.writeText(full).then(() => {
+  _copiar(full).then(() => {
     const btn = document.querySelector('[onclick="copiarTodo()"]');
     const orig = btn.textContent;
     btn.textContent = '✔ Copiado';
