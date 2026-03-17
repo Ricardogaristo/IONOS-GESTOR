@@ -594,17 +594,23 @@ def formacion():
         if not arch or not arch.filename.endswith((".xlsx", ".xls")):
             errores.append("Sube un archivo Excel (.xlsx o .xls).")
 
+        # ── Leer el archivo a memoria ANTES de cualquier otra operación ────
+        # Evita [Errno 5] Input/output error: el fichero temporal de Werkzeug
+        # puede cerrarse si el worker tarda o hay timeout de red.
+        arch_bytes = None
+        if not errores:
+            try:
+                arch_bytes = arch.read()
+            except Exception as e:
+                errores.append(f"No se pudo leer el archivo subido: {e}")
+            if arch_bytes is not None and not arch_bytes:
+                errores.append("El archivo subido está vacío.")
+                arch_bytes = None
+
         if not errores:
             try:
                 fecha_import = datetime.now().strftime("%Y-%m-%d")
 
-                # ── Leer el archivo a memoria de inmediato ─────────────────
-                # (evita [Errno 5] por ficheros temporales cerrados en Windows)
-                try:
-                    arch.stream.seek(0)
-                    arch_bytes = arch.stream.read()
-                except Exception:
-                    arch_bytes = arch.read()
                 if not arch_bytes:
                     errores.append("El archivo subido está vacío o no se pudo leer.")
                     raise ValueError("empty")
