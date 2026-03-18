@@ -1,15 +1,13 @@
-import sqlite3
+from db_mysql import get_tareas_conn, column_exists
 
-DB_NAME = "tareas.db"
-
-conn = sqlite3.connect(DB_NAME)
+conn   = get_tareas_conn()
 cursor = conn.cursor()
 
-try:
+if not column_exists(cursor, 'tareas', 'codigo'):
     cursor.execute("ALTER TABLE tareas ADD COLUMN codigo TEXT")
+    conn.commit()
     print("✅ Columna 'codigo' agregada correctamente")
-except sqlite3.OperationalError:
+else:
     print("⚠️ La columna 'codigo' ya existe")
 
-conn.commit()
 conn.close()

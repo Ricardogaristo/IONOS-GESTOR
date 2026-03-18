@@ -21,7 +21,7 @@ for row in users:
 
     if pw and not pw.startswith("pbkdf2:") and not pw.startswith("scrypt:"):
         hashed = generate_password_hash(pw)
-        cursor.execute("UPDATE usuarios SET password=? WHERE id=?", (hashed, uid))
+        cursor.execute("UPDATE usuarios SET password=%s WHERE id=%s", (hashed, uid))
         print(f"  🔑 {username} (id={uid}) — hasheada")
         migrados += 1
     else:
@@ -29,7 +29,7 @@ for row in users:
         ya_hash += 1
 
 # Asegurar que admin es SuperAdmin
-cursor.execute("UPDATE usuarios SET es_admin=2 WHERE username=?", ("admin",))
+cursor.execute("UPDATE usuarios SET es_admin=2 WHERE username=%s", ("admin",))
 print("\n  👑 admin → es_admin=2 (SuperAdmin)")
 
 conn.commit()

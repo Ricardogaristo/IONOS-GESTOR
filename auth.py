@@ -199,7 +199,7 @@ def _conn():
 
 def _user_by_id(uid: int) -> dict | None:
     conn = _conn()
-    row  = conn.execute("SELECT * FROM usuarios WHERE id=?", (uid,)).fetchone()
+    row  = conn.execute("SELECT * FROM usuarios WHERE id=%s", (uid,)).fetchone()
     conn.close()
     return dict(row) if row else None
 
@@ -208,7 +208,7 @@ def _user_by_identity(ident: str) -> dict | None:
     """Busca por username o email."""
     conn = _conn()
     row  = conn.execute(
-        "SELECT * FROM usuarios WHERE username=? OR email=?", (ident, ident)
+        "SELECT * FROM usuarios WHERE username=%s OR email=%s", (ident, ident)
     ).fetchone()
     conn.close()
     return dict(row) if row else None
@@ -217,7 +217,7 @@ def _user_by_identity(ident: str) -> dict | None:
 def _user_by_google_id(gid: str) -> dict | None:
     conn = _conn()
     row  = conn.execute(
-        "SELECT * FROM usuarios WHERE google_id=?", (gid,)
+        "SELECT * FROM usuarios WHERE google_id=%s", (gid,)
     ).fetchone()
     conn.close()
     return dict(row) if row else None
@@ -240,7 +240,7 @@ def _create_user(username: str, email: str, password_plain: str | None = None,
     cursor  = conn.cursor()
     cursor.execute(
         """INSERT INTO usuarios (username, email, password, perfil, google_id, pw_format)
-           VALUES (?, ?, ?, ?, ?, ?)""",
+           VALUES (%s, %s, %s, %s, %s, %s)""",
         (username, email, pw_hash, perfil, google_id, pw_fmt)
     )
     new_id = cursor.lastrowid
@@ -391,7 +391,7 @@ def login():
                         sha2 = hashlib.sha256(sha_recv.encode()).hexdigest()
                         if check_password_hash(user["password"], sha2):
                             c = _conn()
-                            c.execute("UPDATE usuarios SET password=? WHERE id=?",
+                            c.execute("UPDATE usuarios SET password=%s WHERE id=%s",
                                       (generate_password_hash(sha_recv), user["id"]))
                             c.commit(); c.close()
                             ok = True
@@ -432,7 +432,7 @@ def login():
                     new_hash = generate_password_hash(sha_recv)
                     c = _conn()
                     c.execute(
-                        "UPDATE usuarios SET password=?, pw_format=1 WHERE id=?",
+                        "UPDATE usuarios SET password=%s, pw_format=1 WHERE id=%s",
                         (new_hash, user["id"])
                     )
                     c.commit(); c.close()
@@ -535,7 +535,7 @@ def login_google_callback():
         if user_by_email:
             conn = _conn()
             conn.execute(
-                "UPDATE usuarios SET google_id=?, avatar=? WHERE id=?",
+                "UPDATE usuarios SET google_id=%s, avatar=%s WHERE id=%s",
                 (google_id, avatar, user_by_email["id"])
             )
             conn.commit()
@@ -546,7 +546,7 @@ def login_google_callback():
             new_id = _create_user(name, email, password_plain=None,
                                   perfil=PERFIL_TAREAS, google_id=google_id)
             conn = _conn()
-            conn.execute("UPDATE usuarios SET avatar=? WHERE id=?", (avatar, new_id))
+            conn.execute("UPDATE usuarios SET avatar=%s WHERE id=%s", (avatar, new_id))
             conn.commit()
             conn.close()
             user = _user_by_id(new_id)
@@ -597,7 +597,7 @@ def cambiar_password():
 
     conn = _conn()
     conn.execute(
-        "UPDATE usuarios SET password=? WHERE id=?",
+        "UPDATE usuarios SET password=%s WHERE id=%s",
         (_hash_pw(nueva_sha), session["user_id"])
     )
     conn.commit()
@@ -631,7 +631,7 @@ def cambiar_perfil_usuario(uid: int):
         return jsonify({"ok": False, "error": "Perfil no válido."}), 400
 
     conn = _conn()
-    conn.execute("UPDATE usuarios SET perfil=? WHERE id=?", (nuevo_perfil, uid))
+    conn.execute("UPDATE usuarios SET perfil=%s WHERE id=%s", (nuevo_perfil, uid))
     conn.commit()
     conn.close()
 
@@ -652,7 +652,7 @@ def admin_cambiar_password(uid: int):
 
     conn = _conn()
     conn.execute(
-        "UPDATE usuarios SET password=?, pw_format=1 WHERE id=?",
+        "UPDATE usuarios SET password=%s, pw_format=1 WHERE id=%s",
         (generate_password_hash(nueva), uid)
     )
     conn.commit()

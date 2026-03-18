@@ -165,7 +165,7 @@ def inicializar_todo():
         import hashlib as _hl
         _sha = _hl.sha256("1234".encode()).hexdigest()
         conn.execute(
-            "INSERT INTO usuarios (username, email, password, es_admin, perfil) VALUES (?,?,?,?,?)",
+            "INSERT INTO usuarios (username, email, password, es_admin, perfil) VALUES (%s,%s,%s,%s,%s)",
             ("admin", "admin@correo.com", generate_password_hash(_sha), 2, 20)
         )
 
@@ -188,10 +188,10 @@ def _hashear_passwords():
         pw = u["password"] or ""
         if pw and not pw.startswith("pbkdf2:") and not pw.startswith("scrypt:"):
             cursor.execute(
-                "UPDATE usuarios SET password=? WHERE id=?",
+                "UPDATE usuarios SET password=%s WHERE id=%s",
                 (generate_password_hash(pw), u["id"])
             )
-    cursor.execute("UPDATE usuarios SET es_admin=2 WHERE username=?", ("admin",))
+    cursor.execute("UPDATE usuarios SET es_admin=2 WHERE username=%s", ("admin",))
     # Sincronizar columna perfil con es_admin para usuarios existentes
     cursor.execute("UPDATE usuarios SET perfil=2  WHERE es_admin=0 AND (perfil IS NULL OR perfil=0)")
     cursor.execute("UPDATE usuarios SET perfil=10 WHERE es_admin=1")
@@ -211,7 +211,7 @@ def reset_admin_now():
     sha = _hl.sha256("1234".encode()).hexdigest()
     conn = get_connection()
     conn.execute(
-        "UPDATE usuarios SET password=?, perfil=20, es_admin=2 WHERE username='admin'",
+        "UPDATE usuarios SET password=%s, perfil=20, es_admin=2 WHERE username='admin'",
         (generate_password_hash(sha),)
     )
     conn.commit()
@@ -250,7 +250,7 @@ def index():
     elif filtro_estado == "done":
         filtros.append("completada = 1")
     if filtro_cat:
-        filtros.append("LOWER(TRIM(COALESCE(categoria,''))) = LOWER(TRIM(?))"); params.append(filtro_cat)
+        filtros.append("LOWER(TRIM(COALESCE(categoria,''))) = LOWER(TRIM(%s))"); params.append(filtro_cat)
     if filtro_prio in ("1","2","3"):
         filtros.append("prioridad = ?"); params.append(int(filtro_prio))
     if filtro_fav == "1":
@@ -269,7 +269,7 @@ def index():
     offset = (page - 1) * per_page
 
     tareas = conn.execute(
-        f"SELECT * FROM tareas {where} ORDER BY favorita DESC, prioridad ASC, id DESC LIMIT ? OFFSET ?",
+        f"SELECT * FROM tareas {where} ORDER BY favorita DESC, prioridad ASC, id DESC LIMIT %s OFFSET %s",
         params + [per_page, offset]
     ).fetchall()
 
@@ -283,7 +283,7 @@ def index():
     if es_admin >= 2:
         cats = conn.execute("SELECT DISTINCT COALESCE(NULLIF(TRIM(categoria),''),'General') AS cat FROM tareas ORDER BY cat").fetchall()
     else:
-        cats = conn.execute("SELECT DISTINCT COALESCE(NULLIF(TRIM(categoria),''),'General') AS cat FROM tareas WHERE usuario_id=? ORDER BY cat", (user_id,)).fetchall()
+        cats = conn.execute("SELECT DISTINCT COALESCE(NULLIF(TRIM(categoria),''),'General') AS cat FROM tareas WHERE usuario_id=%s ORDER BY cat", (user_id,)).fetchall()
     categorias_lista = [r["cat"] for r in cats]
     conn.close()
 
@@ -299,7 +299,7 @@ def agregar():
     conn = get_connection()
     conn.execute("""
         INSERT INTO tareas (codigo, descripcion, categoria, fecha, completada, usuario_id, prioridad, favorita, notas, fecha_inicio)
-        VALUES (?,?,?,?,0,?,?,0,?,?)
+        VALUES (%s,%s,%s,%s,0,%s,%s,0,%s,%s)
     """, (request.form.get("codigo"), request.form.get("descripcion"),
           request.form.get("categoria"), request.form.get("fecha"),
           session["user_id"], int(request.form.get("prioridad", 2)),
@@ -321,7 +321,7 @@ def admin():
 
     filtros, params = [], []
     if filtro_cat:
-        filtros.append("LOWER(TRIM(t.categoria)) = LOWER(TRIM(?))"); params.append(filtro_cat)
+        filtros.append("LOWER(TRIM(t.categoria)) = LOWER(TRIM(%s))"); params.append(filtro_cat)
     if filtro_est == "Completada":
         filtros.append("t.completada = 1")
     elif filtro_est == "Pendiente":
@@ -362,7 +362,7 @@ def admin():
             LEFT JOIN usuarios u ON t.usuario_id = u.id
             {where}
             ORDER BY t.completada ASC, t.prioridad ASC, t.id DESC
-            LIMIT ? OFFSET ?
+            LIMIT %s OFFSET %s
         """, params + [per_page, offset]).fetchall()
 
         cats = conn.execute("""
@@ -523,8 +523,8 @@ def usuario_eliminar(uid):
     if uid == session["user_id"]:
         return redirect("/usuarios")
     conn = get_connection()
-    conn.execute("DELETE FROM tareas   WHERE usuario_id = ?", (uid,))
-    conn.execute("DELETE FROM usuarios WHERE id = ?",         (uid,))
+    conn.execute("DELETE FROM tareas   WHERE usuario_id = %s", (uid,))
+    conn.execute("DELETE FROM usuarios WHERE id = %s",         (uid,))
     conn.commit(); conn.close()
     return redirect("/usuarios")
 
@@ -538,7 +538,7 @@ def usuario_asignar_tarea(uid):
     conn = get_connection()
     conn.execute("""
         INSERT INTO tareas (codigo, descripcion, categoria, fecha, completada, usuario_id, prioridad, favorita, notas)
-        VALUES (?,?,?,?,0,?,?,0,?)
+        VALUES (%s,%s,%s,%s,0,%s,%s,0,%s)
     """, (request.form.get("codigo") or None, descripcion,
           request.form.get("categoria") or None, request.form.get("fecha") or None,
           uid, int(request.form.get("prioridad", 2)), request.form.get("notas") or None))
@@ -569,7 +569,7 @@ def usuario_cambiar_perfil(uid):
 
     conn = get_connection()
     conn.execute(
-        "UPDATE usuarios SET perfil=?, es_admin=? WHERE id=?",
+        "UPDATE usuarios SET perfil=%s, es_admin=%s WHERE id=%s",
         (nuevo_perfil, es_admin_val, uid)
     )
     conn.commit()
@@ -584,15 +584,15 @@ def usuario_cambiar_perfil(uid):
 def admin_toggle_completada(tid):
     """Toggle completada vía AJAX desde el panel admin."""
     conn = get_connection()
-    row  = conn.execute("SELECT completada FROM tareas WHERE id=?", (tid,)).fetchone()
+    row  = conn.execute("SELECT completada FROM tareas WHERE id=%s", (tid,)).fetchone()
     if not row:
         conn.close()
         return jsonify({"ok": False}), 404
     nuevo = 0 if row["completada"] == 1 else 1
     if nuevo == 1:
-        conn.execute("UPDATE tareas SET completada=1, fecha_completada=NOW() WHERE id=?", (tid,))
+        conn.execute("UPDATE tareas SET completada=1, fecha_completada=NOW() WHERE id=%s", (tid,))
     else:
-        conn.execute("UPDATE tareas SET completada=0, fecha_completada=NULL WHERE id=?", (tid,))
+        conn.execute("UPDATE tareas SET completada=0, fecha_completada=NULL WHERE id=%s", (tid,))
     conn.commit()
     conn.close()
     return jsonify({"ok": True, "completada": nuevo})
@@ -603,9 +603,9 @@ def admin_toggle_completada(tid):
 def completar(id):
     conn = get_connection()
     if session.get("es_admin", 0) >= 2:
-        conn.execute("UPDATE tareas SET completada=1, fecha_completada=NOW() WHERE id=?", (id,))
+        conn.execute("UPDATE tareas SET completada=1, fecha_completada=NOW() WHERE id=%s", (id,))
     else:
-        conn.execute("UPDATE tareas SET completada=1, fecha_completada=NOW() WHERE id=? AND usuario_id=?", (id, session["user_id"]))
+        conn.execute("UPDATE tareas SET completada=1, fecha_completada=NOW() WHERE id=%s AND usuario_id=%s", (id, session["user_id"]))
     conn.commit(); conn.close()
     return redirect("/")
 
@@ -615,9 +615,9 @@ def completar(id):
 def eliminar(id):
     conn = get_connection()
     if session.get("es_admin", 0) >= 2:
-        conn.execute("DELETE FROM tareas WHERE id=?", (id,))
+        conn.execute("DELETE FROM tareas WHERE id=%s", (id,))
     else:
-        conn.execute("DELETE FROM tareas WHERE id=? AND usuario_id=?", (id, session["user_id"]))
+        conn.execute("DELETE FROM tareas WHERE id=%s AND usuario_id=%s", (id, session["user_id"]))
     conn.commit(); conn.close()
     return redirect("/")
 
@@ -627,9 +627,9 @@ def eliminar(id):
 def favorita(id):
     conn = get_connection()
     if session.get("es_admin", 0) >= 2:
-        conn.execute("UPDATE tareas SET favorita=1-favorita WHERE id=?", (id,))
+        conn.execute("UPDATE tareas SET favorita=1-favorita WHERE id=%s", (id,))
     else:
-        conn.execute("UPDATE tareas SET favorita=1-favorita WHERE id=? AND usuario_id=?", (id, session["user_id"]))
+        conn.execute("UPDATE tareas SET favorita=1-favorita WHERE id=%s AND usuario_id=%s", (id, session["user_id"]))
     conn.commit(); conn.close()
     return redirect(request.referrer or "/")
 
@@ -638,10 +638,10 @@ def favorita(id):
 @login_required
 def duplicar(id):
     conn = get_connection()
-    t = conn.execute("SELECT * FROM tareas WHERE id=?", (id,)).fetchone()
+    t = conn.execute("SELECT * FROM tareas WHERE id=%s", (id,)).fetchone()
     if t:
         conn.execute(
-            "INSERT INTO tareas (descripcion,categoria,fecha,completada,codigo,usuario_id,prioridad,favorita,notas) VALUES (?,?,?,0,?,?,?,0,?)",
+            "INSERT INTO tareas (descripcion,categoria,fecha,completada,codigo,usuario_id,prioridad,favorita,notas) VALUES (%s,%s,%s,0,%s,%s,%s,0,%s)",
             (t["descripcion"]+" (copia)", t["categoria"], t["fecha"], t["codigo"],
              t["usuario_id"], t["prioridad"] or 2, t["notas"] or "")
         )
@@ -656,7 +656,7 @@ def editar(id):
     conn = get_connection()
     if request.method == "POST":
         conn.execute(
-            "UPDATE tareas SET codigo=?,descripcion=?,categoria=?,fecha=?,completada=?,prioridad=?,notas=?,fecha_inicio=? WHERE id=?",
+            "UPDATE tareas SET codigo=%s,descripcion=%s,categoria=%s,fecha=%s,completada=%s,prioridad=%s,notas=%s,fecha_inicio=%s WHERE id=%s",
             (request.form.get("codigo"), request.form.get("descripcion"),
              request.form.get("categoria"), request.form.get("fecha"),
              request.form.get("completada"), int(request.form.get("prioridad", 2)),
@@ -665,7 +665,7 @@ def editar(id):
         )
         conn.commit(); conn.close()
         return redirect("/")
-    tarea = conn.execute("SELECT * FROM tareas WHERE id=?", (id,)).fetchone()
+    tarea = conn.execute("SELECT * FROM tareas WHERE id=%s", (id,)).fetchone()
     conn.close()
     return render_template("editar.html", tarea=tarea)
 
@@ -676,7 +676,7 @@ def subtarea_agregar(tarea_id):
     texto = request.form.get("texto","").strip()
     if texto:
         conn = get_connection()
-        conn.execute("INSERT INTO subtareas (tarea_id,texto) VALUES (?,?)", (tarea_id, texto))
+        conn.execute("INSERT INTO subtareas (tarea_id,texto) VALUES (%s,%s)", (tarea_id, texto))
         conn.commit(); conn.close()
     return redirect(request.referrer or "/")
 
@@ -685,7 +685,7 @@ def subtarea_agregar(tarea_id):
 @login_required
 def subtarea_toggle(sub_id):
     conn = get_connection()
-    conn.execute("UPDATE subtareas SET hecha=1-hecha WHERE id=?", (sub_id,))
+    conn.execute("UPDATE subtareas SET hecha=1-hecha WHERE id=%s", (sub_id,))
     conn.commit(); conn.close()
     return redirect(request.referrer or "/")
 
@@ -694,7 +694,7 @@ def subtarea_toggle(sub_id):
 @login_required
 def subtarea_eliminar(sub_id):
     conn = get_connection()
-    conn.execute("DELETE FROM subtareas WHERE id=?", (sub_id,))
+    conn.execute("DELETE FROM subtareas WHERE id=%s", (sub_id,))
     conn.commit(); conn.close()
     return redirect(request.referrer or "/")
 
@@ -708,7 +708,7 @@ def dashboard():
     es_admin = session.get("es_admin", 0)
     conn     = get_connection()
 
-    filtro = "" if es_admin >= 2 else "WHERE usuario_id = ?"
+    filtro = "" if es_admin >= 2 else "WHERE usuario_id = %s"
     params = () if es_admin >= 2 else (user_id,)
 
     stats = conn.execute(f"""
@@ -955,10 +955,10 @@ def exportar():
     base_q   = "SELECT t.id,t.descripcion,t.categoria,t.fecha,t.completada,t.codigo,t.usuario_id,u.username FROM tareas t LEFT JOIN usuarios u ON t.usuario_id=u.id "
     if es_admin:
         todas      = conn.execute(base_q+"ORDER BY t.categoria,t.id").fetchall()
-        tareas_hoy = conn.execute(base_q+"WHERE t.fecha=? ORDER BY t.id",(hoy,)).fetchall()
+        tareas_hoy = conn.execute(base_q+"WHERE t.fecha=%s ORDER BY t.id",(hoy,)).fetchall()
     else:
-        todas      = conn.execute(base_q+"WHERE t.usuario_id=? ORDER BY t.categoria,t.id",(user_id,)).fetchall()
-        tareas_hoy = conn.execute(base_q+"WHERE t.usuario_id=? AND t.fecha=? ORDER BY t.id",(user_id,hoy)).fetchall()
+        todas      = conn.execute(base_q+"WHERE t.usuario_id=%s ORDER BY t.categoria,t.id",(user_id,)).fetchall()
+        tareas_hoy = conn.execute(base_q+"WHERE t.usuario_id=%s AND t.fecha=%s ORDER BY t.id",(user_id,hoy)).fetchall()
     conn.close()
     cats_dict = defaultdict(list)
     for t in todas: cats_dict[t["categoria"] or "General"].append(t)
@@ -985,12 +985,12 @@ def fix_passwords():
     for u in users:
         pw = u["password"] or ""
         if pw and not pw.startswith("pbkdf2:") and not pw.startswith("scrypt:"):
-            cursor.execute("UPDATE usuarios SET password=? WHERE id=?",
+            cursor.execute("UPDATE usuarios SET password=%s WHERE id=%s",
                            (generate_password_hash(pw), u["id"]))
             migrados.append(f"{u['username']} (id={u['id']})")
         else:
             ya_hash.append(u["username"])
-    cursor.execute("UPDATE usuarios SET es_admin=2 WHERE username=?", ("admin",))
+    cursor.execute("UPDATE usuarios SET es_admin=2 WHERE username=%s", ("admin",))
     conn.commit(); conn.close()
     lines = ["<h2>✅ Migración completada</h2>"]
     lines.append(f"<p><strong>Hasheados ahora:</strong> {len(migrados)}</p>")

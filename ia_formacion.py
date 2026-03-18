@@ -86,7 +86,7 @@ def _llamar_groq(prompt: str, max_tokens: int = 800) -> str:
 
 def _get_alumno(alumno_id: int) -> dict | None:
     conn = get_form_conn()
-    row  = conn.execute("SELECT * FROM alumnos WHERE id=?", (alumno_id,)).fetchone()
+    row  = conn.execute("SELECT * FROM alumnos WHERE id=%s", (alumno_id,)).fetchone()
     conn.close()
     if row is None:
         return None
@@ -96,7 +96,7 @@ def _get_alumno(alumno_id: int) -> dict | None:
 def _get_alumnos_tutor(tutor_id: int) -> list[dict]:
     conn = get_form_conn()
     rows = conn.execute(
-        "SELECT * FROM alumnos WHERE tutor_id=? AND (archivado IS NULL OR archivado=0) "
+        "SELECT * FROM alumnos WHERE tutor_id=%s AND (archivado IS NULL OR archivado=0) "
         "ORDER BY progreso ASC",
         (tutor_id,)
     ).fetchall()
@@ -108,7 +108,7 @@ def _get_historial(alumno_id: int) -> list[dict]:
     conn = get_form_conn()
     rows = conn.execute(
         "SELECT fecha_import, progreso, examenes, delta_progreso "
-        "FROM progreso_historial WHERE alumno_id=? ORDER BY fecha_import ASC",
+        "FROM progreso_historial WHERE alumno_id=%s ORDER BY fecha_import ASC",
         (alumno_id,)
     ).fetchall()
     conn.close()
@@ -438,7 +438,7 @@ def predecir_riesgo_curso(tutor_id: int, curso: str) -> dict:
     """
     conn = get_form_conn()
     alumnos = [dict(r) for r in conn.execute(
-        "SELECT * FROM alumnos WHERE tutor_id=? AND curso=? AND (archivado IS NULL OR archivado=0)",
+        "SELECT * FROM alumnos WHERE tutor_id=%s AND curso=%s AND (archivado IS NULL OR archivado=0)",
         (tutor_id, curso)
     ).fetchall()]
     conn.close()
@@ -875,7 +875,7 @@ def importar_telefonos_excel(archivo_bytes: bytes, tutor_id: int, db_path: str |
     # Actualizar BD
     conn    = get_form_conn()
     alumnos = [dict(r) for r in conn.execute(
-        "SELECT id, nombre FROM alumnos WHERE tutor_id=? AND (archivado IS NULL OR archivado=0)",
+        "SELECT id, nombre FROM alumnos WHERE tutor_id=%s AND (archivado IS NULL OR archivado=0)",
         (tutor_id,)
     ).fetchall()]
 
@@ -885,7 +885,7 @@ def importar_telefonos_excel(archivo_bytes: bytes, tutor_id: int, db_path: str |
     for alumno in alumnos:
         clave = _norm(alumno["nombre"])
         if clave in tel_map:
-            conn.execute("UPDATE alumnos SET telefono=? WHERE id=?",
+            conn.execute("UPDATE alumnos SET telefono=%s WHERE id=%s",
                          (tel_map[clave], alumno["id"]))
             actualizados += 1
         else:

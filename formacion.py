@@ -158,7 +158,7 @@ def inicializar_formacion():
 def _registrar_evento_historico(tutor_id, evento, conn):
     """Registra automáticamente un evento en el historial cada vez que cambia el estado."""
     row = conn.execute(
-        "SELECT COUNT(*) as total, COUNT(DISTINCT curso) as cursos FROM alumnos WHERE tutor_id=?",
+        "SELECT COUNT(*) as total, COUNT(DISTINCT curso) as cursos FROM alumnos WHERE tutor_id=%s",
         (tutor_id,)
     ).fetchone()
     total_alumnos = row["total"] if row else 0
@@ -166,7 +166,7 @@ def _registrar_evento_historico(tutor_id, evento, conn):
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M")
     conn.execute("""
         INSERT INTO historial_automatico (tutor_id, fecha, evento, total_alumnos, total_cursos)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
     """, (tutor_id, fecha, evento, total_alumnos, total_cursos))
 
 def _safe_float(val):
@@ -242,7 +242,7 @@ def _deduplicar_alumnos(tutor_id, conn):
     # Todos los alumnos activos del tutor
     rows = conn.execute(
         "SELECT id, nombre, curso, progreso, examenes FROM alumnos "
-        "WHERE tutor_id=? AND (archivado IS NULL OR archivado=0)",
+        "WHERE tutor_id=%s AND (archivado IS NULL OR archivado=0)",
         (tutor_id,)
     ).fetchall()
 
@@ -265,7 +265,7 @@ def _deduplicar_alumnos(tutor_id, conn):
         # Reasignar historial de los duplicados al keeper
         for dup_id in del_ids:
             conn.execute(
-                "UPDATE progreso_historial SET alumno_id=? WHERE alumno_id=?",
+                "UPDATE progreso_historial SET alumno_id=%s WHERE alumno_id=%s",
                 (keeper["id"], dup_id)
             )
 
@@ -294,7 +294,7 @@ def _generar_alarmas(tutor_id):
     hoy = _date_cls.today()
     conn = get_form_conn()
     alumnos = [dict(a) for a in conn.execute(
-        "SELECT * FROM alumnos WHERE tutor_id=? AND (archivado IS NULL OR archivado=0) ORDER BY fecha_fin ASC, progreso ASC",
+        "SELECT * FROM alumnos WHERE tutor_id=%s AND (archivado IS NULL OR archivado=0) ORDER BY fecha_fin ASC, progreso ASC",
         (tutor_id,)
     ).fetchall()]
     conn.close()
@@ -574,7 +574,7 @@ def _get_completadas_hoy(tutor_id):
     hoy = _d.today().isoformat()
     conn = get_form_conn()
     rows = conn.execute(
-        "SELECT clave FROM alarmas_completadas WHERE tutor_id=? AND fecha_dia=?",
+        "SELECT clave FROM alarmas_completadas WHERE tutor_id=%s AND fecha_dia=%s",
         (tutor_id, hoy)
     ).fetchall()
     conn.close()
@@ -657,95 +657,99 @@ def formacion():
                 # ── UPSERT con historial ──────────────────────────────────
                 conn = get_form_conn()
                 curs = conn.cursor()
+                try:
+                    # Primero limpiar duplicados ya existentes en la BD
+                    dup_eliminados = _deduplicar_alumnos(tutor_id, conn)
+                    if dup_eliminados:
+                        print(f"🧹 {dup_eliminados} duplicados eliminados antes de importar")
 
-                # Primero limpiar duplicados ya existentes en la BD
-                dup_eliminados = _deduplicar_alumnos(tutor_id, conn)
-                if dup_eliminados:
-                    print(f"🧹 {dup_eliminados} duplicados eliminados antes de importar")
+                    # Mapa de existentes: (nombre_norm, curso_norm) → {id, progreso, examenes}
+                    existentes = {}
+                    for ex in conn.execute(
+                        "SELECT id, nombre, curso, progreso, examenes FROM alumnos "
+                        "WHERE tutor_id=%s AND (archivado IS NULL OR archivado=0)", (tutor_id,)
+                    ).fetchall():
+                        key = (norm(ex["nombre"]), norm(ex["curso"] or ""))
+                        existentes[key] = dict(ex)
 
-                # Mapa de existentes: (nombre_norm, curso_norm) → {id, progreso, examenes}
-                existentes = {}
-                for ex in conn.execute(
-                    "SELECT id, nombre, curso, progreso, examenes FROM alumnos "
-                    "WHERE tutor_id=? AND (archivado IS NULL OR archivado=0)", (tutor_id,)
-                ).fetchall():
-                    key = (norm(ex["nombre"]), norm(ex["curso"] or ""))
-                    existentes[key] = dict(ex)
+                    cnt_nuevo = cnt_update = cnt_avanza = cnt_retro = cnt_igual = cnt_sin_tel = 0
 
-                cnt_nuevo = cnt_update = cnt_avanza = cnt_retro = cnt_igual = cnt_sin_tel = 0
+                    for row in ws2.iter_rows(min_row=2, values_only=True):
+                        if not any(row): continue
+                        nombre = str(row[i2_n]).strip() if row[i2_n] else None
+                        if not nombre or nombre.lower() in ("none","nan",""): continue
 
-                for row in ws2.iter_rows(min_row=2, values_only=True):
-                    if not any(row): continue
-                    nombre = str(row[i2_n]).strip() if row[i2_n] else None
-                    if not nombre or nombre.lower() in ("none","nan",""): continue
+                        progreso = _safe_float(row[i2_p])  if i2_p  is not None and i2_p  < len(row) else 0.0
+                        examenes = _fmt_examenes(row[i2_e] if i2_e is not None and i2_e < len(row) else None)
+                        f_inicio = _safe_date(row[i2_fi])  if i2_fi is not None and i2_fi < len(row) else None
+                        f_fin    = _safe_date(row[i2_ff])  if i2_ff is not None and i2_ff < len(row) else None
+                        curso    = str(row[i2_c]).strip()  if i2_c  is not None and i2_c  < len(row) and row[i2_c] else None
+                        supera75 = 1 if progreso >= 75 else 0
+                        telefono = tel_map.get(norm(nombre))
+                        if not telefono: cnt_sin_tel += 1
 
-                    progreso = _safe_float(row[i2_p])  if i2_p  is not None and i2_p  < len(row) else 0.0
-                    examenes = _fmt_examenes(row[i2_e] if i2_e is not None and i2_e < len(row) else None)
-                    f_inicio = _safe_date(row[i2_fi])  if i2_fi is not None and i2_fi < len(row) else None
-                    f_fin    = _safe_date(row[i2_ff])  if i2_ff is not None and i2_ff < len(row) else None
-                    curso    = str(row[i2_c]).strip()  if i2_c  is not None and i2_c  < len(row) and row[i2_c] else None
-                    supera75 = 1 if progreso >= 75 else 0
-                    telefono = tel_map.get(norm(nombre))
-                    if not telefono: cnt_sin_tel += 1
+                        key      = (norm(nombre), norm(curso or ""))
+                        existing = existentes.get(key)
 
-                    key      = (norm(nombre), norm(curso or ""))
-                    existing = existentes.get(key)
+                        if existing:
+                            alumno_id    = existing["id"]
+                            old_progreso = float(existing["progreso"] or 0)
+                            delta        = round(progreso - old_progreso, 2)
+                            avanzo       = 1 if delta > 0 else (-1 if delta < 0 else 0)
+                            if avanzo ==  1: cnt_avanza += 1
+                            elif avanzo == -1: cnt_retro += 1
+                            else: cnt_igual += 1
+                            curs.execute("""
+                                UPDATE alumnos
+                                SET progreso=%s, examenes=%s, fecha_inicio=%s, fecha_fin=%s,
+                                    supera_75=%s, telefono=COALESCE(%s,telefono),
+                                    ultima_importacion=%s, delta_progreso=%s, avanzo=%s
+                                WHERE id=%s
+                            """, (progreso, examenes, f_inicio, f_fin, supera75,
+                                  telefono, fecha_import, delta, avanzo, alumno_id))
+                            cnt_update += 1
+                        else:
+                            delta = 0.0; avanzo = 0
+                            curs.execute("""
+                                INSERT INTO alumnos
+                                    (curso, nombre, progreso, examenes, fecha_inicio, fecha_fin,
+                                     supera_75, telefono, tutor_id, ultima_importacion, delta_progreso, avanzo)
+                                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,0,0)
+                            """, (curso, nombre, progreso, examenes, f_inicio, f_fin,
+                                  supera75, telefono, tutor_id, fecha_import))
+                            alumno_id = curs.lastrowid
+                            cnt_nuevo += 1
 
-                    if existing:
-                        alumno_id    = existing["id"]
-                        old_progreso = float(existing["progreso"] or 0)
-                        delta        = round(progreso - old_progreso, 2)
-                        avanzo       = 1 if delta > 0 else (-1 if delta < 0 else 0)
-                        if avanzo ==  1: cnt_avanza += 1
-                        elif avanzo == -1: cnt_retro += 1
-                        else: cnt_igual += 1
+                        # Registro historial de progreso
+                        old_p = float(existing["progreso"] or 0) if existing else 0.0
                         curs.execute("""
-                            UPDATE alumnos
-                            SET progreso=?, examenes=?, fecha_inicio=?, fecha_fin=?,
-                                supera_75=?, telefono=COALESCE(?,telefono),
-                                ultima_importacion=?, delta_progreso=?, avanzo=?
-                            WHERE id=?
-                        """, (progreso, examenes, f_inicio, f_fin, supera75,
-                              telefono, fecha_import, delta, avanzo, alumno_id))
-                        cnt_update += 1
-                    else:
-                        delta = 0.0; avanzo = 0
-                        curs.execute("""
-                            INSERT INTO alumnos
-                                (curso, nombre, progreso, examenes, fecha_inicio, fecha_fin,
-                                 supera_75, telefono, tutor_id, ultima_importacion, delta_progreso, avanzo)
-                            VALUES (?,?,?,?,?,?,?,?,?,?,0,0)
-                        """, (curso, nombre, progreso, examenes, f_inicio, f_fin,
-                              supera75, telefono, tutor_id, fecha_import))
-                        alumno_id = curs.lastrowid
-                        cnt_nuevo += 1
+                            INSERT INTO progreso_historial
+                                (alumno_id, tutor_id, fecha_import, progreso, examenes, delta_progreso, avanzo)
+                            VALUES (%s,%s,%s,%s,%s,%s,%s)
+                        """, (alumno_id, tutor_id, fecha_import, progreso, examenes,
+                              round(progreso - old_p, 2) if existing else 0.0,
+                              1 if (progreso - old_p) > 0 else (-1 if (progreso - old_p) < 0 else 0) if existing else 0))
 
-                    # Registro historial de progreso
-                    old_p = float(existing["progreso"] or 0) if existing else 0.0
-                    curs.execute("""
-                        INSERT INTO progreso_historial
-                            (alumno_id, tutor_id, fecha_import, progreso, examenes, delta_progreso, avanzo)
-                        VALUES (?,?,?,?,?,?,?)
-                    """, (alumno_id, tutor_id, fecha_import, progreso, examenes,
-                          round(progreso - old_p, 2) if existing else 0.0,
-                          1 if (progreso - old_p) > 0 else (-1 if (progreso - old_p) < 0 else 0) if existing else 0))
+                        # Actualizar mapa para evitar duplicados dentro del mismo Excel
+                        existentes[key] = {"id": alumno_id, "nombre": nombre,
+                                           "curso": curso, "progreso": progreso, "examenes": examenes}
 
-                    # Actualizar mapa para evitar duplicados dentro del mismo Excel
-                    existentes[key] = {"id": alumno_id, "nombre": nombre,
-                                       "curso": curso, "progreso": progreso, "examenes": examenes}
-
-                _registrar_evento_historico(
-                    tutor_id,
-                    f"Importación ({cnt_nuevo} nuevos, {cnt_update} actualizados)",
-                    conn
-                )
-                conn.commit()
-                conn.close()
-                dup_msg = f" · {dup_eliminados} duplicados fusionados" if dup_eliminados else ""
-                exito = (f"✅ {cnt_nuevo + cnt_update} alumnos procesados — "
-                         f"{cnt_nuevo} nuevos · {cnt_update} actualizados "
-                         f"({cnt_avanza} avanzaron, {cnt_retro} retrocedieron, {cnt_igual} sin cambio)"
-                         f"{dup_msg} · {cnt_sin_tel} sin teléfono.")
+                    _registrar_evento_historico(
+                        tutor_id,
+                        f"Importación ({cnt_nuevo} nuevos, {cnt_update} actualizados)",
+                        conn
+                    )
+                    conn.commit()
+                    dup_msg = f" · {dup_eliminados} duplicados fusionados" if dup_eliminados else ""
+                    exito = (f"✅ {cnt_nuevo + cnt_update} alumnos procesados — "
+                             f"{cnt_nuevo} nuevos · {cnt_update} actualizados "
+                             f"({cnt_avanza} avanzaron, {cnt_retro} retrocedieron, {cnt_igual} sin cambio)"
+                             f"{dup_msg} · {cnt_sin_tel} sin teléfono.")
+                except Exception as _inner_e:
+                    conn.rollback()
+                    raise _inner_e
+                finally:
+                    conn.close()  # se ejecuta SIEMPRE, haya error o no
 
             except ValueError:
                 pass
@@ -755,7 +759,7 @@ def formacion():
     # Cargar alumnos activos del tutor actual (excluye archivados)
     conn = get_form_conn()
     _alumnos_raw = conn.execute(
-        "SELECT * FROM alumnos WHERE tutor_id=? AND (archivado IS NULL OR archivado=0) ORDER BY progreso DESC, nombre ASC",
+        "SELECT * FROM alumnos WHERE tutor_id=%s AND (archivado IS NULL OR archivado=0) ORDER BY progreso DESC, nombre ASC",
         (tutor_id,)
     ).fetchall()
     alumnos = []
@@ -767,7 +771,7 @@ def formacion():
         alumnos.append(_a)
     # Contar cursos archivados para el badge
     row_arch = conn.execute(
-        "SELECT COUNT(DISTINCT curso) as n FROM alumnos WHERE tutor_id=? AND archivado=1",
+        "SELECT COUNT(DISTINCT curso) as n FROM alumnos WHERE tutor_id=%s AND archivado=1",
         (tutor_id,)
     ).fetchone()
     archivados_count = row_arch["n"] if row_arch else 0
@@ -777,7 +781,7 @@ def formacion():
         """SELECT a.curso, COUNT(DISTINCT ph.fecha_import) as n_imports
            FROM progreso_historial ph
            JOIN alumnos a ON ph.alumno_id = a.id
-           WHERE ph.tutor_id=? AND (a.archivado IS NULL OR a.archivado=0)
+           WHERE ph.tutor_id=%s AND (a.archivado IS NULL OR a.archivado=0)
            GROUP BY a.curso""",
         (tutor_id,)
     ).fetchall()
@@ -815,7 +819,7 @@ def historial_alumno(alumno_id):
     conn = get_form_conn()
     rows = conn.execute(
         "SELECT fecha_import, progreso, examenes, delta_progreso, avanzo "
-        "FROM progreso_historial WHERE alumno_id=? AND tutor_id=? ORDER BY fecha_import ASC",
+        "FROM progreso_historial WHERE alumno_id=%s AND tutor_id=%s ORDER BY fecha_import ASC",
         (alumno_id, tutor_id)
     ).fetchall()
     conn.close()
@@ -830,7 +834,7 @@ def borrar_curso():
     if not curso:
         return redirect(url_for("formacion.formacion"))
     conn = get_form_conn()
-    conn.execute("DELETE FROM alumnos WHERE curso=? AND tutor_id=?", (curso, tutor_id))
+    conn.execute("DELETE FROM alumnos WHERE curso=%s AND tutor_id=%s", (curso, tutor_id))
     _registrar_evento_historico(tutor_id, f"Borrado curso: {curso}", conn)
     conn.commit()
     conn.close()
@@ -844,7 +848,7 @@ def toggle_no_llamar(alumno_id):
     valor = 1 if datos.get("no_llamar") else 0
     conn  = get_form_conn()
     conn.execute(
-        "UPDATE alumnos SET no_llamar=? WHERE id=? AND (tutor_id=? OR tutor_id IS NULL)",
+        "UPDATE alumnos SET no_llamar=%s WHERE id=%s AND (tutor_id=%s OR tutor_id IS NULL)",
         (valor, alumno_id, session["user_id"])
     )
     conn.commit()
@@ -859,8 +863,8 @@ def editar_alumno(alumno_id):
     telefono = request.form.get("telefono", "").strip()
     conn = get_form_conn()
     # Permite editar si el alumno pertenece al tutor O si tutor_id es NULL (migrado)
-    conn.execute("""UPDATE alumnos SET telefono=?
-                    WHERE id=? AND (tutor_id=? OR tutor_id IS NULL)""",
+    conn.execute("""UPDATE alumnos SET telefono=%s
+                    WHERE id=%s AND (tutor_id=%s OR tutor_id IS NULL)""",
                  (telefono, alumno_id, session["user_id"]))
     conn.commit()
     conn.close()
@@ -872,7 +876,7 @@ def editar_alumno(alumno_id):
 @login_required
 def eliminar_alumno(alumno_id):
     conn = get_form_conn()
-    conn.execute("DELETE FROM alumnos WHERE id=? AND tutor_id=?",
+    conn.execute("DELETE FROM alumnos WHERE id=%s AND tutor_id=%s",
                  (alumno_id, session["user_id"]))
     _registrar_evento_historico(session["user_id"], "Eliminación de alumno", conn)
     conn.commit()
@@ -885,7 +889,7 @@ def eliminar_alumno(alumno_id):
 @login_required
 def borrar_todos():
     conn = get_form_conn()
-    conn.execute("DELETE FROM alumnos WHERE tutor_id=?", (session["user_id"],))
+    conn.execute("DELETE FROM alumnos WHERE tutor_id=%s", (session["user_id"],))
     _registrar_evento_historico(session["user_id"], "Borrado total", conn)
     conn.commit()
     conn.close()
@@ -905,8 +909,8 @@ def archivar_curso():
     conn  = get_form_conn()
     conn.execute("""
         UPDATE alumnos
-        SET archivado=1, archivado_at=?
-        WHERE tutor_id=? AND curso=? AND (archivado IS NULL OR archivado=0)
+        SET archivado=1, archivado_at=%s
+        WHERE tutor_id=%s AND curso=%s AND (archivado IS NULL OR archivado=0)
     """, (ahora, tutor_id, curso))
     _registrar_evento_historico(tutor_id, f"Curso archivado: {curso}", conn)
     conn.commit()
@@ -927,7 +931,7 @@ def restaurar_curso():
     conn.execute("""
         UPDATE alumnos
         SET archivado=0, archivado_at=NULL
-        WHERE tutor_id=? AND curso=? AND archivado=1
+        WHERE tutor_id=%s AND curso=%s AND archivado=1
     """, (tutor_id, curso))
     _registrar_evento_historico(tutor_id, f"Curso restaurado: {curso}", conn)
     conn.commit()
@@ -944,7 +948,7 @@ def formacion_archivados():
 
     alumnos_arch = [dict(a) for a in conn.execute(
         """SELECT * FROM alumnos
-           WHERE tutor_id=? AND archivado=1
+           WHERE tutor_id=%s AND archivado=1
            ORDER BY archivado_at DESC, curso, nombre""",
         (tutor_id,)
     ).fetchall()]
@@ -1063,7 +1067,7 @@ def guardar_snapshot():
 
     conn    = get_form_conn()
     alumnos = conn.execute(
-        "SELECT * FROM alumnos WHERE tutor_id=? AND (archivado IS NULL OR archivado=0)", (tutor_id,)
+        "SELECT * FROM alumnos WHERE tutor_id=%s AND (archivado IS NULL OR archivado=0)", (tutor_id,)
     ).fetchall()
 
     total        = len(alumnos)
@@ -1073,7 +1077,7 @@ def guardar_snapshot():
 
     conn.execute("""
         INSERT INTO historial_snapshots (tutor_id, fecha, label, total, superan_75, pct_exito, avg_progreso)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
     """, (tutor_id, fecha, label, total, superan_75, pct_exito, avg_progreso))
     conn.commit()
     conn.close()
@@ -1085,7 +1089,7 @@ def guardar_snapshot():
 @login_required
 def borrar_snapshot(snap_id):
     conn = get_form_conn()
-    conn.execute("DELETE FROM historial_snapshots WHERE id=? AND tutor_id=?",
+    conn.execute("DELETE FROM historial_snapshots WHERE id=%s AND tutor_id=%s",
                  (snap_id, session["user_id"]))
     conn.commit()
     conn.close()
@@ -1097,7 +1101,7 @@ def borrar_snapshot(snap_id):
 @login_required
 def borrar_historial_auto():
     conn = get_form_conn()
-    conn.execute("DELETE FROM historial_automatico WHERE tutor_id=?", (session["user_id"],))
+    conn.execute("DELETE FROM historial_automatico WHERE tutor_id=%s", (session["user_id"],))
     conn.commit()
     conn.close()
     return redirect(url_for("formacion.formacion_dashboard"))
@@ -1123,7 +1127,7 @@ def formacion_alarmas():
     conn2 = get_form_conn()
     alumnos_cursos = [dict(a) for a in conn2.execute(
         "SELECT curso, progreso, supera_75, fecha_inicio, fecha_fin, no_llamar FROM alumnos "
-        "WHERE tutor_id=? AND (archivado IS NULL OR archivado=0)",
+        "WHERE tutor_id=%s AND (archivado IS NULL OR archivado=0)",
         (tutor_id,)
     ).fetchall()]
     conn2.close()
@@ -1183,12 +1187,12 @@ def alarma_completar():
     conn = get_form_conn()
     if accion == "deshacer":
         conn.execute(
-            "DELETE FROM alarmas_completadas WHERE tutor_id=? AND clave=? AND fecha_dia=?",
+            "DELETE FROM alarmas_completadas WHERE tutor_id=%s AND clave=%s AND fecha_dia=%s",
             (tutor_id, clave, hoy)
         )
     else:
         conn.execute(
-            "INSERT IGNORE INTO alarmas_completadas (tutor_id, clave, fecha_dia) VALUES (?,?,?)",
+            "INSERT IGNORE INTO alarmas_completadas (tutor_id, clave, fecha_dia) VALUES (%s,%s,%s)",
             (tutor_id, clave, hoy)
         )
     conn.commit()
@@ -1216,7 +1220,7 @@ def formacion_calendar_data():
     conn = get_form_conn()
     alumnos = [dict(a) for a in conn.execute(
         "SELECT id, nombre, curso, fecha_inicio, fecha_fin "
-        "FROM alumnos WHERE tutor_id=? AND (archivado IS NULL OR archivado=0)",
+        "FROM alumnos WHERE tutor_id=%s AND (archivado IS NULL OR archivado=0)",
         (tutor_id,)
     ).fetchall()]
     conn.close()
@@ -1267,7 +1271,7 @@ def formacion_calendar_data():
         )
     """)
     rows = conn2.execute(
-        "SELECT id, fecha, nota, color FROM notas_calendario WHERE tutor_id=? ORDER BY id ASC",
+        "SELECT id, fecha, nota, color FROM notas_calendario WHERE tutor_id=%s ORDER BY id ASC",
         (tutor_id,)
     ).fetchall()
     conn2.commit()
@@ -1306,13 +1310,13 @@ def guardar_nota_calendario():
     """)
     if nota_id:
         conn.execute(
-            "UPDATE notas_calendario SET nota=?, color=? WHERE id=? AND tutor_id=?",
+            "UPDATE notas_calendario SET nota=%s, color=%s WHERE id=%s AND tutor_id=%s",
             (nota, color, nota_id, tutor_id)
         )
         new_id = nota_id
     else:
         cur = conn.execute(
-            "INSERT INTO notas_calendario (tutor_id, fecha, nota, color) VALUES (?,?,?,?)",
+            "INSERT INTO notas_calendario (tutor_id, fecha, nota, color) VALUES (%s,%s,%s,%s)",
             (tutor_id, fecha, nota, color)
         )
         new_id = cur.lastrowid
@@ -1328,7 +1332,7 @@ def borrar_nota_calendario(nota_id):
     tutor_id = session["user_id"]
     conn = get_form_conn()
     conn.execute(
-        "DELETE FROM notas_calendario WHERE id=? AND tutor_id=?",
+        "DELETE FROM notas_calendario WHERE id=%s AND tutor_id=%s",
         (nota_id, tutor_id)
     )
     conn.commit()
@@ -1345,14 +1349,14 @@ def formacion_dashboard():
 
     # Convertir a dicts para que tojson pueda serializarlos en el template
     alumnos = [dict(a) for a in conn.execute(
-        "SELECT * FROM alumnos WHERE tutor_id=? AND (archivado IS NULL OR archivado=0) ORDER BY progreso DESC", (tutor_id,)
+        "SELECT * FROM alumnos WHERE tutor_id=%s AND (archivado IS NULL OR archivado=0) ORDER BY progreso DESC", (tutor_id,)
     ).fetchall()]
 
     # Adjuntar historial de progreso a cada alumno
     for a in alumnos:
         hist = conn.execute(
             "SELECT fecha_import, progreso, examenes, delta_progreso, avanzo "
-            "FROM progreso_historial WHERE alumno_id=? ORDER BY fecha_import ASC",
+            "FROM progreso_historial WHERE alumno_id=%s ORDER BY fecha_import ASC",
             (a["id"],)
         ).fetchall()
         a["historial"] = [dict(h) for h in hist]
@@ -1380,7 +1384,7 @@ def formacion_dashboard():
     # Snapshots históricos (también como dicts)
     conn2     = get_form_conn()
     snapshots = [dict(s) for s in conn2.execute(
-        "SELECT * FROM historial_snapshots WHERE tutor_id=? ORDER BY fecha ASC", (tutor_id,)
+        "SELECT * FROM historial_snapshots WHERE tutor_id=%s ORDER BY fecha ASC", (tutor_id,)
     ).fetchall()]
     conn2.close()
 
@@ -1392,7 +1396,7 @@ def formacion_dashboard():
     # Historial automático
     conn3    = get_form_conn()
     historial_auto = [dict(h) for h in conn3.execute(
-        "SELECT * FROM historial_automatico WHERE tutor_id=? ORDER BY id DESC LIMIT 50",
+        "SELECT * FROM historial_automatico WHERE tutor_id=%s ORDER BY id DESC LIMIT 50",
         (tutor_id,)
     ).fetchall()]
     conn3.close()
@@ -1451,7 +1455,7 @@ def descargar_modelo():
 @login_required
 def whatsapp_alumno(alumno_id):
     conn   = get_form_conn()
-    alumno = conn.execute("SELECT * FROM alumnos WHERE id=?", (alumno_id,)).fetchone()
+    alumno = conn.execute("SELECT * FROM alumnos WHERE id=%s", (alumno_id,)).fetchone()
     conn.close()
 
     if not alumno:
@@ -1712,7 +1716,7 @@ def formacion_ia():
     tutor_id = session["user_id"]
     conn     = get_form_conn()
     cursos   = [r[0] for r in conn.execute(
-        "SELECT DISTINCT curso FROM alumnos WHERE tutor_id=? AND (archivado IS NULL OR archivado=0) AND curso IS NOT NULL ORDER BY curso",
+        "SELECT DISTINCT curso FROM alumnos WHERE tutor_id=%s AND (archivado IS NULL OR archivado=0) AND curso IS NOT NULL ORDER BY curso",
         (tutor_id,)
     ).fetchall()]
     conn.close()
@@ -1862,16 +1866,16 @@ def exportar_curso_excel():
     curso    = request.args.get("curso", "").strip()
 
     conn = get_form_conn()
-    query = "SELECT * FROM alumnos WHERE tutor_id=? AND (archivado IS NULL OR archivado=0)"
+    query = "SELECT * FROM alumnos WHERE tutor_id=%s AND (archivado IS NULL OR archivado=0)"
     params = [tutor_id]
     if curso:
-        query += " AND curso=?"
+        query += " AND curso=%s"
         params.append(curso)
     query += " ORDER BY progreso DESC, nombre ASC"
     alumnos = [dict(a) for a in conn.execute(query, params).fetchall()]
     # Cargar observaciones de todos los alumnos del tutor
     obs_rows = conn.execute(
-        "SELECT alumno_id, texto, created_at FROM observaciones_alumno WHERE tutor_id=? ORDER BY created_at ASC",
+        "SELECT alumno_id, texto, created_at FROM observaciones_alumno WHERE tutor_id=%s ORDER BY created_at ASC",
         (tutor_id,)
     ).fetchall()
     obs_map = {}
@@ -2034,11 +2038,11 @@ def exportar_excel():
     tutor_id = session["user_id"]
     conn     = get_form_conn()
     alumnos  = [dict(a) for a in conn.execute(
-        "SELECT * FROM alumnos WHERE tutor_id=? AND (archivado IS NULL OR archivado=0) ORDER BY curso, nombre", (tutor_id,)
+        "SELECT * FROM alumnos WHERE tutor_id=%s AND (archivado IS NULL OR archivado=0) ORDER BY curso, nombre", (tutor_id,)
     ).fetchall()]
     # Cargar observaciones
     obs_rows2 = conn.execute(
-        "SELECT alumno_id, texto, created_at FROM observaciones_alumno WHERE tutor_id=? ORDER BY created_at ASC",
+        "SELECT alumno_id, texto, created_at FROM observaciones_alumno WHERE tutor_id=%s ORDER BY created_at ASC",
         (tutor_id,)
     ).fetchall()
     obs_map2 = {}
@@ -2321,8 +2325,8 @@ def alumno_gestion(alumno_id):
     conn = get_form_conn()
     conn.execute(
         """UPDATE alumnos
-           SET gestionado=?, tipo_gestion=?, comentario=?, fecha_gestion=?
-           WHERE id=? AND tutor_id=?""",
+           SET gestionado=%s, tipo_gestion=%s, comentario=%s, fecha_gestion=%s
+           WHERE id=%s AND tutor_id=%s""",
         (gestionado, tipo_gestion, comentario, fecha_gestion, alumno_id, tutor_id)
     )
     conn.commit()
