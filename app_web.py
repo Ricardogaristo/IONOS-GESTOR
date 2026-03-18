@@ -242,7 +242,8 @@ def index():
     per_page = 10
 
     filtros, params = [], []
-    if es_admin < 1:
+    # Solo SuperAdmin (es_admin=2) ve tareas de todos. Admin ve solo las suyas.
+    if es_admin < 2:
         filtros.append("usuario_id = ?"); params.append(user_id)
     if filtro_estado == "pending":
         filtros.append("completada = 0")
@@ -279,7 +280,7 @@ def index():
         for s in conn.execute(f"SELECT * FROM subtareas WHERE tarea_id IN ({ph}) ORDER BY id", ids).fetchall():
             subtareas_map.setdefault(s["tarea_id"], []).append(dict(s))
 
-    if es_admin >= 1:
+    if es_admin >= 2:
         cats = conn.execute("SELECT DISTINCT COALESCE(NULLIF(TRIM(categoria),''),'General') AS cat FROM tareas ORDER BY cat").fetchall()
     else:
         cats = conn.execute("SELECT DISTINCT COALESCE(NULLIF(TRIM(categoria),''),'General') AS cat FROM tareas WHERE usuario_id=? ORDER BY cat", (user_id,)).fetchall()
@@ -601,7 +602,7 @@ def admin_toggle_completada(tid):
 @login_required
 def completar(id):
     conn = get_connection()
-    if session.get("es_admin", 0) >= 1:
+    if session.get("es_admin", 0) >= 2:
         conn.execute("UPDATE tareas SET completada=1, fecha_completada=NOW() WHERE id=?", (id,))
     else:
         conn.execute("UPDATE tareas SET completada=1, fecha_completada=NOW() WHERE id=? AND usuario_id=?", (id, session["user_id"]))
@@ -613,7 +614,7 @@ def completar(id):
 @login_required
 def eliminar(id):
     conn = get_connection()
-    if session.get("es_admin", 0) >= 1:
+    if session.get("es_admin", 0) >= 2:
         conn.execute("DELETE FROM tareas WHERE id=?", (id,))
     else:
         conn.execute("DELETE FROM tareas WHERE id=? AND usuario_id=?", (id, session["user_id"]))
@@ -625,7 +626,7 @@ def eliminar(id):
 @login_required
 def favorita(id):
     conn = get_connection()
-    if session.get("es_admin", 0) >= 1:
+    if session.get("es_admin", 0) >= 2:
         conn.execute("UPDATE tareas SET favorita=1-favorita WHERE id=?", (id,))
     else:
         conn.execute("UPDATE tareas SET favorita=1-favorita WHERE id=? AND usuario_id=?", (id, session["user_id"]))
@@ -707,8 +708,8 @@ def dashboard():
     es_admin = session.get("es_admin", 0)
     conn     = get_connection()
 
-    filtro = "" if es_admin >= 1 else "WHERE usuario_id = ?"
-    params = () if es_admin >= 1 else (user_id,)
+    filtro = "" if es_admin >= 2 else "WHERE usuario_id = ?"
+    params = () if es_admin >= 2 else (user_id,)
 
     stats = conn.execute(f"""
         SELECT COUNT(*) AS total, SUM(CASE WHEN completada=1 THEN 1 ELSE 0 END) AS completadas
@@ -948,7 +949,7 @@ def _hoja_hoy(wb,tareas_hoy,hoy_str):
 def exportar():
     hoy      = datetime.now().strftime("%Y-%m-%d")
     user_id  = session.get("user_id")
-    es_admin = session.get("es_admin", 0) >= 1
+    es_admin = session.get("es_admin", 0) >= 2  # Solo SuperAdmin exporta todo
     username = session.get("user", "sistema")
     conn     = get_connection()
     base_q   = "SELECT t.id,t.descripcion,t.categoria,t.fecha,t.completada,t.codigo,t.usuario_id,u.username FROM tareas t LEFT JOIN usuarios u ON t.usuario_id=u.id "
