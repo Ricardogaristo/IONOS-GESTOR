@@ -135,8 +135,14 @@ def subir_zip():
     else:
         safe_name = secure_filename(f.filename)
 
-    # Leer y validar tamaño
-    data = f.read()
+    # Leer el stream — puede fallar si la conexión se cortó durante la subida
+    try:
+        data = f.read()
+    except OSError as e:
+        return jsonify({
+            "error": f"Error al leer el archivo recibido (la conexión pudo cortarse): {e.strerror}"
+        }), 400
+
     size_mb = len(data) / (1024 * 1024)
     if size_mb > MAX_ZIP_MB:
         return jsonify({"error": f"El archivo supera el límite de {MAX_ZIP_MB} MB"}), 413
@@ -148,9 +154,15 @@ def subir_zip():
     except zipfile.BadZipFile:
         return jsonify({"error": "El archivo no es un ZIP válido"}), 400
 
+    # Guardar en disco
     dest = os.path.join(_tutor_dir(tutor_id), safe_name)
-    with open(dest, "wb") as out:
-        out.write(data)
+    try:
+        with open(dest, "wb") as out:
+            out.write(data)
+    except OSError as e:
+        return jsonify({
+            "error": f"Error al guardar el archivo en el servidor: {e.strerror} (errno {e.errno})"
+        }), 500
 
     return jsonify({
         "ok":        True,
