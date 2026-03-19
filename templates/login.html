@@ -271,7 +271,7 @@
     }
     .btn-cv .cv-meta { display: flex; flex-direction: column; gap: .05rem; }
     .btn-cv .cv-name { font-weight: 500; color: var(--ink); font-size: .82rem; }
-    .btn-cv .cv-desc { font-size: .68rem; color: var(--ink3); }
+    .btn-cv .cv-desc { font-size: .68rem; #ffffff; }
     .btn-cv .cv-dl {
       font-family: 'JetBrains Mono', monospace;
       font-size: .68rem; color: var(--red);
@@ -300,7 +300,19 @@
     <div class="mark-dot"></div>
     <span class="mark-name">gestor<span>/</span>tareas</span>
   </div>
-
+    <!-- Botón descarga CV -->
+    <a class="btn-cv"
+       href="{{ url_for('static', filename='cv/CV_Ricardo_Garisto_Viso.pdf') }}"
+       download="CV_Ricardo_Garisto_Viso.pdf">
+      <div class="cv-left">
+        <div class="cv-icon">📄</div>
+        <div class="cv-meta">
+          <span class="cv-name">Ricardo Garisto Viso</span>
+          <span class="cv-desc">Consultor técnico · e-learning · sistemas</span>
+        </div>
+      </div>
+      <span class="cv-dl">↓ CV</span>
+    </a> </br>
   <h1>Bienvenido<br>de <em>vuelta.</em></h1>
   <h2 style="font-size:.9rem; font-weight:300; color:var(--ink2); margin-top:.3rem; margin-bottom:.5rem;">Gestor Práctico para tus tareas</h2>
   <p class="sub">¿No tienes cuenta? <a href="{{ url_for('auth.registro') }}">Regístrate</a></p>
@@ -379,20 +391,6 @@
         </a>
       </div>
     </div>
-
-    <!-- Botón descarga CV -->
-    <a class="btn-cv"
-       href="{{ url_for('static', filename='cv/CV_Ricardo_Garisto_Viso.pdf') }}"
-       download="CV_Ricardo_Garisto_Viso.pdf">
-      <div class="cv-left">
-        <div class="cv-icon">📄</div>
-        <div class="cv-meta">
-          <span class="cv-name">Ricardo Garisto Viso</span>
-          <span class="cv-desc">Consultor técnico · e-learning · sistemas</span>
-        </div>
-      </div>
-      <span class="cv-dl">↓ CV</span>
-    </a>
 
   </div>
 
