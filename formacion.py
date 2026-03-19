@@ -589,23 +589,29 @@ def formacion():
     exito    = None
 
     if request.method == "POST":
-        arch = request.files.get("excel")
+        # ── Leer bytes INMEDIATAMENTE, antes de cualquier otra operación ──
+        # Evita [Errno 5] Input/output error: el fichero temporal de Werkzeug
+        # se cierra/elimina si el worker tarda o hay timeout de red.
+        arch_bytes    = None
+        arch_filename = ""
+        try:
+            arch = request.files.get("excel")
+            if arch:
+                arch_filename = arch.filename or ""
+                arch_bytes    = arch.read()   # consumir el stream de inmediato
+        except Exception as e:
+            errores.append(f"No se pudo leer el archivo subido: {e}")
 
-        if not arch or not arch.filename.endswith((".xlsx", ".xls")):
+        # ── Validaciones sobre los datos ya leídos ────────────────────────
+        if not errores and not arch_bytes:
+            errores.append("No se recibió ningún archivo.")
+
+        if not errores and not arch_filename.endswith((".xlsx", ".xls")):
             errores.append("Sube un archivo Excel (.xlsx o .xls).")
 
-        # ── Leer el archivo a memoria ANTES de cualquier otra operación ────
-        # Evita [Errno 5] Input/output error: el fichero temporal de Werkzeug
-        # puede cerrarse si el worker tarda o hay timeout de red.
-        arch_bytes = None
-        if not errores:
-            try:
-                arch_bytes = arch.read()
-            except Exception as e:
-                errores.append(f"No se pudo leer el archivo subido: {e}")
-            if arch_bytes is not None and not arch_bytes:
-                errores.append("El archivo subido está vacío.")
-                arch_bytes = None
+        if not errores and not arch_bytes:
+            errores.append("El archivo subido está vacío.")
+            arch_bytes = None
 
         if not errores:
             try:
