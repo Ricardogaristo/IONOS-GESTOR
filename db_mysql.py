@@ -19,15 +19,13 @@ load_dotenv()
 
 # ── Configuración ──────────────────────────────────────────────────────────────
 MYSQL_CONFIG = {
-    'host':               os.getenv('MYSQL_HOST', 'localhost'),
-    'port':               int(os.getenv('MYSQL_PORT', '3306')),
-    'user':               os.getenv('MYSQL_USER', 'root'),
-    'password':           os.getenv('MYSQL_PASSWORD', ''),
-    'database':           os.getenv('MYSQL_DB', 'formacion'),
-    'charset':            'utf8mb4',
-    'autocommit':         False,
-    'connection_timeout': 10,       # falla rápido si MySQL no responde
-    'autoReconnect':      True,     # reconectar automáticamente si se cae
+    'host':     os.getenv('MYSQL_HOST', 'localhost'),
+    'port':     int(os.getenv('MYSQL_PORT', '3306')),
+    'user':     os.getenv('MYSQL_USER', 'root'),
+    'password': os.getenv('MYSQL_PASSWORD', ''),
+    'database': os.getenv('MYSQL_DB', 'formacion'),
+    'charset':  'utf8mb4',
+    'autocommit': False,
 }
 
 
@@ -161,52 +159,22 @@ class MysqlConnectionWrapper:
 
 # ── Conexión principal ─────────────────────────────────────────────────────────
 def get_form_conn() -> MysqlConnectionWrapper:
-    """
-    Devuelve una conexión MySQL fresca y verificada.
-    - Si la DB no existe, la crea automáticamente.
-    - Hace ping antes de devolver la conexión para detectar conexiones muertas
-      (evita [Errno 5] causado por wait_timeout de MySQL tras horas de inactividad).
-    """
+    """Devuelve una conexión MySQL. Si la DB no existe, la crea automáticamente."""
     db_name = MYSQL_CONFIG["database"]
-
-    # Excluir claves no reconocidas por mysql.connector al conectar sin DB
-    _CONNECT_KEYS = {"host","port","user","password","database","charset",
-                     "autocommit","connection_timeout"}
-
-    def _connect():
-        try:
-            conn = mysql.connector.connect(**MYSQL_CONFIG)
-        except mysql.connector.errors.ProgrammingError as e:
-            if e.errno != 1049:
-                raise
-            # DB no existe: crearla
-            cfg = {k: v for k, v in MYSQL_CONFIG.items()
-                   if k in _CONNECT_KEYS and k != "database"}
-            tmp = mysql.connector.connect(**cfg)
-            cur = tmp.cursor()
-            cur.execute(
-                "CREATE DATABASE IF NOT EXISTS `" + db_name + "` "
-                "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-            )
-            tmp.commit(); cur.close(); tmp.close()
-            print(f"✅ Base de datos '{db_name}' creada automáticamente.")
-            conn = mysql.connector.connect(**MYSQL_CONFIG)
-        return conn
-
-    conn = _connect()
-
-    # Ping para detectar conexiones muertas (wait_timeout expirado).
-    # reconnect=True hace que mysql.connector reabra la conexión si está caída.
     try:
-        conn.ping(reconnect=True, attempts=3, delay=1)
-    except Exception:
-        # Si el ping falla del todo, abrimos una conexión completamente nueva.
-        try:
-            conn.close()
-        except Exception:
-            pass
-        conn = _connect()
-
+        conn = mysql.connector.connect(**MYSQL_CONFIG)
+        return MysqlConnectionWrapper(conn)
+    except mysql.connector.errors.ProgrammingError as e:
+        if e.errno != 1049:
+            raise
+    # DB no existe: crearla
+    cfg = {k: v for k, v in MYSQL_CONFIG.items() if k != "database"}
+    tmp = mysql.connector.connect(**cfg)
+    cur = tmp.cursor()
+    cur.execute("CREATE DATABASE IF NOT EXISTS `" + db_name + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+    tmp.commit(); cur.close(); tmp.close()
+    print(f"✅ Base de datos '{db_name}' creada automáticamente.")
+    conn = mysql.connector.connect(**MYSQL_CONFIG)
     return MysqlConnectionWrapper(conn)
 
 
