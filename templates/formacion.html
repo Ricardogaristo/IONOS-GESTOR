@@ -308,8 +308,10 @@
             </td>
 
             <td data-label="Inicio / Fin" style="font-family:var(--mono); font-size:.72rem; white-space:nowrap; color:var(--text-muted);">
-              <div>{{ a['fecha_inicio'] if a['fecha_inicio'] else '—' }}</div>
-              <div style="color:var(--text-muted); opacity:.7;">{{ a['fecha_fin'] if a['fecha_fin'] else '—' }}</div>
+              {% set fi = a['fecha_inicio'] %}
+              {% set ff = a['fecha_fin'] %}
+              <div>{{ fi[8:10] + '/' + fi[5:7] + '/' + fi[0:4] if fi and fi|length >= 10 else '—' }}</div>
+              <div style="color:var(--text-muted); opacity:.7;">{{ ff[8:10] + '/' + ff[5:7] + '/' + ff[0:4] if ff and ff|length >= 10 else '—' }}</div>
             </td>
 
             <td data-label="Estado" style="text-align:center;">
@@ -790,6 +792,15 @@ function selTipo(btn) {
   btn.classList.add('active');
   _tipoActual = btn.dataset.tipo;
   rellenarPlantilla();
+}
+
+/* ── Formatea YYYY-MM-DD → DD/MM/YYYY (display corto) ─────────── */
+function fmtFechaCorta(iso) {
+  if (!iso) return '';
+  const p = String(iso).trim().split(/[-/]/);
+  if (p.length < 3) return iso;
+  if (p[0].length === 4) return `${p[2].slice(0,2)}/${p[1]}/${p[0]}`;
+  return iso;
 }
 
 /* ── Plantillas rápidas sin IA ─────────────────────────────────── */
@@ -1454,7 +1465,7 @@ function renderHistorial(data) {
 
   // Subtítulo
   document.getElementById('hist-subtitulo').textContent =
-    `${n} importación${n !== 1 ? 'es' : ''} · ${primera.fecha_import} → ${ultima.fecha_import}`;
+    `${n} importación${n !== 1 ? 'es' : ''} · ${fmtFechaCorta(primera.fecha_import)} → ${fmtFechaCorta(ultima.fecha_import)}`;
 
   // KPI cards
   const kpiEl   = document.getElementById('hist-kpi');
@@ -1513,7 +1524,7 @@ function renderHistorial(data) {
     <div class="htl-item">
       <div class="htl-dot ${dotClass}">${icon}</div>
       <div class="htl-body">
-        <div class="htl-fecha">${item.fecha_import} <span style="opacity:.55;">— ${label}</span></div>
+        <div class="htl-fecha">${fmtFechaCorta(item.fecha_import)} <span style="opacity:.55;">— ${label}</span></div>
         <div class="htl-prog">
           <span style="color:${barColor};">${prog}%</span>
           ${deltaHtml}
