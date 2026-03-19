@@ -757,7 +757,10 @@ def dashboard():
                            ultimas_tareas=ultimas_tareas, categorias=categorias, cantidades=cantidades,
                            todas_tareas=todas_tareas)
 
-
+@app.route("/coordinador")
+@login_required
+def coordinador():
+    return render_template("coordinador.html")
 # ── SUPERADMIN: GRÁFICOS GLOBALES ──────────────────────────────────────────────
 
 @app.route("/superadmin")
