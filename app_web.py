@@ -58,6 +58,7 @@ app.config.update(
     SESSION_COOKIE_SAMESITE  = "Lax",  # Protección básica CSRF en cookies
     SESSION_COOKIE_SECURE    = False,  # Cambiar a True cuando uses HTTPS en producción
     PERMANENT_SESSION_LIFETIME = timedelta(hours=8),
+    MAX_CONTENT_LENGTH       = 16 * 1024 * 1024,  # 16 MB máximo por subida
 )
 
 app.register_blueprint(formacion_bp)

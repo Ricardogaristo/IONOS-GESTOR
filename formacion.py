@@ -272,7 +272,7 @@ def _deduplicar_alumnos(tutor_id, conn):
         # Borrar duplicados
         conn.execute(
             "DELETE FROM alumnos WHERE id IN ({})".format(
-                ",".join("?" * len(del_ids))
+                ",".join(["%s"] * len(del_ids))
             ),
             del_ids
         )

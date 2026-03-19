@@ -199,9 +199,9 @@ def _cargar_desde_db(
     tutor_id: int | None = None,
     incluir_archivados: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Extrae las dos fuentes de la tabla `alumnos` de formacion.db."""
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+    """Extrae las dos fuentes de la tabla `alumnos` usando get_form_conn (MySQL)."""
+    from db_mysql import get_form_conn
+    conn = get_form_conn()
 
     filtros = []
     params: list[Any] = []
@@ -209,7 +209,7 @@ def _cargar_desde_db(
     if not incluir_archivados:
         filtros.append("(archivado IS NULL OR archivado = 0)")
     if tutor_id is not None:
-        filtros.append("tutor_id = ?")
+        filtros.append("tutor_id = %s")
         params.append(tutor_id)
 
     where = ("WHERE " + " AND ".join(filtros)) if filtros else ""
