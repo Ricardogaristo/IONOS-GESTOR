@@ -14,40 +14,7 @@
   <a href="/?nueva=1" class="btn btn-g-primary btn-sm">＋ Nueva tarea</a>
 </div>
 
-<!-- ══ KPI GLOBALES ══════════════════════════════════════════════════════════ -->
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
-    <div class="stat-card blue">
-      <div class="stat-label">Total tareas</div>
-      <div class="stat-value">{{ kpi_total }}</div>
-      <div style="font-size:.72rem; color:var(--text-muted);">{{ kpi_usuarios }} usuario{{ 's' if kpi_usuarios!=1 else '' }}</div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card green">
-      <div class="stat-label">Completadas</div>
-      <div class="stat-value" style="color:var(--accent);">{{ kpi_completadas }}</div>
-      <div style="font-size:.72rem; color:var(--text-muted);">{{ ((kpi_completadas/kpi_total)*100)|round(1) if kpi_total else 0 }}%</div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card amber">
-      <div class="stat-label">Pendientes</div>
-      <div class="stat-value" style="color:var(--amber);">{{ kpi_pendientes }}</div>
-      <div style="font-size:.72rem; color:var(--text-muted);">{{ ((kpi_pendientes/kpi_total)*100)|round(1) if kpi_total else 0 }}%</div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card red">
-      <div class="stat-label">Progreso global</div>
-      {% set pct_g = ((kpi_completadas/kpi_total)*100)|round(1) if kpi_total else 0 %}
-      <div class="stat-value" style="font-size:1.5rem; color:var(--accent);">{{ pct_g }}%</div>
-      <div style="margin-top:.35rem; height:5px; background:var(--bg3); border-radius:99px; overflow:hidden;">
-        <div style="height:100%; width:{{ pct_g }}%; background:var(--accent); border-radius:99px;"></div>
-      </div>
-    </div>
-  </div>
-</div>
+
 
 <!-- ══ GRÁFICOS ══════════════════════════════════════════════════════════════ -->
 <div class="row g-3 mb-4">
