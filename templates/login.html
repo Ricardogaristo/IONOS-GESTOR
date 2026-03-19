@@ -5,7 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Acceso — Gestor Garisto</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Favicon: punto rojo igual que en base.html -->
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" sizes="32x32">
+
   <style>
     :root {
       --bg:      #0c0b0a;
@@ -52,7 +57,7 @@
 
     .card {
       position: relative; z-index: 1;
-      width: 100%; max-width: 380px;
+      width: 100%; max-width: 400px;
       animation: rise .5s cubic-bezier(.22,1,.36,1) both;
     }
 
@@ -61,24 +66,26 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* Mark */
+    /* ── MARK / LOGO ── igual que navbar de base.html */
     .mark {
-      display: flex; align-items: center; gap: .6rem;
+      display: flex; align-items: center; gap: .65rem;
       margin-bottom: 2.8rem;
     }
-    .mark-icon {
-      width: 34px; height: 34px;
+    /* Punto rojo — copia exacta del .dot de base.html */
+    .mark-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
       background: var(--red);
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1rem;
-      box-shadow: 0 0 20px rgba(200,41,10,.35);
+      box-shadow: 0 0 10px rgba(200,41,10,.55);
+      flex-shrink: 0;
     }
     .mark-name {
-      font-size: .72rem; font-weight: 500;
-      letter-spacing: .1em; text-transform: uppercase;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .78rem; font-weight: 500;
+      letter-spacing: .03em;
       color: var(--ink2);
     }
+    .mark-name span { color: var(--ink3); }
 
     /* Heading */
     h1 {
@@ -173,6 +180,104 @@
     .btn .arr { transition: transform .15s; display: inline-block; }
     .btn:hover .arr { transform: translateX(4px); }
 
+    /* ── README + CV SECTION ── */
+    .about-section {
+      margin-top: 2.6rem;
+      border-top: 1px solid var(--border);
+      padding-top: 2rem;
+      animation: rise .6s .15s cubic-bezier(.22,1,.36,1) both;
+    }
+
+    .about-label {
+      font-size: .6rem; font-weight: 500;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: var(--ink3);
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 1rem;
+      display: flex; align-items: center; gap: .5rem;
+    }
+    .about-label::after {
+      content: '';
+      flex: 1; height: 1px;
+      background: var(--border);
+    }
+
+    .readme {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.2rem 1.3rem;
+      font-size: .8rem;
+      line-height: 1.7;
+      color: var(--ink2);
+      margin-bottom: 1rem;
+    }
+    .readme strong {
+      color: var(--ink);
+      font-weight: 500;
+    }
+    .readme .readme-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.05rem;
+      color: var(--ink);
+      margin-bottom: .55rem;
+      letter-spacing: -.01em;
+    }
+    .readme ul {
+      padding-left: 1.1rem;
+      margin: .4rem 0 0;
+      display: flex; flex-direction: column; gap: .2rem;
+    }
+    .readme ul li::marker { color: var(--red); }
+    .readme .tag {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .68rem;
+      background: var(--red-dim);
+      border: 1px solid rgba(200,41,10,.2);
+      color: #e8724e;
+      border-radius: 4px;
+      padding: .1rem .45rem;
+      margin-right: .25rem;
+    }
+
+    /* CV download button */
+    .btn-cv {
+      display: flex; align-items: center; justify-content: space-between;
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: .7rem 1rem;
+      color: var(--ink2);
+      font-size: .8rem;
+      text-decoration: none;
+      transition: border-color .15s, color .15s, background .15s;
+      gap: .5rem;
+    }
+    .btn-cv:hover {
+      border-color: rgba(200,41,10,.5);
+      color: var(--ink);
+      background: #181614;
+    }
+    .btn-cv .cv-left { display: flex; align-items: center; gap: .55rem; }
+    .btn-cv .cv-icon {
+      font-size: 1.05rem;
+      width: 28px; height: 28px;
+      background: var(--red-dim);
+      border: 1px solid rgba(200,41,10,.2);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .btn-cv .cv-meta { display: flex; flex-direction: column; gap: .05rem; }
+    .btn-cv .cv-name { font-weight: 500; color: var(--ink); font-size: .82rem; }
+    .btn-cv .cv-desc { font-size: .68rem; color: var(--ink3); }
+    .btn-cv .cv-dl {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .68rem; color: var(--red);
+      letter-spacing: .04em;
+    }
+
     /* Footer */
     .foot {
       margin-top: 2.5rem;
@@ -190,13 +295,14 @@
 
 <div class="card">
 
+  <!-- LOGO: punto rojo + nombre, igual que la navbar de base.html -->
   <div class="mark">
-    <div class="mark-icon">🗂</div>
-    <span class="mark-name">Gestor Garisto</span>
+    <div class="mark-dot"></div>
+    <span class="mark-name">gestor<span>/</span>tareas</span>
   </div>
 
   <h1>Bienvenido<br>de <em>vuelta.</em></h1>
-  <h2>Gestor Práctico para tus tareas</h2>
+  <h2 style="font-size:.9rem; font-weight:300; color:var(--ink2); margin-top:.3rem; margin-bottom:.5rem;">Gestor Práctico para tus tareas</h2>
   <p class="sub">¿No tienes cuenta? <a href="{{ url_for('auth.registro') }}">Regístrate</a></p>
 
   <div class="divider"></div>
@@ -224,7 +330,6 @@
              placeholder="••••••••" required
              autocomplete="current-password"
              spellcheck="false">
-      <!-- Botón mostrar/ocultar contraseña -->
       <button type="button" id="toggle-pass"
               style="position:absolute; right:.8rem; bottom:.72rem;
                      background:none; border:none; cursor:pointer;
@@ -245,86 +350,132 @@
     </button>
   </form>
 
-  <script>
-    // ── SHA-256 puro en JS (sin Web Crypto — funciona en HTTP, HTTPS e IP local) ──
-    function sha256hex(str) {
-      function rightRotate(value, amount) {
-        return (value >>> amount) | (value << (32 - amount));
-      }
-      const mathPow = Math.pow;
-      const maxWord = mathPow(2, 32);
-      let result = '';
-      const words = [];
-      const asciiBitLength = str.length * 8;
-      let hash = [], k = [];
-      let primeCounter = 0;
-      const isComposite = {};
-      for (let candidate = 2; primeCounter < 64; candidate++) {
-        if (!isComposite[candidate]) {
-          for (let i = candidate * candidate; i < 313; i += candidate) isComposite[i] = true;
-          hash[primeCounter] = (mathPow(candidate, .5) * maxWord) | 0;
-          k[primeCounter++]  = (mathPow(candidate, 1/3) * maxWord) | 0;
-        }
-      }
-      str += '\x80';
-      while (str.length % 64 - 56) str += '\x00';
-      for (let i = 0; i < str.length; i++) {
-        const j = str.charCodeAt(i);
-        if (j >> 8) return '';
-        words[i >> 2] |= j << ((3 - i) % 4) * 8;
-      }
-      words[words.length] = ((asciiBitLength / maxWord) | 0);
-      words[words.length] = (asciiBitLength | 0);
-      for (let j = 0; j < words.length;) {
-        const w = words.slice(j, j += 16);
-        const oldHash = hash.slice(0);
-        for (let i = 0; i < 64; i++) {
-          const w15 = w[i - 15], w2 = w[i - 2];
-          const a = hash[0], e = hash[4];
-          const temp1 = hash[7]
-            + (rightRotate(e,6) ^ rightRotate(e,11) ^ rightRotate(e,25))
-            + ((e & hash[5]) ^ (~e & hash[6]))
-            + k[i]
-            + (w[i] = (i < 16) ? w[i] : (
-                w[i-16]
-                + (rightRotate(w15,7) ^ rightRotate(w15,18) ^ (w15>>>3))
-                + w[i-7]
-                + (rightRotate(w2,17) ^ rightRotate(w2,19) ^ (w2>>>10))
-              ) | 0);
-          const temp2 = (rightRotate(a,2) ^ rightRotate(a,13) ^ rightRotate(a,22))
-            + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
-          hash = [(temp1 + temp2) | 0].concat(hash);
-          hash[4] = (hash[4] + temp1) | 0;
-          hash.length = 8;
-        }
-        for (let i = 0; i < 8; i++) hash[i] = (hash[i] + oldHash[i]) | 0;
-      }
-      for (let i = 0; i < 8; i++) {
-        for (let j = 3; j + 1; j--) {
-          const b = (hash[i] >> (j * 8)) & 255;
-          result += ((b < 16) ? '0' : '') + b.toString(16);
-        }
-      }
-      return result;
-    }
+  <!-- ── README + CV ── -->
+  <div class="about-section">
 
-    document.getElementById('login-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      const btn  = document.getElementById('btn-submit');
-      const pass = document.getElementById('f-pass');
-      btn.disabled = true;
-      pass.value   = sha256hex(pass.value);
-      this.submit();
-    });
+    <div class="about-label">README</div>
 
-    function togglePass() {
-      const f = document.getElementById('f-pass');
-      f.type  = f.type === 'password' ? 'text' : 'password';
-    }
-  </script>
+    <div class="readme">
+      <div class="readme-title">Gestor Garisto — Gestor de Tareas</div>
+      Aplicación web interna desarrollada en <strong>Python / Flask</strong> para la gestión de tareas, formación y usuarios dentro del equipo.
+      <ul>
+        <li>Panel de tareas con filtros, estados y asignaciones</li>
+        <li>Dashboard con métricas y progreso</li>
+        <li>Módulo de formación SCORM integrado</li>
+        <li>Control de acceso por roles (usuario / admin / superadmin)</li>
+        <li>Tema claro/oscuro persistente</li>
+      </ul>
+      <div style="margin-top:.75rem;">
+        <span class="tag">Python</span>
+        <span class="tag">Flask</span>
+        <span class="tag">Bootstrap 5</span>
+        <span class="tag">SQLite</span>
+        <span class="tag">SCORM</span>
+      </div>
+      <div style="margin-top:.6rem; font-size:.75rem;">
+        Proyecto: <a href="http://212.227.88.140/" target="_blank"
+          style="color:var(--red); text-decoration:none; border-bottom:1px solid rgba(200,41,10,.3);">
+          212.227.88.140
+        </a>
+      </div>
+    </div>
+
+    <!-- Botón descarga CV -->
+    <a class="btn-cv"
+       href="{{ url_for('static', filename='cv/CV_Ricardo_Garisto_Viso.pdf') }}"
+       download="CV_Ricardo_Garisto_Viso.pdf">
+      <div class="cv-left">
+        <div class="cv-icon">📄</div>
+        <div class="cv-meta">
+          <span class="cv-name">Ricardo Garisto Viso</span>
+          <span class="cv-desc">Consultor técnico · e-learning · sistemas</span>
+        </div>
+      </div>
+      <span class="cv-dl">↓ CV</span>
+    </a>
+
+  </div>
 
   <div class="foot">© 2026 Ricardo Garisto</div>
 </div>
+
+<script>
+  // ── SHA-256 puro en JS ──
+  function sha256hex(str) {
+    function rightRotate(value, amount) {
+      return (value >>> amount) | (value << (32 - amount));
+    }
+    const mathPow = Math.pow;
+    const maxWord = mathPow(2, 32);
+    let result = '';
+    const words = [];
+    const asciiBitLength = str.length * 8;
+    let hash = [], k = [];
+    let primeCounter = 0;
+    const isComposite = {};
+    for (let candidate = 2; primeCounter < 64; candidate++) {
+      if (!isComposite[candidate]) {
+        for (let i = candidate * candidate; i < 313; i += candidate) isComposite[i] = true;
+        hash[primeCounter] = (mathPow(candidate, .5) * maxWord) | 0;
+        k[primeCounter++]  = (mathPow(candidate, 1/3) * maxWord) | 0;
+      }
+    }
+    str += '\x80';
+    while (str.length % 64 - 56) str += '\x00';
+    for (let i = 0; i < str.length; i++) {
+      const j = str.charCodeAt(i);
+      if (j >> 8) return '';
+      words[i >> 2] |= j << ((3 - i) % 4) * 8;
+    }
+    words[words.length] = ((asciiBitLength / maxWord) | 0);
+    words[words.length] = (asciiBitLength | 0);
+    for (let j = 0; j < words.length;) {
+      const w = words.slice(j, j += 16);
+      const oldHash = hash.slice(0);
+      for (let i = 0; i < 64; i++) {
+        const w15 = w[i - 15], w2 = w[i - 2];
+        const a = hash[0], e = hash[4];
+        const temp1 = hash[7]
+          + (rightRotate(e,6) ^ rightRotate(e,11) ^ rightRotate(e,25))
+          + ((e & hash[5]) ^ (~e & hash[6]))
+          + k[i]
+          + (w[i] = (i < 16) ? w[i] : (
+              w[i-16]
+              + (rightRotate(w15,7) ^ rightRotate(w15,18) ^ (w15>>>3))
+              + w[i-7]
+              + (rightRotate(w2,17) ^ rightRotate(w2,19) ^ (w2>>>10))
+            ) | 0);
+        const temp2 = (rightRotate(a,2) ^ rightRotate(a,13) ^ rightRotate(a,22))
+          + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
+        hash = [(temp1 + temp2) | 0].concat(hash);
+        hash[4] = (hash[4] + temp1) | 0;
+        hash.length = 8;
+      }
+      for (let i = 0; i < 8; i++) hash[i] = (hash[i] + oldHash[i]) | 0;
+    }
+    for (let i = 0; i < 8; i++) {
+      for (let j = 3; j + 1; j--) {
+        const b = (hash[i] >> (j * 8)) & 255;
+        result += ((b < 16) ? '0' : '') + b.toString(16);
+      }
+    }
+    return result;
+  }
+
+  document.getElementById('login-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn  = document.getElementById('btn-submit');
+    const pass = document.getElementById('f-pass');
+    btn.disabled = true;
+    pass.value   = sha256hex(pass.value);
+    this.submit();
+  });
+
+  function togglePass() {
+    const f = document.getElementById('f-pass');
+    f.type  = f.type === 'password' ? 'text' : 'password';
+  }
+</script>
 
 </body>
 </html>
