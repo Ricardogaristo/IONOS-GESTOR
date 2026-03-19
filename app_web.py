@@ -379,6 +379,49 @@ def admin():
         """).fetchall()
         usuarios_nombres = [r["username"] for r in usuarios_lista]
 
+        # ── Datos para gráficos ──────────────────────────────────────
+        chart_usuarios = [dict(r) for r in conn.execute("""
+            SELECT u.username,
+                   COUNT(t.id)                                      AS total,
+                   SUM(CASE WHEN t.completada=1 THEN 1 ELSE 0 END) AS completadas,
+                   SUM(CASE WHEN t.completada=0 THEN 1 ELSE 0 END) AS pendientes
+            FROM usuarios u
+            LEFT JOIN tareas t ON t.usuario_id = u.id
+            GROUP BY u.id, u.username
+            ORDER BY total DESC
+        """).fetchall()]
+
+        chart_categorias = [dict(r) for r in conn.execute("""
+            SELECT COALESCE(NULLIF(TRIM(categoria),''), 'General') AS categoria,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN completada=1 THEN 1 ELSE 0 END) AS completadas
+            FROM tareas
+            GROUP BY categoria
+            ORDER BY total DESC
+            LIMIT 8
+        """).fetchall()]
+
+        chart_prioridades = [dict(r) for r in conn.execute("""
+            SELECT prioridad,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN completada=1 THEN 1 ELSE 0 END) AS completadas
+            FROM tareas
+            GROUP BY prioridad
+            ORDER BY prioridad ASC
+        """).fetchall()]
+
+        # Detalle tareas por usuario para modal
+        detalle_usuarios = {}
+        for row in conn.execute("""
+            SELECT u.username, t.id, t.descripcion, t.categoria, t.completada,
+                   t.prioridad, t.fecha, t.codigo
+            FROM tareas t
+            LEFT JOIN usuarios u ON t.usuario_id = u.id
+            ORDER BY t.completada ASC, t.prioridad ASC, t.id DESC
+        """).fetchall():
+            u = row["username"] or "—"
+            detalle_usuarios.setdefault(u, []).append(dict(row))
+
     return render_template("admin.html",
         tareas=tareas, page=page, total_pages=total_pages,
         total=total_filtrado, categorias=categorias_lista,
@@ -389,6 +432,10 @@ def admin():
         kpi_completadas=kpi["completadas"] or 0,
         kpi_pendientes=kpi["pendientes"] or 0,
         kpi_usuarios=kpi["n_usuarios"] or 0,
+        chart_usuarios=chart_usuarios,
+        chart_categorias=chart_categorias,
+        chart_prioridades=chart_prioridades,
+        detalle_usuarios=detalle_usuarios,
     )
 
 

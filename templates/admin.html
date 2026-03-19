@@ -4,21 +4,18 @@
 {% block content %}
 
 <!-- ══ HEADER ══════════════════════════════════════════════════════════════ -->
-<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2 pt-2">
   <div>
-    <h4 style="font-weight:700; margin:0;">⚙ Panel de Tareas</h4>
+    <h4 style="font-weight:700; margin:0;">⚙ Panel de Administración</h4>
     <div style="font-size:.75rem; color:var(--text-muted); margin-top:.15rem; font-family:var(--mono);">
       Vista global · todos los usuarios
     </div>
   </div>
-  <a href="/admin/nueva" class="btn btn-g-primary btn-sm" style="gap:.4rem;">
-    ＋ Nueva tarea
-  </a>
+  <a href="/?nueva=1" class="btn btn-g-primary btn-sm">＋ Nueva tarea</a>
 </div>
 
-<!-- ══ KPI GLOBALES ════════════════════════════════════════════════════════ -->
+<!-- ══ KPI GLOBALES ══════════════════════════════════════════════════════════ -->
 <div class="row g-3 mb-4">
-
   <div class="col-6 col-md-3">
     <div class="stat-card blue">
       <div class="stat-label">Total tareas</div>
@@ -26,393 +23,530 @@
       <div style="font-size:.72rem; color:var(--text-muted);">{{ kpi_usuarios }} usuario{{ 's' if kpi_usuarios!=1 else '' }}</div>
     </div>
   </div>
-
   <div class="col-6 col-md-3">
     <div class="stat-card green">
       <div class="stat-label">Completadas</div>
       <div class="stat-value" style="color:var(--accent);">{{ kpi_completadas }}</div>
-      <div style="font-size:.72rem; color:var(--text-muted);">
-        {{ ((kpi_completadas / kpi_total)*100)|round(1) if kpi_total else 0 }}%
-      </div>
+      <div style="font-size:.72rem; color:var(--text-muted);">{{ ((kpi_completadas/kpi_total)*100)|round(1) if kpi_total else 0 }}%</div>
     </div>
   </div>
-
   <div class="col-6 col-md-3">
     <div class="stat-card amber">
       <div class="stat-label">Pendientes</div>
       <div class="stat-value" style="color:var(--amber);">{{ kpi_pendientes }}</div>
-      <div style="font-size:.72rem; color:var(--text-muted);">
-        {{ ((kpi_pendientes / kpi_total)*100)|round(1) if kpi_total else 0 }}%
-      </div>
+      <div style="font-size:.72rem; color:var(--text-muted);">{{ ((kpi_pendientes/kpi_total)*100)|round(1) if kpi_total else 0 }}%</div>
     </div>
   </div>
-
   <div class="col-6 col-md-3">
     <div class="stat-card red">
       <div class="stat-label">Progreso global</div>
-      {% set pct_g = ((kpi_completadas / kpi_total)*100)|round(1) if kpi_total else 0 %}
+      {% set pct_g = ((kpi_completadas/kpi_total)*100)|round(1) if kpi_total else 0 %}
       <div class="stat-value" style="font-size:1.5rem; color:var(--accent);">{{ pct_g }}%</div>
       <div style="margin-top:.35rem; height:5px; background:var(--bg3); border-radius:99px; overflow:hidden;">
-        <div style="height:100%; width:{{ pct_g }}%; background:var(--accent); border-radius:99px; transition:width .6s;"></div>
+        <div style="height:100%; width:{{ pct_g }}%; background:var(--accent); border-radius:99px;"></div>
       </div>
     </div>
   </div>
-
 </div>
 
-<!-- ══ FILTROS ══════════════════════════════════════════════════════════════ -->
-<div class="gcard mb-4">
-  <div class="gcard-header">
-    <span style="color:var(--text-muted);">⊟</span>
-    <span class="gcard-title">Filtros</span>
-    {% if filtro_cat or filtro_est or filtro_user or filtro_q %}
-    <a href="/admin" class="badge-g ms-auto" style="cursor:pointer; color:var(--red); border-color:var(--red); background:var(--red-dim);">✕ Limpiar</a>
-    {% endif %}
-  </div>
-  <div class="gcard-body">
-    <div class="row g-2 align-items-end">
+<!-- ══ GRÁFICOS ══════════════════════════════════════════════════════════════ -->
+<div class="row g-3 mb-4">
 
-      <div class="col-sm-6 col-md-3">
-        <label class="form-label">Buscar</label>
-        <div class="search-wrap">
-          <span class="search-icon">🔍</span>
-          <input type="text" id="fil-q" class="form-control"
-                 placeholder="Descripción o código…"
-                 value="{{ filtro_q }}">
+  <!-- Gráfico por usuario — barras horizontales -->
+  <div class="col-md-5">
+    <div class="gcard h-100">
+      <div class="gcard-header">
+        <span style="color:var(--blue);">👥</span>
+        <span class="gcard-title">Tareas por usuario</span>
+        <span style="font-size:.68rem; color:var(--text-muted); margin-left:auto; font-family:var(--mono);">clic para detalles</span>
+      </div>
+      <div class="gcard-body" style="padding:.85rem 1rem;">
+        <div id="chart-usuarios-wrap" style="position:relative; height:200px;">
+          <canvas id="chart-usuarios"></canvas>
         </div>
       </div>
-
-      <div class="col-sm-6 col-md-2">
-        <label class="form-label">Estado</label>
-        <select id="fil-estado" class="form-select">
-          <option value="">Todos</option>
-          <option value="Pendiente"  {% if filtro_est=='Pendiente'  %}selected{% endif %}>Pendiente</option>
-          <option value="Completada" {% if filtro_est=='Completada' %}selected{% endif %}>Completada</option>
-        </select>
-      </div>
-
-      <div class="col-sm-6 col-md-2">
-        <label class="form-label">Categoría</label>
-        <select id="fil-cat" class="form-select">
-          <option value="">Todas</option>
-          {% for cat in categorias %}
-          <option value="{{ cat }}" {% if filtro_cat==cat %}selected{% endif %}>{{ cat }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="col-sm-6 col-md-2">
-        <label class="form-label">Usuario</label>
-        <select id="fil-user" class="form-select">
-          <option value="">Todos</option>
-          {% for u in usuarios_nombres %}
-          <option value="{{ u }}" {% if filtro_user==u %}selected{% endif %}>{{ u }}</option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="col-md-3 d-flex gap-2">
-        <button onclick="filtrar()" class="btn btn-g-primary flex-fill">Filtrar</button>
-        <a href="/admin" class="btn btn-g-ghost">✕</a>
-      </div>
-
     </div>
   </div>
-</div>
 
-<!-- ══ LISTA DE TAREAS ══════════════════════════════════════════════════════ -->
-<div class="gcard">
-  <div class="gcard-header">
-    <span style="color:var(--blue);">☰</span>
-    <span class="gcard-title">Tareas</span>
-    <span style="margin-left:auto; font-family:var(--mono); font-size:.72rem; color:var(--text-muted);">
-      {{ total }} resultado{{ 's' if total!=1 else '' }}
-    </span>
+  <!-- Gráfico por categoría — doughnut -->
+  <div class="col-md-4">
+    <div class="gcard h-100">
+      <div class="gcard-header">
+        <span style="color:var(--amber);">🏷</span>
+        <span class="gcard-title">Por categoría</span>
+      </div>
+      <div class="gcard-body" style="padding:.85rem 1rem;">
+        <div style="position:relative; height:200px; display:flex; align-items:center; justify-content:center;">
+          <canvas id="chart-categorias"></canvas>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div class="gcard-body p-0">
+  <!-- Gráfico por prioridad — donut pequeño -->
+  <div class="col-md-3">
+    <div class="gcard h-100">
+      <div class="gcard-header">
+        <span style="color:var(--red);">⚡</span>
+        <span class="gcard-title">Prioridad</span>
+      </div>
+      <div class="gcard-body" style="padding:.85rem 1rem;">
+        <div style="position:relative; height:200px; display:flex; align-items:center; justify-content:center;">
+          <canvas id="chart-prioridades"></canvas>
+        </div>
+        <div id="prio-legend" style="margin-top:.75rem; display:flex; flex-direction:column; gap:.3rem;"></div>
+      </div>
+    </div>
+  </div>
 
-    {% if tareas %}
+</div>
+
+<!-- Fila 2 gráficos: completadas vs pendientes por usuario (stacked) + progreso barras -->
+<div class="row g-3 mb-4">
+
+  <!-- Completadas vs Pendientes por usuario -->
+  <div class="col-md-7">
+    <div class="gcard">
+      <div class="gcard-header">
+        <span style="color:var(--accent);">◈</span>
+        <span class="gcard-title">Completadas vs Pendientes por usuario</span>
+      </div>
+      <div class="gcard-body" style="padding:.85rem 1rem;">
+        <div style="position:relative; height:180px;">
+          <canvas id="chart-stacked"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tasa de éxito por usuario -->
+  <div class="col-md-5">
+    <div class="gcard">
+      <div class="gcard-header">
+        <span style="color:var(--accent);">🎯</span>
+        <span class="gcard-title">Tasa de completado</span>
+      </div>
+      <div class="gcard-body" style="padding:.75rem 1rem;">
+        <div id="tasa-lista" style="display:flex; flex-direction:column; gap:.45rem; max-height:180px; overflow-y:auto;"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ LISTA TAREAS PENDIENTES (sin tachados) ════════════════════════════════ -->
+<div class="gcard">
+  <div class="gcard-header">
+    <span style="color:var(--amber);">● </span>
+    <span class="gcard-title">Tareas pendientes</span>
+    <span style="margin-left:auto; font-family:var(--mono); font-size:.72rem; color:var(--text-muted);">
+      {{ kpi_pendientes }} tarea{{ 's' if kpi_pendientes!=1 else '' }}
+    </span>
+  </div>
+  <div class="gcard-body p-0">
+    {% set pendientes = tareas | selectattr("completada", "equalto", 0) | list %}
+    {% if pendientes %}
     <div class="task-admin-list">
-      {% for t in tareas %}
-      {% set done = t["completada"] == 1 %}
+      {% for t in pendientes %}
       {% set prio_color = 'var(--red)' if t["prioridad"]==1 else ('var(--amber)' if t["prioridad"]==2 else 'var(--accent)') %}
       {% set prio_label = '🔴' if t["prioridad"]==1 else ('🟡' if t["prioridad"]==2 else '🟢') %}
-
-      <div class="task-admin-row {{ 'task-done' if done else '' }}" id="row-{{ t['id'] }}">
-
-        <!-- Checkbox -->
-        <label class="task-checkbox-wrap" title="{{ 'Marcar pendiente' if done else 'Marcar completada' }}">
-          <input type="checkbox" class="task-check"
-                 data-id="{{ t['id'] }}"
-                 {{ 'checked' if done else '' }}>
+      <div class="task-admin-row" id="row-{{ t['id'] }}">
+        <label class="task-checkbox-wrap" title="Marcar completada">
+          <input type="checkbox" class="task-check" data-id="{{ t['id'] }}">
           <span class="task-checkmark">
             <svg viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <polyline points="2,7 6,11 12,3" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round"/>
+              <polyline points="2,7 6,11 12,3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </span>
         </label>
-
-        <!-- Prioridad stripe -->
         <div class="task-prio-stripe" style="background:{{ prio_color }};"></div>
-
-        <!-- Contenido principal -->
         <div class="task-main">
-          <div class="task-desc {{ 'text-muted-strike' if done else '' }}">
-            {{ t["descripcion"] }}
-          </div>
+          <div class="task-desc">{{ t["descripcion"] }}</div>
           <div class="task-meta">
-            {% if t["codigo"] %}
-            <span class="meta-chip mono">{{ t["codigo"] }}</span>
-            {% endif %}
-            <span class="meta-chip">
-              {{ t["categoria"] or "General" }}
-            </span>
-            {% if t["fecha"] %}
-            <span class="meta-chip mono">📅 {{ t["fecha"] }}</span>
-            {% endif %}
-            <span class="meta-chip user-chip">
-              👤 {{ t["username"] or "—" }}
-            </span>
+            {% if t["codigo"] %}<span class="meta-chip mono">{{ t["codigo"] }}</span>{% endif %}
+            <span class="meta-chip">{{ t["categoria"] or "General" }}</span>
+            {% if t["fecha"] %}<span class="meta-chip mono">📅 {{ t["fecha"] }}</span>{% endif %}
+            <span class="meta-chip user-chip">👤 {{ t["username"] or "—" }}</span>
             <span class="meta-chip" style="color:{{ prio_color }}; border-color:{{ prio_color }}; background:transparent;">
               {{ prio_label }} {{ 'Alta' if t["prioridad"]==1 else ('Media' if t["prioridad"]==2 else 'Baja') }}
             </span>
           </div>
         </div>
-
-        <!-- Estado badge -->
         <div class="task-status-col">
-          {% if done %}
-          <span class="badge-g badge-done" id="badge-{{ t['id'] }}">✔ Hecha</span>
-          {% else %}
           <span class="badge-g badge-pending" id="badge-{{ t['id'] }}">● Pendiente</span>
-          {% endif %}
         </div>
-
-        <!-- Acciones -->
         <div class="task-actions">
           <a href="/editar/{{ t['id'] }}" class="btn btn-g-warning btn-sm" title="Editar">✏</a>
           <a href="/eliminar/{{ t['id'] }}" class="btn btn-g-danger btn-sm" title="Eliminar"
              onclick="return confirm('¿Eliminar esta tarea?')">🗑</a>
         </div>
-
       </div>
       {% endfor %}
     </div>
-
     {% else %}
-    <div style="text-align:center; padding:4rem; color:var(--text-muted);">
-      <div style="font-size:2.5rem; margin-bottom:.75rem;">🔍</div>
-      <div style="font-size:.9rem;">No hay tareas con los filtros seleccionados.</div>
+    <div style="text-align:center; padding:3.5rem; color:var(--text-muted);">
+      <div style="font-size:2rem; margin-bottom:.5rem;">✅</div>
+      <div style="font-size:.88rem;">Todas las tareas están completadas</div>
     </div>
     {% endif %}
-
-    <!-- Paginación -->
-    {% if total_pages > 1 %}
-    <div class="py-3 px-3" style="border-top:1px solid var(--border);">
-      <ul class="gpagination">
-        <li class="{{ 'disabled' if page<=1 else '' }}">
-          <a class="gpage-link" href="?page={{ page-1 }}&categoria={{ filtro_cat }}&estado={{ filtro_est }}&usuario={{ filtro_user }}&q={{ filtro_q }}">← Ant</a>
-        </li>
-        {% for p in range(1, total_pages+1) %}
-        {% if p == page or p <= 2 or p >= total_pages-1 or (p >= page-1 and p <= page+1) %}
-        <li class="{{ 'active' if p==page else '' }}">
-          <a class="gpage-link" href="?page={{ p }}&categoria={{ filtro_cat }}&estado={{ filtro_est }}&usuario={{ filtro_user }}&q={{ filtro_q }}">{{ p }}</a>
-        </li>
-        {% elif p == 3 or p == total_pages-2 %}
-        <li><span class="gpage-link" style="opacity:.4;">…</span></li>
-        {% endif %}
-        {% endfor %}
-        <li class="{{ 'disabled' if page>=total_pages else '' }}">
-          <a class="gpage-link" href="?page={{ page+1 }}&categoria={{ filtro_cat }}&estado={{ filtro_est }}&usuario={{ filtro_user }}&q={{ filtro_q }}">Sig →</a>
-        </li>
-      </ul>
-    </div>
-    {% endif %}
-
   </div>
 </div>
 
-<!-- ══ ESTILOS ══════════════════════════════════════════════════════════════ -->
+<!-- ══ MODAL detalle usuario ═════════════════════════════════════════════════ -->
+<div id="modal-usuario" style="display:none; position:fixed; inset:0; z-index:9999;
+  background:rgba(0,0,0,.55); backdrop-filter:blur(4px);
+  align-items:center; justify-content:center; padding:1rem;">
+  <div style="background:var(--bg2,var(--surface)); border:1px solid var(--border);
+    border-radius:14px; width:100%; max-width:560px; max-height:86vh;
+    display:flex; flex-direction:column; box-shadow:0 24px 64px rgba(0,0,0,.45);">
+
+    <!-- Cabecera modal -->
+    <div style="padding:1rem 1.3rem .8rem; border-bottom:1px solid var(--border);
+      display:flex; align-items:center; gap:.75rem; flex-shrink:0;">
+      <span style="font-size:1.1rem;">👤</span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:700; font-size:.95rem;" id="modal-user-nombre">Usuario</div>
+        <div id="modal-user-sub" style="font-size:.7rem; color:var(--text-muted); font-family:var(--mono);"></div>
+      </div>
+      <button onclick="cerrarModal()" style="background:none; border:none; color:var(--text-muted);
+        font-size:1.2rem; cursor:pointer; padding:.2rem .4rem; border-radius:6px;"
+        onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'">✕</button>
+    </div>
+
+    <!-- KPIs mini -->
+    <div id="modal-kpis" style="display:grid; grid-template-columns:repeat(3,1fr); gap:.6rem;
+      padding:.85rem 1.3rem .7rem; flex-shrink:0; border-bottom:1px solid var(--border);"></div>
+
+    <!-- Lista tareas -->
+    <div style="padding:.75rem 1.3rem 1.3rem; overflow-y:auto; flex:1;">
+      <div id="modal-tareas-lista"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ESTILOS ════════════════════════════════════════════════════════════════ -->
 <style>
-/* Lista de tareas admin */
-.task-admin-list {
-  display: flex;
-  flex-direction: column;
-}
-
+.task-admin-list { display:flex; flex-direction:column; }
 .task-admin-row {
-  display: flex;
-  align-items: center;
-  gap: .85rem;
-  padding: .85rem 1.1rem;
-  border-bottom: 1px solid var(--border);
-  transition: background .15s;
-  position: relative;
+  display:flex; align-items:center; gap:.85rem;
+  padding:.8rem 1.1rem; border-bottom:1px solid var(--border);
+  transition:background .15s; position:relative;
 }
-.task-admin-row:last-child { border-bottom: none; }
-.task-admin-row:hover { background: var(--bg2, rgba(255,255,255,.02)); }
-.task-admin-row.task-done { opacity: .55; }
-
-/* Checkbox visual */
-.task-checkbox-wrap {
-  position: relative;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.task-checkbox-wrap input[type=checkbox] {
-  position: absolute;
-  opacity: 0;
-  width: 0; height: 0;
-}
+.task-admin-row:last-child { border-bottom:none; }
+.task-admin-row:hover { background:var(--bg2,rgba(255,255,255,.02)); }
+.task-checkbox-wrap { position:relative; cursor:pointer; flex-shrink:0; }
+.task-checkbox-wrap input[type=checkbox] { position:absolute; opacity:0; width:0; height:0; }
 .task-checkmark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px; height: 22px;
-  border: 2px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  transition: all .15s;
-  color: transparent;
+  display:flex; align-items:center; justify-content:center;
+  width:22px; height:22px; border:2px solid var(--border);
+  border-radius:6px; background:var(--surface);
+  transition:all .15s; color:transparent;
 }
-.task-checkmark svg { width: 13px; height: 13px; }
-.task-checkbox-wrap input:checked + .task-checkmark {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-.task-checkbox-wrap:hover .task-checkmark {
-  border-color: var(--accent);
-}
+.task-checkmark svg { width:13px; height:13px; }
+.task-checkbox-wrap input:checked + .task-checkmark { background:var(--accent); border-color:var(--accent); color:#fff; }
+.task-checkbox-wrap:hover .task-checkmark { border-color:var(--accent); }
+.task-prio-stripe { width:3px; height:36px; border-radius:99px; flex-shrink:0; opacity:.7; }
+.task-main { flex:1; min-width:0; }
+.task-desc { font-size:.88rem; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:.3rem; }
+.task-meta { display:flex; flex-wrap:wrap; gap:.3rem; align-items:center; }
+.meta-chip { font-size:.67rem; padding:.15rem .45rem; border-radius:5px; border:1px solid var(--border); color:var(--text-muted); background:var(--bg3,var(--surface)); white-space:nowrap; }
+.meta-chip.mono { font-family:var(--mono); }
+.user-chip { color:var(--blue)!important; border-color:var(--blue)!important; background:var(--blue-dim,rgba(59,130,246,.08))!important; }
+.task-status-col { flex-shrink:0; min-width:90px; }
+.task-actions { display:flex; gap:.3rem; flex-shrink:0; }
+@keyframes check-pop { 0%{transform:scale(1)} 50%{transform:scale(1.25)} 100%{transform:scale(1)} }
+.check-animate { animation:check-pop .2s ease; }
 
-/* Barra de prioridad */
-.task-prio-stripe {
-  width: 3px;
-  height: 36px;
-  border-radius: 99px;
-  flex-shrink: 0;
-  opacity: .7;
+/* Modal tareas */
+.modal-task-item {
+  display:flex; align-items:center; gap:.65rem;
+  padding:.5rem .6rem; border-radius:8px; margin-bottom:.3rem;
+  border:1px solid var(--border); background:var(--bg3,var(--surface));
+  font-size:.82rem;
 }
+.modal-task-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.modal-task-desc { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.modal-task-badge { font-size:.62rem; padding:.1rem .35rem; border-radius:4px; white-space:nowrap; }
 
-/* Contenido */
-.task-main {
-  flex: 1;
-  min-width: 0;
-}
-.task-desc {
-  font-size: .88rem;
-  font-weight: 500;
-  color: var(--text, var(--ink));
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: .3rem;
-}
-.text-muted-strike {
-  text-decoration: line-through;
-  color: var(--text-muted) !important;
-}
-.task-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .3rem;
-  align-items: center;
-}
-.meta-chip {
-  font-size: .67rem;
-  padding: .15rem .45rem;
-  border-radius: 5px;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  background: var(--bg3, var(--surface));
-  white-space: nowrap;
-}
-.meta-chip.mono { font-family: var(--mono); }
-.user-chip { color: var(--blue) !important; border-color: var(--blue) !important; background: var(--blue-dim) !important; }
+/* Mini KPI modal */
+.mini-kpi { background:var(--bg3,var(--surface)); border-radius:8px; padding:.55rem .7rem; text-align:center; }
+.mini-kpi-label { font-size:.62rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:.2rem; }
+.mini-kpi-val { font-size:1.15rem; font-weight:800; font-family:var(--mono); }
 
-/* Status y acciones */
-.task-status-col { flex-shrink: 0; min-width: 90px; }
-.task-actions {
-  display: flex;
-  gap: .3rem;
-  flex-shrink: 0;
-}
-
-/* Animación de toggle */
-@keyframes check-pop {
-  0%   { transform: scale(1); }
-  50%  { transform: scale(1.25); }
-  100% { transform: scale(1); }
-}
-.check-animate { animation: check-pop .2s ease; }
-
-@media (max-width: 640px) {
-  .task-status-col { display: none; }
-  .task-admin-row { padding: .7rem .75rem; gap: .6rem; }
-  .task-desc { font-size: .82rem; }
+@media (max-width:640px) {
+  .task-status-col { display:none; }
+  .task-admin-row { padding:.7rem .75rem; gap:.6rem; }
 }
 </style>
 
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
-// ── Filtros servidor ──────────────────────────────────────────────────────
-function filtrar() {
-  const url = new URL(window.location.href);
-  const q      = document.getElementById('fil-q').value.trim();
-  const estado = document.getElementById('fil-estado').value;
-  const cat    = document.getElementById('fil-cat').value;
-  const user   = document.getElementById('fil-user').value;
-  q      ? url.searchParams.set('q',         q)      : url.searchParams.delete('q');
-  estado ? url.searchParams.set('estado',    estado) : url.searchParams.delete('estado');
-  cat    ? url.searchParams.set('categoria', cat)    : url.searchParams.delete('categoria');
-  user   ? url.searchParams.set('usuario',   user)   : url.searchParams.delete('usuario');
-  url.searchParams.set('page', 1);
-  window.location.href = url.toString();
-}
-// Filtrar al cambiar selects
-['fil-estado','fil-cat','fil-user'].forEach(id =>
-  document.getElementById(id)?.addEventListener('change', filtrar)
-);
-// Filtrar con Enter en el buscador
-document.getElementById('fil-q')?.addEventListener('keydown', e => {
-  if (e.key === 'Enter') filtrar();
+// ── Datos del servidor ────────────────────────────────────────────────────
+const chartUsuarios   = {{ chart_usuarios   | tojson }};
+const chartCategorias = {{ chart_categorias | tojson }};
+const chartPrioridades= {{ chart_prioridades| tojson }};
+const detalleUsuarios = {{ detalle_usuarios | tojson }};
+
+// ── Paleta ────────────────────────────────────────────────────────────────
+const isDark  = !document.body.classList.contains('light');
+const C_TEXT  = isDark ? 'rgba(242,236,228,.55)' : 'rgba(28,21,16,.5)';
+const C_GRID  = isDark ? 'rgba(46,40,32,.9)'     : 'rgba(216,204,188,.6)';
+const COLORS  = ['#d4822a','#3b82c4','#2d9d78','#c48a1a','#b83a2a','#8b5cf6','#06b6d4','#ec4899'];
+const C_DONE  = '#2d9d78';
+const C_PEND  = '#d4822a';
+
+Chart.defaults.font.family = "'Outfit', sans-serif";
+Chart.defaults.color       = C_TEXT;
+
+// ── 1. Barras horizontales por usuario ───────────────────────────────────
+const labelsU = chartUsuarios.map(u => u.username);
+const totalesU= chartUsuarios.map(u => u.total);
+
+const ctxU = document.getElementById('chart-usuarios').getContext('2d');
+const chartU = new Chart(ctxU, {
+  type: 'bar',
+  data: {
+    labels: labelsU,
+    datasets: [{
+      label: 'Tareas',
+      data: totalesU,
+      backgroundColor: COLORS.slice(0, labelsU.length),
+      borderRadius: 5,
+      borderSkipped: false,
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true, maintainAspectRatio: false,
+    onClick: (e, els) => {
+      if (els.length) abrirModal(labelsU[els[0].index]);
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => {
+            const u = chartUsuarios[ctx.dataIndex];
+            return [`Total: ${u.total}`, `✔ ${u.completadas}`, `● ${u.pendientes}`];
+          }
+        }
+      }
+    },
+    scales: {
+      x: { grid: { color: C_GRID }, ticks: { font: { size: 10 } } },
+      y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+    }
+  }
 });
 
-// ── Toggle completada via AJAX ────────────────────────────────────────────
-document.querySelectorAll('.task-check').forEach(cb => {
-  cb.addEventListener('change', async function () {
-    const id      = this.dataset.id;
-    const row     = document.getElementById('row-' + id);
-    const badge   = document.getElementById('badge-' + id);
-    const check   = this.nextElementSibling; // .task-checkmark
+// ── 2. Doughnut categorías ────────────────────────────────────────────────
+const ctxC = document.getElementById('chart-categorias').getContext('2d');
+new Chart(ctxC, {
+  type: 'doughnut',
+  data: {
+    labels: chartCategorias.map(c => c.categoria),
+    datasets: [{
+      data: chartCategorias.map(c => c.total),
+      backgroundColor: COLORS,
+      borderWidth: 2,
+      borderColor: isDark ? '#1c1814' : '#faf6f0',
+      hoverOffset: 6,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    cutout: '60%',
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { font: { size: 9 }, padding: 8, boxWidth: 10, boxHeight: 10 }
+      },
+      tooltip: {
+        callbacks: {
+          label: ctx => {
+            const c = chartCategorias[ctx.dataIndex];
+            const pct = Math.round(c.total / chartCategorias.reduce((s,x)=>s+x.total,0)*100);
+            return ` ${c.total} (${pct}%)`;
+          }
+        }
+      }
+    }
+  }
+});
 
+// ── 3. Donut prioridades ──────────────────────────────────────────────────
+const PRIO_LABELS = { 1:'Alta', 2:'Media', 3:'Baja' };
+const PRIO_COLORS = { 1:'#b83a2a', 2:'#d4822a', 3:'#2d9d78' };
+const ctxP = document.getElementById('chart-prioridades').getContext('2d');
+new Chart(ctxP, {
+  type: 'doughnut',
+  data: {
+    labels: chartPrioridades.map(p => PRIO_LABELS[p.prioridad] || p.prioridad),
+    datasets: [{
+      data: chartPrioridades.map(p => p.total),
+      backgroundColor: chartPrioridades.map(p => PRIO_COLORS[p.prioridad] || '#8b5cf6'),
+      borderWidth: 2,
+      borderColor: isDark ? '#1c1814' : '#faf6f0',
+      hoverOffset: 5,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    cutout: '65%',
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: { label: ctx => ` ${ctx.parsed} tareas` }
+      }
+    }
+  }
+});
+
+// Leyenda manual prioridades
+const legendEl = document.getElementById('prio-legend');
+chartPrioridades.forEach(p => {
+  const pct = chartPrioridades.reduce((s,x)=>s+x.total,0)
+    ? Math.round(p.total/chartPrioridades.reduce((s,x)=>s+x.total,0)*100) : 0;
+  legendEl.innerHTML += `
+    <div style="display:flex;align-items:center;gap:.5rem;font-size:.75rem;">
+      <span style="width:9px;height:9px;border-radius:50%;background:${PRIO_COLORS[p.prioridad]};flex-shrink:0;"></span>
+      <span style="flex:1;color:var(--text-muted);">${PRIO_LABELS[p.prioridad]}</span>
+      <span style="font-family:var(--mono);font-weight:600;">${p.total} <span style="opacity:.5;font-weight:400;">${pct}%</span></span>
+    </div>`;
+});
+
+// ── 4. Stacked bar completadas/pendientes por usuario ─────────────────────
+const ctxS = document.getElementById('chart-stacked').getContext('2d');
+new Chart(ctxS, {
+  type: 'bar',
+  data: {
+    labels: labelsU,
+    datasets: [
+      {
+        label: 'Completadas',
+        data: chartUsuarios.map(u => u.completadas),
+        backgroundColor: C_DONE,
+        borderRadius: 4, borderSkipped: false,
+      },
+      {
+        label: 'Pendientes',
+        data: chartUsuarios.map(u => u.pendientes),
+        backgroundColor: C_PEND,
+        borderRadius: 4, borderSkipped: false,
+      }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { font: { size: 10 }, padding: 10, boxWidth: 10, boxHeight: 10 }
+      }
+    },
+    scales: {
+      x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+      y: { stacked: true, grid: { color: C_GRID }, ticks: { font: { size: 10 } } }
+    }
+  }
+});
+
+// ── 5. Tasa de completado barras inline ───────────────────────────────────
+const tasaEl = document.getElementById('tasa-lista');
+chartUsuarios.forEach((u, i) => {
+  const pct = u.total ? Math.round(u.completadas / u.total * 100) : 0;
+  const col = pct >= 75 ? C_DONE : pct >= 50 ? '#c48a1a' : '#b83a2a';
+  tasaEl.innerHTML += `
+    <div style="cursor:pointer;" onclick="abrirModal('${u.username.replace(/'/g,"\\'")}')">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.2rem;">
+        <span style="font-size:.78rem;font-weight:500;">${u.username}</span>
+        <span style="font-family:var(--mono);font-size:.72rem;color:${col};font-weight:700;">${pct}%</span>
+      </div>
+      <div style="height:5px;background:var(--bg3,var(--border));border-radius:99px;overflow:hidden;">
+        <div style="height:100%;width:${pct}%;background:${col};border-radius:99px;transition:width .5s ${i*0.08}s;"></div>
+      </div>
+    </div>`;
+});
+
+// ── Modal detalle usuario ─────────────────────────────────────────────────
+function abrirModal(username) {
+  const tareas = detalleUsuarios[username] || [];
+  const total  = tareas.length;
+  const hecha  = tareas.filter(t => t.completada === 1).length;
+  const pend   = total - hecha;
+  const pct    = total ? Math.round(hecha/total*100) : 0;
+
+  document.getElementById('modal-user-nombre').textContent = username;
+  document.getElementById('modal-user-sub').textContent =
+    `${total} tarea${total!==1?'s':''} · ${pct}% completado`;
+
+  const kpiEl = document.getElementById('modal-kpis');
+  kpiEl.innerHTML = [
+    { label:'Total', val:total, color:'var(--blue)' },
+    { label:'Hechas', val:hecha, color:'var(--accent)' },
+    { label:'Pendientes', val:pend, color:'var(--amber)' },
+  ].map(k => `
+    <div class="mini-kpi">
+      <div class="mini-kpi-label">${k.label}</div>
+      <div class="mini-kpi-val" style="color:${k.color};">${k.val}</div>
+    </div>`).join('');
+
+  const listaEl = document.getElementById('modal-tareas-lista');
+  if (!tareas.length) {
+    listaEl.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted);font-size:.84rem;">Sin tareas registradas</div>';
+  } else {
+    const PCOLOR = { 1:'#b83a2a', 2:'#d4822a', 3:'#2d9d78' };
+    listaEl.innerHTML = tareas.map(t => {
+      const done = t.completada === 1;
+      const col  = PCOLOR[t.prioridad] || 'var(--text-muted)';
+      const badge = done
+        ? `<span class="modal-task-badge" style="background:rgba(45,157,120,.12);color:#5ecfaa;">✔ Hecha</span>`
+        : `<span class="modal-task-badge" style="background:rgba(212,130,42,.12);color:#e8a24a;">● Pendiente</span>`;
+      return `
+        <div class="modal-task-item" style="${done ? 'opacity:.55;' : ''}">
+          <div class="modal-task-dot" style="background:${col};"></div>
+          <div class="modal-task-desc" style="${done ? 'text-decoration:line-through;' : ''}">${t.descripcion}</div>
+          <span style="font-size:.67rem;color:var(--text-muted);white-space:nowrap;">${t.categoria||'General'}</span>
+          ${badge}
+        </div>`;
+    }).join('');
+  }
+
+  const modal = document.getElementById('modal-usuario');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarModal() {
+  document.getElementById('modal-usuario').style.display = 'none';
+  document.body.style.overflow = '';
+}
+document.getElementById('modal-usuario').addEventListener('click', function(e) {
+  if (e.target === this) cerrarModal();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModal(); });
+
+// ── Toggle completada AJAX ────────────────────────────────────────────────
+document.querySelectorAll('.task-check').forEach(cb => {
+  cb.addEventListener('change', async function() {
+    const id    = this.dataset.id;
+    const row   = document.getElementById('row-' + id);
+    const badge = document.getElementById('badge-' + id);
+    const check = this.nextElementSibling;
     try {
-      const res  = await fetch(`/admin/toggle_completada/${id}`, { method: 'POST' });
+      const res  = await fetch(`/admin/toggle_completada/${id}`, { method:'POST' });
       const data = await res.json();
       if (!data.ok) { this.checked = !this.checked; return; }
-
-      // Animación
       check.classList.add('check-animate');
       setTimeout(() => check.classList.remove('check-animate'), 200);
-
       if (data.completada === 1) {
-        row.classList.add('task-done');
-        row.querySelector('.task-desc').classList.add('text-muted-strike');
-        badge.className = 'badge-g badge-done';
-        badge.textContent = '✔ Hecha';
-      } else {
-        row.classList.remove('task-done');
-        row.querySelector('.task-desc').classList.remove('text-muted-strike');
-        badge.className = 'badge-g badge-pending';
-        badge.textContent = '● Pendiente';
+        row.style.opacity = '0';
+        setTimeout(() => row.remove(), 300);
       }
-    } catch(e) {
-      this.checked = !this.checked; // revert si error
-    }
+    } catch(e) { this.checked = !this.checked; }
   });
 });
 </script>
