@@ -885,17 +885,17 @@ def superadmin():
 
 # ── EXPORTAR EXCEL ─────────────────────────────────────────────────────────────
 
-_DARK="1A1410"; _DARK2="241C16"; _ACCENT="E6A15A"; _AMBER="D18B47"
-_BLUE="C47A5A"; _PURPLE="B07A63"; _TEAL="8F6B50"
-_TXT_W="F5EDE6"; _TXT_M="B7A79A"; _BDR="3A2E25"
-_CAT_COLS=[("2A1F18","E6A15A"),("332419","D18B47"),("2E1E17","C47A5A"),
-           ("2B1B16","B07A63"),("241A15","8F6B50"),("3A221C","E07A5F"),
-           ("2F2018","F2A65A"),("352317","C97B3C")]
+_DARK="1F4E79"; _DARK2="D6E4F0"; _ACCENT="2E75B6"; _AMBER="ED7D31"
+_BLUE="2E75B6"; _PURPLE="7030A0"; _TEAL="00B050"
+_TXT_W="FFFFFF"; _TXT_M="404040"; _BDR="BFBFBF"
+_CAT_COLS=[("D6E4F0","1F4E79"),("FCE4D6","C55A11"),("EAF2EA","375623"),
+           ("EDE7F6","4A235A"),("E8F5E9","1A5E20"),("FFF3CD","7D5C00"),
+           ("E3F2FD","0D47A1"),("F3E5F5","6A1B9A")]
 
 def _xb():
     s=Side(style="thin",color=_BDR); return Border(left=s,right=s,top=s,bottom=s)
 def _xf(h): return PatternFill(start_color=h,end_color=h,fill_type="solid")
-def _xfn(bold=False,color=_TXT_W,size=10,italic=False):
+def _xfn(bold=False,color="000000",size=10,italic=False):
     return Font(bold=bold,color=color,size=size,italic=italic,name="Calibri")
 def _xal(h="center",v="center",wrap=False): return Alignment(horizontal=h,vertical=v,wrap_text=wrap)
 def _xhdr(cell,bg=_DARK,fg=_TXT_W,size=10):
@@ -912,14 +912,14 @@ def _hoja_resumen(wb,todas,hoy_str,admin_usr,username):
     ws=wb.active; ws.title="Resumen General"; ws.sheet_properties.tabColor=_ACCENT; ws.sheet_view.showGridLines=False
     ws.merge_cells("A1:H1"); c=ws["A1"]
     c.value=f"  REPORTE DE TAREAS — {datetime.now().strftime('%d/%m/%Y %H:%M')}"
-    c.fill=_xf(_DARK); c.font=_xfn(bold=True,size=14,color=_ACCENT); c.alignment=_xal(h="left"); c.border=_xb(); ws.row_dimensions[1].height=36
+    c.fill=_xf(_DARK); c.font=_xfn(bold=True,size=14,color=_TXT_W); c.alignment=_xal(h="left"); c.border=_xb(); ws.row_dimensions[1].height=36
     ws.merge_cells("A2:H2"); c=ws["A2"]
     c.value=f"  Generado por: {username}   ·   {'Vista administrador' if admin_usr else 'Vista personal'}"
     c.fill=_xf(_DARK2); c.font=_xfn(color=_TXT_M,size=9,italic=True); c.alignment=_xal(h="left"); c.border=_xb(); ws.row_dimensions[2].height=20
     total=len(todas); comp=sum(1 for t in todas if t["completada"]==1); pend=total-comp
     pct=round(comp/total*100,1) if total else 0; n_cats=len({t["categoria"] or "General" for t in todas})
-    kpis=[("TOTAL TAREAS",total,_BLUE,"0D2040"),("COMPLETADAS",comp,_ACCENT,"1A4A24"),
-          ("PENDIENTES",pend,_AMBER,"3D2E00"),(f"% COMPLETADO",f"{pct}%",_TEAL,"0A2E2A"),("CATEGORÍAS",n_cats,_PURPLE,"1E1040")]
+    kpis=[("TOTAL TAREAS",total,"FFFFFF",_BLUE),("COMPLETADAS",comp,"FFFFFF","00703C"),
+          ("PENDIENTES",pend,"FFFFFF","C55A11"),(f"% COMPLETADO",f"{pct}%","FFFFFF","00868A"),("CATEGORÍAS",n_cats,"FFFFFF",_PURPLE)]
     for rh,h in [(3,10),(4,22),(5,40),(6,18),(7,10)]: ws.row_dimensions[rh].height=h
     for ci,(label,valor,fg,bg) in enumerate(kpis,start=1):
         for rn,val,fsz in [(4,label,8),(5,valor,22),(6,"",9)]:
@@ -927,7 +927,7 @@ def _hoja_resumen(wb,todas,hoy_str,admin_usr,username):
         ws.column_dimensions[get_column_letter(ci)].width=18
     ws.row_dimensions[8].height=22
     for ci,h in enumerate(["Categoría","Total","Completadas","Pendientes","% Completado","Usuarios"],start=1):
-        _xhdr(ws.cell(row=8,column=ci,value=h),bg=_DARK,fg=_ACCENT)
+        _xhdr(ws.cell(row=8,column=ci,value=h),bg=_DARK,fg=_TXT_W)
     cat_data=defaultdict(lambda:{"total":0,"completadas":0,"usuarios":set()})
     for t in todas:
         cat=t["categoria"] or "General"; cat_data[cat]["total"]+=1; cat_data[cat]["completadas"]+=(1 if t["completada"]==1 else 0)
@@ -938,10 +938,10 @@ def _hoja_resumen(wb,todas,hoy_str,admin_usr,username):
         u_str=", ".join(sorted(d["usuarios"])) if d["usuarios"] else "—"
         for cj,val in enumerate([cat,d["total"],d["completadas"],pc2,f"{ptc2}%",u_str],start=1):
             c=ws.cell(row=rn,column=cj,value=val); c.fill=_xf(bg_f if cj==1 else _DARK2)
-            c.font=_xfn(bold=(cj==1),color=fg_c if cj==1 else _TXT_W); c.alignment=_xal(h="left" if cj in(1,6) else "center"); c.border=_xb()
+            c.font=_xfn(bold=(cj==1),color=fg_c if cj==1 else _TXT_M); c.alignment=_xal(h="left" if cj in(1,6) else "center"); c.border=_xb()
         ws.row_dimensions[rn].height=18; rn+=1
     for cj,val in enumerate(["TOTAL",total,comp,pend,f"{pct}%",""],start=1):
-        c=ws.cell(row=rn,column=cj,value=val); c.fill=_xf(_DARK); c.font=_xfn(bold=True,color=_ACCENT,size=10)
+        c=ws.cell(row=rn,column=cj,value=val); c.fill=_xf(_DARK); c.font=_xfn(bold=True,color=_TXT_W,size=10)
         c.alignment=_xal(h="left" if cj==1 else "center"); c.border=_xb()
     ws.row_dimensions[rn].height=20
     for i,w in enumerate([28,10,14,12,16,32],start=1): ws.column_dimensions[get_column_letter(i)].width=w
@@ -960,11 +960,11 @@ def _hoja_categoria(wb,cat_nombre,tareas_cat,color_idx):
         _xhdr(ws.cell(row=3,column=ci,value=h),bg=bg_fill,fg=fg_col)
     ws.row_dimensions[3].height=20
     for ri,t in enumerate(tareas_cat,start=4):
-        done=t["completada"]==1; est="✔  Completada" if done else "●  Pendiente"; ec=_ACCENT if done else _AMBER; rbg="1A4A24" if done else "3D2E00"
+        done=t["completada"]==1; est="✔  Completada" if done else "●  Pendiente"; ec="217346" if done else "C55A11"; rbg="E2EFDA" if done else "FCE4D6"
         vals=[t["id"],t["codigo"] or "—",t["descripcion"],t["fecha"] or "—",est,t.get("username") or "—",""]
         for ci,val in enumerate(vals,start=1):
             c=ws.cell(row=ri,column=ci,value=val); c.fill=_xf(rbg if ci==5 else _DARK2)
-            c.font=_xfn(bold=(ci==5),color=ec if ci==5 else(_TXT_M if ci in(1,4,6) else _TXT_W),size=9 if ci in(1,4,6) else 10)
+            c.font=_xfn(bold=(ci==5),color=ec if ci==5 else _TXT_M,size=9 if ci in(1,4,6) else 10)
             c.alignment=_xal(h="center" if ci in(1,4,5) else "left",wrap=(ci==3)); c.border=_xb()
         ws.row_dimensions[ri].height=16
     _xaw(ws); ws.column_dimensions["C"].width=45; ws.column_dimensions["G"].width=20; ws.freeze_panes="A4"; ws.auto_filter.ref=ws.dimensions
@@ -973,24 +973,24 @@ def _hoja_hoy(wb,tareas_hoy,hoy_str):
     ws=wb.create_sheet(title="Hoy"); ws.sheet_properties.tabColor=_BLUE; ws.sheet_view.showGridLines=False
     ws.merge_cells("A1:G1"); c=ws["A1"]
     c.value=f"  TAREAS DEL DÍA — {datetime.strptime(hoy_str,'%Y-%m-%d').strftime('%d / %m / %Y')}"
-    c.fill=_xf("0D2040"); c.font=_xfn(bold=True,size=13,color=_BLUE); c.alignment=_xal(h="left"); c.border=_xb(); ws.row_dimensions[1].height=32
+    c.fill=_xf(_BLUE); c.font=_xfn(bold=True,size=13,color=_TXT_W); c.alignment=_xal(h="left"); c.border=_xb(); ws.row_dimensions[1].height=32
     th=len(tareas_hoy); ch=sum(1 for t in tareas_hoy if t["completada"]==1)
     ws.merge_cells("A2:G2"); c=ws["A2"]
     c.value=f"  {th} tarea{'s' if th!=1 else ''} programadas hoy  ·  {ch} completadas  ·  {th-ch} pendientes"
     c.fill=_xf(_DARK2); c.font=_xfn(color=_TXT_M,size=9,italic=True); c.alignment=_xal(h="left"); c.border=_xb(); ws.row_dimensions[2].height=18
     for ci,h in enumerate(["ID","Código","Descripción","Categoría","Estado","Usuario","Notas"],start=1):
-        _xhdr(ws.cell(row=3,column=ci,value=h),bg="0D2040",fg=_BLUE)
+        _xhdr(ws.cell(row=3,column=ci,value=h),bg=_BLUE,fg=_TXT_W)
     ws.row_dimensions[3].height=20
     if not tareas_hoy:
         ws.merge_cells("A4:G4"); e=ws["A4"]; e.value="No hay tareas programadas para hoy."
         e.fill=_xf(_DARK2); e.font=_xfn(color=_TXT_M,italic=True); e.alignment=_xal(); e.border=_xb()
     else:
         for ri,t in enumerate(tareas_hoy,start=4):
-            done=t["completada"]==1; est="✔  Completada" if done else "●  Pendiente"; ec=_ACCENT if done else _AMBER; rbg="1A4A24" if done else "3D2E00"
+            done=t["completada"]==1; est="✔  Completada" if done else "●  Pendiente"; ec="217346" if done else "C55A11"; rbg="E2EFDA" if done else "FCE4D6"
             vals=[t["id"],t["codigo"] or "—",t["descripcion"],t["categoria"] or "General",est,t.get("username") or "—",""]
             for ci,val in enumerate(vals,start=1):
                 c=ws.cell(row=ri,column=ci,value=val); c.fill=_xf(rbg if ci==5 else _DARK2)
-                c.font=_xfn(bold=(ci==5),color=ec if ci==5 else(_TXT_M if ci in(1,6) else _TXT_W),size=9 if ci in(1,6) else 10)
+                c.font=_xfn(bold=(ci==5),color=ec if ci==5 else _TXT_M,size=9 if ci in(1,6) else 10)
                 c.alignment=_xal(h="center" if ci in(1,5) else "left",wrap=(ci==3)); c.border=_xb()
             ws.row_dimensions[ri].height=16
     _xaw(ws); ws.column_dimensions["C"].width=45; ws.column_dimensions["G"].width=20; ws.freeze_panes="A4"; ws.auto_filter.ref=ws.dimensions
