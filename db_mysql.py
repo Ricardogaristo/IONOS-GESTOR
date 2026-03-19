@@ -126,24 +126,75 @@ class MysqlCursorWrapper:
 class MysqlConnectionWrapper:
     """Conexión wrapper: imita sqlite3.Connection."""
 
+    # Errnos de MySQL que indican conexión muerta
+    _DEAD_ERRNOS = {
+        2006,  # MySQL server has gone away
+        2013,  # Lost connection to MySQL server during query
+        4031,  # The client was disconnected by the server (wait_timeout)
+    }
+
     def __init__(self, conn):
         self._conn = conn
 
+    def _reconnect(self):
+        """Intenta reconectar si la conexión está muerta."""
+        try:
+            self._conn.reconnect(attempts=3, delay=1)
+        except Exception:
+            # Como último recurso, crear una conexión nueva
+            try:
+                self._conn = mysql.connector.connect(**MYSQL_CONFIG)
+            except Exception:
+                pass
+
     def execute(self, sql, params=None):
-        """Crea un cursor, ejecuta y devuelve el wrapper (listo para .fetchall())."""
+        """Crea un cursor, ejecuta y devuelve el wrapper (listo para .fetchall()).
+        Si la conexión está muerta (wait_timeout), reconecta y reintenta una vez."""
         sql = sql.replace('?', '%s')
-        cursor = self._conn.cursor(dictionary=True)
-        cursor.execute(sql, params if params is not None else ())
-        return MysqlCursorWrapper(cursor)
+        for attempt in range(2):
+            try:
+                cursor = self._conn.cursor(dictionary=True)
+                cursor.execute(sql, params if params is not None else ())
+                return MysqlCursorWrapper(cursor)
+            except mysql.connector.errors.OperationalError as e:
+                if attempt == 0 and e.errno in self._DEAD_ERRNOS:
+                    self._reconnect()
+                    continue
+                raise
+            except mysql.connector.errors.InterfaceError as e:
+                # InterfaceError también puede indicar conexión muerta
+                if attempt == 0 and ('not connected' in str(e).lower()
+                                     or 'connection' in str(e).lower()):
+                    self._reconnect()
+                    continue
+                raise
 
     def cursor(self):
         return MysqlCursorWrapper(self._conn.cursor(dictionary=True))
+
+    def keep_alive(self):
+        """Refresca la conexión antes de operaciones largas (importaciones de Excel).
+        Llama a esto justo antes de procesar archivos grandes para evitar
+        que MySQL cierre la conexión por wait_timeout durante el procesamiento."""
+        try:
+            self._conn.ping(reconnect=True, attempts=3, delay=1)
+        except Exception:
+            self._reconnect()
+
+    def rollback(self):
+        try:
+            self._conn.rollback()
+        except Exception:
+            pass  # Si la conexión está muerta, el rollback también falla — ignorar
 
     def commit(self):
         self._conn.commit()
 
     def close(self):
-        self._conn.close()
+        try:
+            self._conn.close()
+        except Exception:
+            pass  # Ignorar errores al cerrar conexión ya muerta
 
     # Context manager: permite `with get_connection() as conn:`
     def __enter__(self):
@@ -151,10 +202,13 @@ class MysqlConnectionWrapper:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type:
-            self._conn.rollback()
+            self.rollback()   # usa el rollback seguro
         else:
-            self._conn.commit()
-        self._conn.close()
+            try:
+                self._conn.commit()
+            except Exception:
+                pass
+        self.close()          # usa el close seguro
         return False
 
 

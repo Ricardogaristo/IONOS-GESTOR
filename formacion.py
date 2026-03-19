@@ -662,6 +662,9 @@ def formacion():
 
                 # ── UPSERT con historial ──────────────────────────────────
                 conn = get_form_conn()
+                conn.keep_alive()   # refresca la conexión antes del bucle largo
+                                    # para evitar [Errno 5] / wait_timeout durante
+                                    # el procesamiento de Excels con muchas filas
                 curs = conn.cursor()
                 try:
                     # Primero limpiar duplicados ya existentes en la BD
@@ -752,10 +755,10 @@ def formacion():
                              f"({cnt_avanza} avanzaron, {cnt_retro} retrocedieron, {cnt_igual} sin cambio)"
                              f"{dup_msg} · {cnt_sin_tel} sin teléfono.")
                 except Exception as _inner_e:
-                    conn.rollback()
+                    conn.rollback()   # seguro: absorbe errores si la conn está muerta
                     raise _inner_e
                 finally:
-                    conn.close()  # se ejecuta SIEMPRE, haya error o no
+                    conn.close()      # seguro: absorbe errores si la conn está muerta
 
             except ValueError:
                 pass
