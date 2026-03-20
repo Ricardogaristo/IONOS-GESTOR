@@ -8,7 +8,6 @@
        DESIGN TOKENS
     ══════════════════════════════════════ */
     :root {
-      /* ── Dark mode (default): softer dark, better contrast ── */
       --bg:           #252b3b;
       --bg2:          #2e3549;
       --bg3:          #38405a;
@@ -260,6 +259,54 @@
     }
     .btn-g-export:hover { box-shadow: 0 0 20px var(--accent-glow); color: #fff; }
 
+    /* ── btn-g-blue (Dashboard) ── */
+    .btn-g-blue {
+      background: var(--blue-dim);
+      color: var(--blue);
+      border-color: var(--blue);
+    }
+    .btn-g-blue:hover {
+      background: var(--blue);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(88,166,255,.25);
+    }
+
+    /* ── btn-g-purple (IA) ── */
+    .btn-g-purple {
+      background: rgba(139,92,246,.15);
+      color: #a78bfa;
+      border-color: #7c3aed;
+    }
+    .btn-g-purple:hover {
+      background: #7c3aed;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(124,58,237,.3);
+    }
+
+    /* Light mode overrides */
+    body.light .btn-g-blue {
+      background: #dbeafe;
+      color: #1e40af;
+      border-color: #93c5fd;
+    }
+    body.light .btn-g-blue:hover {
+      background: #1e40af;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(30,64,175,.25);
+    }
+
+    body.light .btn-g-purple {
+      background: #ede9fe;
+      color: #5b21b6;
+      border-color: #c4b5fd;
+    }
+    body.light .btn-g-purple:hover {
+      background: #5b21b6;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(91,33,182,.25);
+    }
+
+
     /* ══════════════════════════════════════
        TABLE
     ══════════════════════════════════════ */
@@ -426,7 +473,6 @@
        LIGHT MODE
     ══════════════════════════════════════ */
     body.light {
-      /* ── Light mode: warm & comfortable ── */
       --bg:          #f2ebe0;
       --bg2:         #fdf8f0;
       --bg3:         #e8e0d2;
@@ -438,13 +484,13 @@
       --accent-glow: rgba(22,101,52,.14);
       --accent:      #166534;
       --accent-dim:  #dcfce7;
+      --accent:      #166534;
       --amber:       #92400e;
       --amber-dim:   #fef3c7;
       --red:         #b91c1c;
       --red-dim:     #fee2e2;
       --blue:        #1e40af;
       --blue-dim:    #dbeafe;
-      --shadow:      0 1px 3px rgba(30,26,20,.08), 0 8px 24px rgba(30,26,20,.06);
     }
     body.light::before { /* grid removed */ }
     body.light .navbar { background: rgba(242,235,224,.97); border-bottom-color: #cec5b5; }
@@ -452,6 +498,148 @@
     body.light .form-select { background: #fdf8f0; color: var(--text); border-color: var(--border); }
     body.light .form-control:focus,
     body.light .form-select:focus { background: #fdf8f0; }
+
+
+    /* ══════════════════════════════════════
+       LIGHT MODE — Button & pill overrides
+    ══════════════════════════════════════ */
+
+    /* btn-g-primary: verde oscuro sobre fondo claro */
+    body.light .btn-g-primary {
+      background: #166534;
+      color: #ffffff;
+      border-color: #166534;
+    }
+    body.light .btn-g-primary:hover {
+      background: #15803d;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(22,101,52,.25);
+    }
+
+    /* btn-g-success */
+    body.light .btn-g-success {
+      background: #dcfce7;
+      color: #166534;
+      border-color: #86efac;
+    }
+    body.light .btn-g-success:hover {
+      background: #166534;
+      color: #ffffff;
+    }
+
+    /* btn-g-warning */
+    body.light .btn-g-warning {
+      background: #fef3c7;
+      color: #92400e;
+      border-color: #fcd34d;
+    }
+    body.light .btn-g-warning:hover {
+      background: #92400e;
+      color: #ffffff;
+    }
+
+    /* btn-g-danger */
+    body.light .btn-g-danger {
+      background: #fee2e2;
+      color: #b91c1c;
+      border-color: #fca5a5;
+    }
+    body.light .btn-g-danger:hover {
+      background: #b91c1c;
+      color: #ffffff;
+    }
+
+    /* btn-g-ghost */
+    body.light .btn-g-ghost {
+      background: transparent;
+      color: #3d3328;
+      border-color: #cec5b5;
+    }
+    body.light .btn-g-ghost:hover {
+      background: #e8e0d2;
+      color: #1a1510;
+    }
+
+    /* btn-g-export */
+    body.light .btn-g-export {
+      background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+      color: #166534;
+      border-color: #86efac;
+    }
+    body.light .btn-g-export:hover {
+      background: #166534;
+      color: #ffffff;
+      box-shadow: 0 0 20px rgba(22,101,52,.2);
+    }
+
+    /* btn-logout */
+    body.light .btn-logout {
+      border-color: #fca5a5;
+      color: #b91c1c;
+    }
+    body.light .btn-logout:hover {
+      background: #b91c1c;
+      color: #ffffff;
+    }
+
+    /* btn-dark-toggle */
+    body.light .btn-dark-toggle {
+      border-color: #cec5b5;
+      color: #6b5f52;
+    }
+    body.light .btn-dark-toggle:hover {
+      background: #e8e0d2;
+      color: #1a1510;
+    }
+
+    /* ── Filter pills ── */
+    body.light .fpill {
+      background: #fdf8f0;
+      border-color: #cec5b5;
+      color: #3d3328;
+    }
+    body.light .fpill:hover {
+      border-color: #b8ae9e;
+      color: #1a1510;
+      background: #e8e0d2;
+    }
+    body.light .fpill.s-all.on     { background: #e8e0d2  !important; border-color: #6b5f52 !important; color: #1a1510  !important; }
+    body.light .fpill.s-pending.on { background: #fef3c7  !important; border-color: #d97706 !important; color: #92400e  !important; }
+    body.light .fpill.s-done.on    { background: #dcfce7  !important; border-color: #16a34a !important; color: #166534  !important; }
+    body.light .fpill.s-fav.on     { background: #fef9c3  !important; border-color: #ca8a04 !important; color: #92400e  !important; }
+    body.light .fpill.prio-all.on  { background: #e8e0d2  !important; border-color: #6b5f52 !important; color: #1a1510  !important; }
+    body.light .fpill.prio-high.on { background: #fee2e2  !important; border-color: #dc2626 !important; color: #b91c1c  !important; }
+    body.light .fpill.prio-med.on  { background: #fef3c7  !important; border-color: #d97706 !important; color: #92400e  !important; }
+    body.light .fpill.prio-low.on  { background: #dcfce7  !important; border-color: #16a34a !important; color: #166534  !important; }
+
+    /* ── Category select ── */
+    body.light .cat-select {
+      background-color: #fdf8f0;
+      border-color: #cec5b5;
+      color: #3d3328;
+    }
+    body.light .cat-select:hover { border-color: #b8ae9e; color: #1a1510; }
+    body.light .cat-select.active { background-color: #dbeafe; border-color: #3b82f6; color: #1e40af; }
+
+    /* ── Pagination ── */
+    body.light .gpage-link {
+      background: #fdf8f0;
+      border-color: #cec5b5;
+      color: #6b5f52;
+    }
+    body.light .gpage-link:hover { border-color: #166534; color: #166534; }
+    body.light .gpagination .active .gpage-link {
+      background: #166534;
+      color: #ffffff;
+      border-color: #166534;
+    }
+
+    /* ── Navbar user pill ── */
+    body.light .navbar-user {
+      background: #e8e0d2;
+      border-color: #cec5b5;
+      color: #3d3328;
+    }
 
     /* scrollbar */
     ::-webkit-scrollbar { width: 6px; height: 6px; }

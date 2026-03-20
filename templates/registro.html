@@ -7,20 +7,44 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
+    /* ══════════════════════════════════════
+       THEME TOKENS — sincronizados con components.css
+    ══════════════════════════════════════ */
     :root {
-      --bg:        #d8dce8;
-      --surface:   #ffffff;
-      --surface2:  #f6f7fb;
-      --border:    #dde0ea;
-      --border2:   #c4c8d8;
-      --ink:       #141720;
-      --ink2:      #2c3045;
-      --ink3:      #6b7080;
-      --accent:    #c8290a;
-      --accent-lt: rgba(200,41,10,.08);
-      --accent-md: rgba(200,41,10,.16);
-      --blue:      #2563eb;
-      --blue-lt:   rgba(37,99,235,.07);
+      /* Dark mode (default) */
+      --bg:           #252b3b;
+      --surface:      #2e3549;
+      --surface2:     #38405a;
+      --border:       #4a536e;
+      --border2:      #5a6480;
+      --ink:          #f0f4ff;
+      --ink2:         #b0bbd8;
+      --ink3:         #6e7a99;
+      --accent:       #c8290a;   /* rojo de marca — fijo en ambos temas */
+      --accent-lt:    rgba(200,41,10,.12);
+      --accent-md:    rgba(200,41,10,.22);
+      --blue:         #7dd3fc;
+      --blue-lt:      rgba(125,211,252,.1);
+      --green:        #4ade80;
+      --green-lt:     rgba(74,222,128,.1);
+    }
+
+    body.light {
+      --bg:           #f2ebe0;
+      --surface:      #fdf8f0;
+      --surface2:     #e8e0d2;
+      --border:       #cec5b5;
+      --border2:      #b8ae9e;
+      --ink:          #1a1510;
+      --ink2:         #3d3328;
+      --ink3:         #6b5f52;
+      --accent:       #c8290a;   /* rojo de marca — fijo */
+      --accent-lt:    rgba(200,41,10,.08);
+      --accent-md:    rgba(200,41,10,.16);
+      --blue:         #1e40af;
+      --blue-lt:      rgba(30,64,175,.08);
+      --green:        #166534;
+      --green-lt:     rgba(22,101,52,.08);
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -42,7 +66,7 @@
       content: '';
       position: fixed; top: -200px; right: -200px;
       width: 650px; height: 650px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(200,41,10,.08) 0%, transparent 65%);
+      background: radial-gradient(circle, rgba(200,41,10,.07) 0%, transparent 65%);
       pointer-events: none;
     }
     body::after {
@@ -266,6 +290,14 @@
   </style>
 </head>
 <body>
+  <!-- Theme toggle — sincronizado con el resto de la app -->
+  <button onclick="toggleLight()" id="theme-btn"
+          style="position:fixed;top:1rem;right:1rem;z-index:999;
+                 font-size:.8rem;padding:.35rem .65rem;border-radius:6px;
+                 border:1px solid var(--border);background:var(--surface);
+                 color:var(--ink2);cursor:pointer;transition:all .18s;"
+          title="Cambiar tema">◐</button>
+
 
 <div class="card">
 
@@ -393,5 +425,17 @@
     this.submit();
   });
 </script>
+
+  <script>
+    (function(){
+      if(localStorage.getItem('theme') !== 'dark'){
+        document.body.classList.add('light');
+      }
+    })();
+    function toggleLight(){
+      document.body.classList.toggle('light');
+      localStorage.setItem('theme', document.body.classList.contains('light') ? 'light' : 'dark');
+    }
+  </script>
 </body>
 </html>
