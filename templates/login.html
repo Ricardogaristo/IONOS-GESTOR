@@ -5,289 +5,344 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Acceso — Gestor Garisto</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-
-  <!-- Favicon: punto rojo igual que en base.html -->
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
   <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" sizes="32x32">
-
   <style>
     :root {
-      --bg:      #0c0b0a;
-      --surface: #141311;
-      --border:  #242220;
-      --ink:     #f0ede8;
-      --ink2:    #7a756f;
-      --ink3:    #3d3a36;
-      --red:     #c8290a;
-      --red-dim: rgba(200,41,10,.12);
+      --bg:        #d8dce8;
+      --surface:   #ffffff;
+      --surface2:  #f6f7fb;
+      --border:    #dde0ea;
+      --border2:   #c4c8d8;
+      --ink:       #141720;
+      --ink2:      #2c3045;
+      --ink3:      #6b7080;
+      --accent:    #c8290a;
+      --accent-lt: rgba(200,41,10,.08);
+      --accent-md: rgba(200,41,10,.16);
+      --blue:      #2563eb;
+      --blue-lt:   rgba(37,99,235,.07);
+      --green:     #166534;
+      --green-lt:  rgba(22,101,52,.07);
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Instrument Sans', sans-serif;
       background: var(--bg);
       color: var(--ink);
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 2rem;
+      padding: 2.5rem 1.5rem;
       position: relative;
+      overflow-x: hidden;
     }
 
-    /* Grain overlay */
     body::before {
       content: '';
-      position: fixed; inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-      pointer-events: none; z-index: 0; opacity: .45;
+      position: fixed; top: -200px; right: -200px;
+      width: 650px; height: 650px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(200,41,10,.08) 0%, transparent 65%);
+      pointer-events: none;
     }
-
-    /* Red glow bottom-center */
     body::after {
       content: '';
-      position: fixed;
-      bottom: -200px; left: 50%; transform: translateX(-50%);
-      width: 600px; height: 400px;
-      background: radial-gradient(ellipse, rgba(200,41,10,.18) 0%, transparent 65%);
-      pointer-events: none; z-index: 0;
+      position: fixed; bottom: -180px; left: -180px;
+      width: 550px; height: 550px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(37,99,235,.06) 0%, transparent 65%);
+      pointer-events: none;
     }
 
+    /* ── UN SOLO RECUADRO GRANDE ── */
     .card {
       position: relative; z-index: 1;
-      width: 100%; max-width: 400px;
-      animation: rise .5s cubic-bezier(.22,1,.36,1) both;
+      width: 100%; max-width: 860px;
+      background: var(--surface);
+      border: 2px solid rgba(200,41,10,.3);
+      border-radius: 24px;
+      padding: 3.5rem 4rem;
+      box-shadow:
+        0 1px 2px rgba(200,41,10,.06),
+        0 4px 24px rgba(200,41,10,.12),
+        0 20px 56px rgba(200,41,10,.08);
+      animation: rise .55s cubic-bezier(.22,1,.36,1) both;
     }
 
     @keyframes rise {
-      from { opacity: 0; transform: translateY(18px); }
+      from { opacity: 0; transform: translateY(24px); }
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    /* ── MARK / LOGO ── igual que navbar de base.html */
-    .mark {
-      display: flex; align-items: center; gap: .65rem;
-      margin-bottom: 2.8rem;
+    .card-top {
+      text-align: center;
+      margin-bottom: 2.4rem;
     }
-    /* Punto rojo — copia exacta del .dot de base.html */
+
+    .mark {
+      display: inline-flex; align-items: center; gap: .65rem;
+      margin-bottom: 1.6rem;
+    }
     .mark-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      background: var(--red);
-      box-shadow: 0 0 10px rgba(200,41,10,.55);
-      flex-shrink: 0;
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(200,41,10,.45);
+      animation: pulse 2.8s ease-in-out infinite; flex-shrink: 0;
+    }
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 10px rgba(200,41,10,.45); }
+      50%      { box-shadow: 0 0 22px rgba(200,41,10,.75); }
     }
     .mark-name {
       font-family: 'JetBrains Mono', monospace;
-      font-size: .78rem; font-weight: 500;
-      letter-spacing: .03em;
-      color: var(--ink2);
-    }
-    .mark-name span { color: var(--ink3); }
-
-    /* Heading */
-    h1 {
-      font-family: 'DM Serif Display', serif;
-      font-size: 2.6rem; line-height: 1.05;
-      letter-spacing: -.02em;
-      margin-bottom: .5rem;
-    }
-    h1 em { font-style: italic; color: var(--red); }
-
-    .sub {
-      font-size: .83rem; color: var(--ink2);
-      margin-bottom: 2.2rem; font-weight: 300;
-    }
-    .sub a {
-      color: var(--red); text-decoration: none; font-weight: 500;
-      border-bottom: 1px solid rgba(200,41,10,.3);
-      transition: border-color .15s;
-    }
-    .sub a:hover { border-color: var(--red); }
-
-    /* Divider */
-    .divider {
-      height: 1px; background: var(--border);
-      margin-bottom: 2rem;
+      font-size: .68rem; font-weight: 400;
+      letter-spacing: .13em; text-transform: uppercase;
+      color: var(--ink3);
     }
 
-    /* Alert */
-    .alert {
-      border-radius: 8px; font-size: .82rem; font-weight: 400;
-      padding: .65rem .9rem; margin-bottom: 1.4rem;
-      display: flex; align-items: flex-start; gap: .4rem;
-      line-height: 1.45;
-      animation: rise .3s ease both;
-    }
-    .alert-error {
-      background: rgba(185,28,28,.1);
-      border: 1px solid rgba(185,28,28,.25);
-      color: #f87171;
-    }
-    .alert-ok {
-      background: rgba(34,197,94,.07);
-      border: 1px solid rgba(34,197,94,.2);
-      color: #86efac;
-    }
-
-    /* Fields */
-    .field { margin-bottom: 1.1rem; }
-    .field label {
+    .eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .6rem; font-weight: 500;
+      letter-spacing: .14em; text-transform: uppercase;
+      color: var(--ink3); margin-bottom: .6rem;
       display: block;
-      font-size: .67rem; font-weight: 500;
-      letter-spacing: .1em; text-transform: uppercase;
-      color: #ffffff; margin-bottom: .38rem;
     }
+
+    h1 {
+      font-family: 'Instrument Serif', serif;
+      font-size: 2.8rem; line-height: 1.05;
+      letter-spacing: -.03em; font-weight: 400;
+      margin-bottom: .4rem; color: var(--ink);
+    }
+    h1 em { font-style: italic; color: var(--accent); }
+
+    .sub { font-size: .82rem; color: var(--ink2); font-weight: 300; }
+    .sub a {
+      color: var(--accent); text-decoration: none; font-weight: 500;
+      border-bottom: 1px solid rgba(200,41,10,.25); transition: border-color .15s;
+    }
+    .sub a:hover { border-color: var(--accent); }
+
+    .card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 1.8rem;
+    }
+
+    .form-col {}
+    .aside-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+      align-items: start;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 0 1rem;
+      align-items: end;
+    }
+    .field-btn { min-width: 120px; }
+    .field-btn .btn { margin-top: 0; height: 44px; padding: 0 1.4rem; white-space: nowrap; }
+
+    .divider { height: 1px; background: var(--border); margin-bottom: 1.6rem; }
+
+    .alert {
+      border-radius: 9px; font-size: .8rem;
+      padding: .65rem .9rem; margin-bottom: 1.2rem;
+      display: flex; align-items: center; gap: .45rem;
+      line-height: 1.4; animation: rise .3s ease both;
+    }
+    .alert-error { background: rgba(185,28,28,.05); border: 1px solid rgba(185,28,28,.18); color: #b91c1c; }
+    .alert-ok    { background: var(--green-lt); border: 1px solid rgba(22,101,52,.18); color: var(--green); }
+
+    .field { margin-bottom: 1rem; }
+    .field label {
+      display: block; font-size: .62rem; font-weight: 600;
+      letter-spacing: .1em; text-transform: uppercase;
+      color: var(--ink2); margin-bottom: .35rem;
+    }
+    .input-wrap { position: relative; }
     .field input {
-      width: 100%;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--ink);
-      font-family: 'DM Sans', sans-serif;
-      font-size: .88rem; font-weight: 300;
-      padding: .7rem 1rem;
-      transition: border-color .15s, box-shadow .15s;
-      outline: none;
+      width: 100%; background: var(--surface2);
+      border: 1.5px solid var(--border); border-radius: 10px;
+      color: var(--ink); font-family: 'Instrument Sans', sans-serif;
+      font-size: .88rem; font-weight: 300; padding: .75rem 1rem;
+      transition: border-color .15s, box-shadow .15s, background .15s; outline: none;
     }
     .field input:focus {
-      border-color: rgba(200,41,10,.6);
-      box-shadow: 0 0 0 3px rgba(200,41,10,.08);
+      border-color: var(--accent); background: var(--surface);
+      box-shadow: 0 0 0 3px rgba(200,41,10,.07);
     }
     .field input::placeholder { color: var(--ink3); }
 
-    /* Submit */
+    .toggle-btn {
+      position: absolute; right: .8rem; top: 50%;
+      transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      color: var(--ink3); font-size: .85rem; padding: .2rem;
+      line-height: 1; transition: color .15s;
+    }
+    .toggle-btn:hover { color: var(--ink2); }
+
     .btn {
-      width: 100%; padding: .75rem 1rem;
-      background: var(--red); color: #fff;
-      font-family: 'DM Sans', sans-serif;
-      font-weight: 500; font-size: .9rem;
-      border: none; border-radius: 8px; cursor: pointer;
-      margin-top: .8rem;
+      width: 100%; padding: .82rem 1rem;
+      background: var(--accent); color: #fff;
+      font-family: 'Instrument Sans', sans-serif;
+      font-weight: 600; font-size: .9rem;
+      border: none; border-radius: 10px; cursor: pointer; margin-top: .8rem;
       display: flex; align-items: center; justify-content: center; gap: .5rem;
-      transition: background .15s, box-shadow .15s, transform .1s;
-      letter-spacing: .01em;
-      box-shadow: 0 0 0 rgba(200,41,10,0);
+      transition: background .15s, box-shadow .15s, transform .12s;
     }
-    .btn:hover {
-      background: #d93010;
-      box-shadow: 0 0 24px rgba(200,41,10,.3);
-      transform: translateY(-1px);
-    }
+    .btn:hover { background: #d93010; box-shadow: 0 4px 20px rgba(200,41,10,.3); transform: translateY(-1px); }
     .btn:active { transform: translateY(0); }
-    .btn .arr { transition: transform .15s; display: inline-block; }
+    .btn .arr { transition: transform .15s; }
     .btn:hover .arr { transform: translateX(4px); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
 
-    /* ── README + CV SECTION ── */
-    .about-section {
-      margin-top: 2.6rem;
-      border-top: 1px solid var(--border);
-      padding-top: 2rem;
-      animation: rise .6s .15s cubic-bezier(.22,1,.36,1) both;
-    }
+    .form-col {}
 
-    .about-label {
-      font-size: .6rem; font-weight: 500;
-      letter-spacing: .12em; text-transform: uppercase;
-      color: var(--ink3);
-      font-family: 'JetBrains Mono', monospace;
-      margin-bottom: 1rem;
-      display: flex; align-items: center; gap: .5rem;
+    /* ── CV CARD ── */
+    .cv-card {
+      display: block; text-decoration: none;
+      border-radius: 14px; overflow: hidden;
+      border: 2px solid var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-lt), 0 4px 20px rgba(200,41,10,.1);
+      transition: box-shadow .2s, transform .15s;
+      margin-bottom: 1.2rem;
     }
-    .about-label::after {
+    .cv-card:hover {
+      box-shadow: 0 0 0 5px var(--accent-md), 0 8px 28px rgba(200,41,10,.18);
+      transform: translateY(-2px);
+    }
+    .cv-header {
+      background: var(--ink);
+      padding: 1.2rem 1.4rem 1rem;
+      display: flex; align-items: center; justify-content: space-between;
+      position: relative; overflow: hidden;
+    }
+    .cv-header::after {
       content: '';
-      flex: 1; height: 1px;
-      background: var(--border);
+      position: absolute; top: -35px; right: -35px;
+      width: 110px; height: 110px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(200,41,10,.3) 0%, transparent 65%);
+      pointer-events: none;
     }
-
-    .readme {
+    .cv-person { display: flex; align-items: center; gap: .85rem; }
+    .cv-avatar {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: rgba(200,41,10,.2); border: 2px solid rgba(200,41,10,.5);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; flex-shrink: 0;
+    }
+    .cv-fullname {
+      font-family: 'Instrument Serif', serif;
+      font-size: 1.4rem; color: #ffffff;
+      letter-spacing: -.02em; line-height: 1.1;
+      text-shadow: 0 1px 8px rgba(200,41,10,.25);
+    }
+    .cv-role { font-size: .72rem; color: #c8ccd8; margin-top: .18rem; font-weight: 400; }
+    .cv-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .58rem; font-weight: 500; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--accent); background: rgba(200,41,10,.15); border: 1px solid rgba(200,41,10,.3);
+      border-radius: 20px; padding: .3rem .75rem;
+      display: flex; align-items: center; gap: .35rem; flex-shrink: 0;
+    }
+    .cv-badge-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent); animation: pulse 2s ease-in-out infinite;
+    }
+    .cv-body {
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 1.2rem 1.3rem;
-      font-size: .8rem;
-      line-height: 1.7;
-      color: var(--ink2);
-      margin-bottom: 1rem;
+      padding: .85rem 1.4rem;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: .8rem; border-top: 1px solid var(--border);
     }
-    .readme strong {
-      color: var(--ink);
-      font-weight: 500;
+    .cv-skills { display: flex; flex-wrap: wrap; gap: .28rem; flex: 1; }
+    .cv-skill-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .6rem; color: var(--ink2);
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 4px; padding: .18rem .48rem;
     }
-    .readme .readme-title {
-      font-family: 'DM Serif Display', serif;
-      font-size: 1.05rem;
-      color: var(--ink);
-      margin-bottom: .55rem;
-      letter-spacing: -.01em;
+    .cv-dl-btn {
+      display: inline-flex; align-items: center; gap: .4rem;
+      background: var(--accent); color: #fff;
+      font-family: 'Instrument Sans', sans-serif;
+      font-size: .76rem; font-weight: 600;
+      border-radius: 8px; padding: .48rem 1rem;
+      white-space: nowrap; flex-shrink: 0;
+      transition: background .15s, box-shadow .15s;
     }
-    .readme ul {
-      padding-left: 1.1rem;
-      margin: .4rem 0 0;
-      display: flex; flex-direction: column; gap: .2rem;
+    .cv-card:hover .cv-dl-btn { background: #d93010; box-shadow: 0 2px 10px rgba(200,41,10,.3); }
+
+    /* ── README ── */
+    .readme-block {
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: 14px; overflow: hidden;
     }
-    .readme ul li::marker { color: var(--red); }
+    .readme-header {
+      padding: .6rem 1.2rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .readme-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .6rem; font-weight: 500;
+      letter-spacing: .13em; text-transform: uppercase;
+      color: var(--ink3);
+    }
+    .readme {
+      padding: 1.1rem 1.2rem;
+      font-size: .79rem; line-height: 1.75; color: var(--ink2);
+    }
+    .readme strong { color: var(--ink); font-weight: 600; }
+    .readme-title {
+      font-family: 'Instrument Serif', serif;
+      font-size: 1rem; color: var(--ink);
+      margin-bottom: .5rem; letter-spacing: -.01em;
+    }
+    .readme ul { padding-left: 1.1rem; margin: .4rem 0 0; display: flex; flex-direction: column; gap: .18rem; }
+    .readme ul li::marker { color: var(--accent); }
     .readme .tag {
       display: inline-block;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: .68rem;
-      background: var(--red-dim);
-      border: 1px solid rgba(200,41,10,.2);
-      color: #e8724e;
-      border-radius: 4px;
-      padding: .1rem .45rem;
-      margin-right: .25rem;
+      font-family: 'JetBrains Mono', monospace; font-size: .65rem;
+      background: var(--blue-lt); border: 1px solid rgba(37,99,235,.2);
+      color: var(--blue); border-radius: 4px; padding: .08rem .4rem; margin-right: .2rem;
     }
+    .readme a {
+      color: var(--accent); text-decoration: none;
+      border-bottom: 1px solid rgba(200,41,10,.25); transition: border-color .15s;
+    }
+    .readme a:hover { border-color: var(--accent); }
 
-    /* CV download button */
-    .btn-cv {
-      display: flex; align-items: center; justify-content: space-between;
-      width: 100%;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: .7rem 1rem;
-      color: var(--ink2);
-      font-size: .8rem;
-      text-decoration: none;
-      transition: border-color .15s, color .15s, background .15s;
-      gap: .5rem;
-    }
-    .btn-cv:hover {
-      border-color: rgba(200,41,10,.5);
-      color: var(--ink);
-      background: #181614;
-    }
-    .btn-cv .cv-left { display: flex; align-items: center; gap: .55rem; }
-    .btn-cv .cv-icon {
-      font-size: 1.05rem;
-      width: 28px; height: 28px;
-      background: var(--red-dim);
-      border: 1px solid rgba(200,41,10,.2);
-      border-radius: 6px;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .btn-cv .cv-meta { display: flex; flex-direction: column; gap: .05rem; }
-    .btn-cv .cv-name { font-weight: 500; color: var(--ink); font-size: .82rem; }
-    .btn-cv .cv-desc { font-size: .68rem; #ffffff; }
-    .btn-cv .cv-dl {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: .68rem; color: var(--red);
-      letter-spacing: .04em;
-    }
-
-    /* Footer */
     .foot {
-      margin-top: 2.5rem;
-      font-size: .67rem; color: #ffffff;
-      text-align: center; letter-spacing: .05em;
-      text-transform: uppercase;
+      margin-top: 2rem; font-size: .62rem; color: var(--ink3);
+      text-align: center; letter-spacing: .07em; text-transform: uppercase;
+      border-top: 1px solid var(--border); padding-top: 1.4rem;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 760px) {
+      .card { padding: 2.5rem 2rem; }
+      .aside-col { grid-template-columns: 1fr; }
+      h1 { font-size: 2.2rem; }
     }
 
     @media (max-width: 480px) {
-      h1 { font-size: 2.1rem; }
+      body { padding: 1.2rem .8rem; }
+      .card { padding: 1.8rem 1.4rem; border-radius: 18px; }
+      h1 { font-size: 1.9rem; }
+      .cv-body { flex-direction: column; align-items: flex-start; }
+      .cv-dl-btn { width: 100%; justify-content: center; }
+      .form-row { grid-template-columns: 1fr; }
+      .field-btn .btn { height: auto; padding: .78rem 1rem; }
     }
   </style>
 </head>
@@ -295,27 +350,18 @@
 
 <div class="card">
 
-  <!-- LOGO: punto rojo + nombre, igual que la navbar de base.html -->
-  <div class="mark">
-    <div class="mark-dot"></div>
-    <span class="mark-name">gestor<span>/</span>tareas</span>
-  </div>
-    <!-- Botón descarga CV -->
-    <a class="btn-cv"
-       href="{{ url_for('static', filename='cv/CV_Ricardo_Garisto_Viso.pdf') }}"
-       download="CV_Ricardo_Garisto_Viso.pdf">
-      <div class="cv-left">
-        <div class="cv-icon">📄</div>
-        <div class="cv-meta">
-          <span class="cv-name">Ricardo Garisto Viso</span>
-          <span class="cv-desc">Consultor técnico · e-learning · sistemas</span>
-        </div>
+  <!-- Cabecera: marca + título -->
+  <div class="card-top">
+    <div>
+      <div class="mark">
+        <div class="mark-dot"></div>
+        <span class="mark-name">Gestor Garisto</span>
       </div>
-      <span class="cv-dl">↓ CV</span>
-    </a> </br>
-  <h1>Bienvenido<br>de <em>vuelta.</em></h1>
-  <h2 style="font-size:.9rem; font-weight:300; color:var(--ink2); margin-top:.3rem; margin-bottom:.5rem;">Gestor Práctico para tus tareas</h2>
-  <p class="sub">¿No tienes cuenta? <a href="{{ url_for('auth.registro') }}">Regístrate</a></p>
+      <div class="eyebrow">Acceso</div>
+      <h1>Bienvenido<br>de <em>vuelta.</em></h1>
+      <p class="sub">¿No tienes cuenta? <a href="{{ url_for('auth.registro') }}">Regístrate</a></p>
+    </div>
+  </div>
 
   <div class="divider"></div>
 
@@ -326,69 +372,99 @@
   <div class="alert alert-error">✖ {{ error }}</div>
   {% endif %}
 
-  <form id="login-form" method="POST" action="{{ url_for('auth.login') }}" autocomplete="off">
+  <!-- Cuerpo: formulario | CV + README -->
+  <div class="card-body">
 
-    <div class="field">
-      <label>Usuario o Email</label>
-      <input id="f-user" type="text" name="username"
-             placeholder="nombre o correo" required
-             autocomplete="username"
-             spellcheck="false" autocorrect="off" autocapitalize="off">
+    <div class="form-col">
+      <form id="login-form" method="POST" action="{{ url_for('auth.login') }}" autocomplete="off">
+        <div class="form-row">
+          <div class="field">
+            <label>Usuario o Email</label>
+            <input id="f-user" type="text" name="username"
+                   placeholder="nombre o correo" required
+                   autocomplete="username" spellcheck="false" autocorrect="off" autocapitalize="off">
+          </div>
+
+          <div class="field">
+            <label>Contraseña</label>
+            <div class="input-wrap">
+              <input id="f-pass" type="password" name="password"
+                     placeholder="••••••••" required
+                     autocomplete="current-password" spellcheck="false"
+                     style="padding-right:2.8rem;">
+              <button type="button" class="toggle-btn" onclick="togglePass()" title="Mostrar / ocultar">👁</button>
+            </div>
+          </div>
+
+          <div class="field field-btn">
+            <label>&nbsp;</label>
+            <button type="submit" class="btn" id="btn-submit">
+              Entrar <span class="arr">→</span>
+            </button>
+          </div>
+        </div>
+
+        {% if bloqueado %}
+        <p style="font-size:.78rem; color:#b91c1c; margin-top:.4rem; text-align:center;">
+          ⏳ Vuelve a intentarlo en 10 minutos.
+        </p>
+        {% endif %}
+      </form>
     </div>
 
-    <div class="field" style="position:relative;">
-      <label>Contraseña</label>
-      <input id="f-pass" type="password" name="password"
-             placeholder="••••••••" required
-             autocomplete="current-password"
-             spellcheck="false">
-      <button type="button" id="toggle-pass"
-              style="position:absolute; right:.8rem; bottom:.72rem;
-                     background:none; border:none; cursor:pointer;
-                     color:var(--ink2); font-size:.85rem; padding:0; line-height:1;"
-              onclick="togglePass()" title="Mostrar / ocultar contraseña">
-        👁
-      </button>
-    </div>
+    <div class="aside-col">
+      <!-- CV primero -->
+      <a class="cv-card"
+         href="{{ url_for('static', filename='cv/CV_Ricardo_Garisto_Viso.pdf') }}"
+         download="CV_Ricardo_Garisto_Viso.pdf">
+        <div class="cv-header">
+          <div class="cv-person">
+            <div class="cv-avatar">👤</div>
+            <div>
+              <div class="cv-fullname">Ricardo Garisto Viso</div>
+              <div class="cv-role">Consultor técnico · e-learning · sistemas</div>
+            </div>
+          </div>
+          <span class="cv-badge"><span class="cv-badge-dot"></span>Disponible</span>
+        </div>
+        <div class="cv-body">
+          <div class="cv-skills">
+            <span class="cv-skill-tag">Python</span>
+            <span class="cv-skill-tag">Flask</span>
+            <span class="cv-skill-tag">e-learning</span>
+            <span class="cv-skill-tag">SCORM</span>
+            <span class="cv-skill-tag">MySQL</span>
+          </div>
+          <span class="cv-dl-btn">↓ Descargar CV</span>
+        </div>
+      </a>
 
-    {% if bloqueado %}
-    <p style="font-size:.78rem; color:#f87171; margin-top:.5rem; text-align:center;">
-      ⏳ Vuelve a intentarlo en 10 minutos.
-    </p>
-    {% endif %}
-
-    <button type="submit" class="btn" id="btn-submit">
-      Entrar <span class="arr">→</span>
-    </button>
-  </form>
-
-  <!-- ── README + CV ── -->
-  <div class="about-section">
-
-    <div class="about-label">README</div>
-
-    <div class="readme">
-      <div class="readme-title">Gestor Garisto — Gestor de Tareas</div>
-      Aplicación web interna desarrollada en <strong>Python / Flask</strong> para la gestión de tareas, formación y usuarios dentro del equipo.
-      <ul>
-        <li>Panel de tareas con filtros, estados y asignaciones</li>
-        <li>Dashboard con métricas y progreso</li>
-        <li>Módulo de formación SCORM integrado</li>
-        <li>Control de acceso por roles (usuario / admin / superadmin)</li>
-        <li>Tema claro/oscuro persistente</li>
-      </ul>
-      <div style="margin-top:.75rem;">
-        <span class="tag">Python</span>
-        <span class="tag">Flask</span>
-        <span class="tag">Bootstrap 5</span>
-        <span class="tag">SQLite</span>
-        <span class="tag">SCORM</span>
-      </div>
-      <div style="margin-top:.6rem; font-size:.75rem;">
-        Proyecto: <a href="http://212.227.88.140/" target="_blank"
-          style="color:var(--red); text-decoration:none; border-bottom:1px solid rgba(200,41,10,.3);">
-          212.227.88.140
-        </a>
+      <!-- README debajo -->
+      <div class="readme-block">
+        <div class="readme-header">
+          <span class="readme-label">README</span>
+        </div>
+        <div class="readme">
+          <div class="readme-title">Gestor Garisto — Gestor de Tareas</div>
+          Aplicación web interna en <strong>Python / Flask</strong> para gestión de tareas, formación y usuarios.
+          <ul>
+            <li>Panel de tareas con filtros, estados y asignaciones</li>
+            <li>Dashboard con métricas y progreso</li>
+            <li>Módulo de formación SCORM integrado</li>
+            <li>Control de acceso por roles</li>
+            <li>Tema claro/oscuro persistente</li>
+          </ul>
+          <div style="margin-top:.7rem;">
+            <span class="tag">Python</span>
+            <span class="tag">Flask</span>
+            <span class="tag">Bootstrap 5</span>
+            <span class="tag">MySQL</span>
+            <span class="tag">SCORM</span>
+          </div>
+          <div style="margin-top:.55rem; font-size:.74rem;">
+            Proyecto: <a href="http://212.227.88.140/" target="_blank">212.227.88.140</a>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -398,27 +474,24 @@
 </div>
 
 <script>
-  // ── SHA-256: Web Crypto API (HTTPS) con fallback JS puro (HTTP/local) ──
   async function sha256hex(str) {
     const crypto = window.crypto || window.msCrypto;
     if (crypto && crypto.subtle) {
-      // Versión nativa — más rápida y segura
-      const data   = new TextEncoder().encode(str);
-      const buf    = await crypto.subtle.digest('SHA-256', data);
+      const data = new TextEncoder().encode(str);
+      const buf  = await crypto.subtle.digest('SHA-256', data);
       return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
     }
-    // Fallback JS puro (HTTP sin TLS, navegadores muy antiguos)
     function rightRotate(v,a){ return (v>>>a)|(v<<(32-a)); }
-    const mp=Math.pow, mw=mp(2,32); let res='',words=[],abl=str.length*8,hash=[],k=[],pc=0,ic={};
+    const mp=Math.pow,mw=mp(2,32);let res='',words=[],abl=str.length*8,hash=[],k=[],pc=0,ic={};
     for(let c=2;pc<64;c++){if(!ic[c]){for(let i=c*c;i<313;i+=c)ic[i]=true;hash[pc]=(mp(c,.5)*mw)|0;k[pc++]=(mp(c,1/3)*mw)|0;}}
-    str+='\x80'; while(str.length%64-56)str+='\x00';
+    str+='\x80';while(str.length%64-56)str+='\x00';
     for(let i=0;i<str.length;i++){const j=str.charCodeAt(i);if(j>>8)return'';words[i>>2]|=j<<((3-i)%4)*8;}
-    words[words.length]=((abl/mw)|0); words[words.length]=(abl|0);
+    words[words.length]=((abl/mw)|0);words[words.length]=(abl|0);
     for(let j=0;j<words.length;){const w=words.slice(j,j+=16),oh=hash.slice(0);
       for(let i=0;i<64;i++){const w15=w[i-15],w2=w[i-2],a=hash[0],e=hash[4];
         const t1=hash[7]+(rightRotate(e,6)^rightRotate(e,11)^rightRotate(e,25))+((e&hash[5])^(~e&hash[6]))+k[i]+(w[i]=(i<16)?w[i]:(w[i-16]+(rightRotate(w15,7)^rightRotate(w15,18)^(w15>>>3))+w[i-7]+(rightRotate(w2,17)^rightRotate(w2,19)^(w2>>>10)))|0);
         const t2=(rightRotate(a,2)^rightRotate(a,13)^rightRotate(a,22))+((a&hash[1])^(a&hash[2])^(hash[1]&hash[2]));
-        hash=[(t1+t2)|0].concat(hash); hash[4]=(hash[4]+t1)|0; hash.length=8;}
+        hash=[(t1+t2)|0].concat(hash);hash[4]=(hash[4]+t1)|0;hash.length=8;}
       for(let i=0;i<8;i++)hash[i]=(hash[i]+oh[i])|0;}
     for(let i=0;i<8;i++)for(let j=3;j+1;j--){const b=(hash[i]>>(j*8))&255;res+=((b<16)?'0':'')+b.toString(16);}
     return res;
@@ -438,6 +511,5 @@
     f.type  = f.type === 'password' ? 'text' : 'password';
   }
 </script>
-
 </body>
 </html>

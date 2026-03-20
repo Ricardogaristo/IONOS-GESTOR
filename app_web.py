@@ -245,7 +245,7 @@ def index():
     filtros, params = [], []
     # Solo SuperAdmin (es_admin=2) ve tareas de todos. Admin ve solo las suyas.
     if es_admin < 2:
-        filtros.append("usuario_id = ?"); params.append(user_id)
+        filtros.append("usuario_id = %s"); params.append(user_id)
     if filtro_estado == "pending":
         filtros.append("completada = 0")
     elif filtro_estado == "done":
@@ -253,11 +253,11 @@ def index():
     if filtro_cat:
         filtros.append("LOWER(TRIM(COALESCE(categoria,''))) = LOWER(TRIM(%s))"); params.append(filtro_cat)
     if filtro_prio in ("1","2","3"):
-        filtros.append("prioridad = ?"); params.append(int(filtro_prio))
+        filtros.append("prioridad = %s"); params.append(int(filtro_prio))
     if filtro_fav == "1":
         filtros.append("favorita = 1")
     if filtro_q:
-        filtros.append("(LOWER(descripcion) LIKE ? OR LOWER(COALESCE(codigo,'')) LIKE ? OR LOWER(COALESCE(categoria,'')) LIKE ?)")
+        filtros.append("(LOWER(descripcion) LIKE %s OR LOWER(COALESCE(codigo,'')) LIKE %s OR LOWER(COALESCE(categoria,'')) LIKE %s)")
         like = f"%{filtro_q.lower()}%"; params.extend([like, like, like])
 
     where = ("WHERE " + " AND ".join(filtros)) if filtros else ""
@@ -328,9 +328,9 @@ def admin():
     elif filtro_est == "Pendiente":
         filtros.append("t.completada = 0")
     if filtro_user:
-        filtros.append("u.username = ?"); params.append(filtro_user)
+        filtros.append("u.username = %s"); params.append(filtro_user)
     if filtro_q:
-        filtros.append("(LOWER(t.descripcion) LIKE ? OR LOWER(COALESCE(t.codigo,'')) LIKE ?)")
+        filtros.append("(LOWER(t.descripcion) LIKE %s OR LOWER(COALESCE(t.codigo,'')) LIKE %s)")
         like = f"%{filtro_q.lower()}%"; params.extend([like, like])
 
     where = ("WHERE " + " AND ".join(filtros)) if filtros else ""
