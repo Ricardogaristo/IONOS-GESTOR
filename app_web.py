@@ -239,13 +239,16 @@ def index():
     filtro_q      = request.args.get("q",      "").strip()
     filtro_prio   = request.args.get("prio",   "").strip()
     filtro_fav    = request.args.get("fav",    "").strip()
+    filtro_user   = request.args.get("user",   "").strip()
     page     = max(request.args.get("page", 1, type=int), 1)
     per_page = 10
 
     filtros, params = [], []
     # Solo SuperAdmin (es_admin=2) ve tareas de todos. Admin ve solo las suyas.
-    if es_admin < 2:
+    if es_admin < 1:
         filtros.append("usuario_id = %s"); params.append(user_id)
+    elif filtro_user and es_admin >= 1:
+        filtros.append("usuario_id = (SELECT id FROM usuarios WHERE username = %s LIMIT 1)"); params.append(filtro_user)
     if filtro_estado == "pending":
         filtros.append("completada = 0")
     elif filtro_estado == "done":
@@ -286,12 +289,20 @@ def index():
     else:
         cats = conn.execute("SELECT DISTINCT COALESCE(NULLIF(TRIM(categoria),''),'General') AS cat FROM tareas WHERE usuario_id=%s ORDER BY cat", (user_id,)).fetchall()
     categorias_lista = [r["cat"] for r in cats]
+
+    usuarios_lista = []
+    if es_admin >= 1:
+        usuarios_lista = [r["username"] for r in conn.execute(
+            "SELECT DISTINCT u.username FROM usuarios u "
+            "INNER JOIN tareas t ON t.usuario_id = u.id ORDER BY u.username"
+        ).fetchall()]
     conn.close()
 
     return render_template("index.html", tareas=tareas, page=page, total_pages=total_pages,
                            filtro_estado=filtro_estado, filtro_cat=filtro_cat, filtro_q=filtro_q,
-                           filtro_prio=filtro_prio, filtro_fav=filtro_fav,
-                           categorias_lista=categorias_lista, subtareas_map=subtareas_map)
+                           filtro_prio=filtro_prio, filtro_fav=filtro_fav, filtro_user=filtro_user,
+                           categorias_lista=categorias_lista, subtareas_map=subtareas_map,
+                           usuarios_lista=usuarios_lista)
 
 
 @app.route("/agregar", methods=["POST"])
