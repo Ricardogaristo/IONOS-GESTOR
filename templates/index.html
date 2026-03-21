@@ -61,6 +61,7 @@
       <input type="hidden" id="hid-cat"    name="cat"    value="{{ filtro_cat }}">
       <input type="hidden" id="hid-prio"   name="prio"   value="{{ filtro_prio }}">
       <input type="hidden" id="hid-fav"    name="fav"    value="{{ filtro_fav }}">
+      <input type="hidden" id="hid-user"   name="user"   value="{{ filtro_user|default('') }}">
       <div class="filter-bar">
 
         <!-- Fila 1: estado + favoritas + búsqueda -->
@@ -84,17 +85,30 @@
           <button type="button" class="fpill prio-high {{ 'on' if filtro_prio=='1' else '' }}" data-prio="1">🔴 Alta</button>
           <button type="button" class="fpill prio-med  {{ 'on' if filtro_prio=='2' else '' }}" data-prio="2">🟡 Media</button>
           <button type="button" class="fpill prio-low  {{ 'on' if filtro_prio=='3' else '' }}" data-prio="3">🟢 Baja</button>
-          {% if categorias_lista | length > 0 %}
-          <div class="cat-select-wrap ms-auto">
-            <span class="cat-select-icon">⊟</span>
-            <select id="cat-select" class="cat-select">
-              <option value="">Todas las categorías</option>
-              {% for cat in categorias_lista %}
-              <option value="{{ cat }}" {{ 'selected' if filtro_cat==cat else '' }}>{{ cat }}</option>
-              {% endfor %}
-            </select>
+          <div class="ms-auto" style="display:flex; align-items:center; gap:.5rem;">
+            {% if categorias_lista | length > 0 %}
+            <div class="cat-select-wrap" style="margin:0;">
+              <span class="cat-select-icon">⊟</span>
+              <select id="cat-select" class="cat-select">
+                <option value="">Todas las categorías</option>
+                {% for cat in categorias_lista %}
+                <option value="{{ cat }}" {{ 'selected' if filtro_cat==cat else '' }}>{{ cat }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endif %}
+            {% if session.get('es_admin', 0) >= 1 and usuarios_lista %}
+            <div class="cat-select-wrap" style="margin:0;">
+              <span class="cat-select-icon">👤</span>
+              <select id="user-select" class="cat-select">
+                <option value="">Todos los usuarios</option>
+                {% for uname in usuarios_lista %}
+                <option value="{{ uname }}" {{ 'selected' if filtro_user == uname else '' }}>{{ uname }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endif %}
           </div>
-          {% endif %}
         </div>
 
       </div>
@@ -105,14 +119,11 @@
       <table class="gtable">
         <thead>
           <tr>
-            <th style="width:28px;"></th>
-            <th>Estado</th>
-            <th>Pri</th>
-            <th>Código</th>
+            <th style="width:160px;">Estado</th>
             <th>Descripción</th>
-            <th>Categoría</th>
-            <th>Fecha</th>
-            <th>Acciones</th>
+            <th style="width:130px;">Categoría</th>
+            <th style="width:110px;">Fecha</th>
+            <th style="width:130px;">Acciones</th>
           </tr>
         </thead>
         <tbody id="task-tbody">
@@ -130,144 +141,147 @@
           {% set n_hechas = tsubs | selectattr('hecha', 'equalto', 1) | list | length %}
 
           <!-- Fila principal -->
-          <tr class="task-row {{ 'row-done' if tcomp==1 else '' }}"
+          <tr class="task-row {{ 'row-done' if tcomp==1 else '' }} row-prio-{{ tprio }}"
               data-st="{{ 'done' if tcomp==1 else 'pending' }}"
-              data-prio="{{ tprio }}" data-fav="{{ tfav }}">
+              data-prio="{{ tprio }}" data-fav="{{ tfav }}" data-tid="{{ tid }}">
 
-            <td style="text-align:center; padding:.5rem .35rem;">
-              <a href="/favorita/{{ tid }}" class="fav-btn {{ 'active' if tfav==1 else '' }}"
-                 title="{{ 'Quitar favorita' if tfav==1 else 'Marcar favorita' }}">
-                {{ '⭐' if tfav==1 else '☆' }}
-              </a>
-            </td>
-
-            <td data-label="Estado">
-              {% if tcomp==1 %}
-                <span class="badge-g badge-done">✔ Hecha</span>
-              {% else %}
-                <span class="badge-g badge-pending">● Pendiente</span>
-              {% endif %}
-            </td>
-
-            <td data-label="Prioridad">
-              {% if tprio==1 %}<span class="badge-g badge-prio-high" title="Alta">🔴</span>
-              {% elif tprio==3 %}<span class="badge-g badge-prio-low" title="Baja">🟢</span>
-              {% else %}<span class="badge-g badge-prio-med" title="Media">🟡</span>{% endif %}
-            </td>
-
-            <td data-label="Código" style="font-family:var(--mono); font-size:.78rem;">
-              {{ tcod if tcod else '—' }}
-            </td>
-
-            <td data-label="Descripción">
-              <div style="display:flex; align-items:center; gap:.45rem; flex-wrap:wrap;">
-                <span class="task-toggle"
-                      data-real="{{ tdesc | e }}"
-                      onclick="revealPriv(event, this); toggleDetail({{ tid }})"
-                      style="cursor:pointer;" title="Clic para revelar">{{ tdesc }}</span>
-                {% if tsubs %}
-                <span class="badge-g" style="font-size:.62rem; background:var(--bg3);
-                      border-color:var(--border);
-                      color:{{ 'var(--accent)' if n_hechas==tsubs|length else 'var(--text-muted)' }};">
-                  ✓ {{ n_hechas }}/{{ tsubs|length }}
-                </span>
-                {% endif %}
-                {% if tnotas %}
-                <span class=""
-                      data-real="{{ tnotas | e }}"
-                      onclick="revealPriv(event, this)"
-                      title="Clic para ver notas"
-                      style="font-size:.78rem; cursor:pointer; color:var(--text-muted);">📝</span>
-                {% endif %}
+            <!-- COLUMNA: Estado + Prioridad + Favorita (fusionadas) -->
+            <td data-label="Estado" class="td-estado">
+              <div class="estado-cell">
+                <!-- Fila superior: dot de prioridad + badge de estado -->
+                <div class="estado-top">
+                  {% if tprio==1 %}
+                    <span class="prio-dot prio-dot-high" title="Alta"></span>
+                  {% elif tprio==3 %}
+                    <span class="prio-dot prio-dot-low" title="Baja"></span>
+                  {% else %}
+                    <span class="prio-dot prio-dot-med" title="Media"></span>
+                  {% endif %}
+                  {% if tcomp==1 %}
+                    <span class="badge-g badge-done">✔ Hecha</span>
+                  {% else %}
+                    <span class="badge-g badge-pending">● Pendiente</span>
+                  {% endif %}
+                </div>
+                <!-- Fila inferior: favorita + etiqueta de prioridad -->
+                <div class="estado-meta">
+                  <a href="/favorita/{{ tid }}"
+                     class="fav-btn {{ 'active' if tfav==1 else '' }}"
+                     title="{{ 'Quitar favorita' if tfav==1 else 'Marcar favorita' }}">
+                    {{ '⭐' if tfav==1 else '☆' }}
+                  </a>
+                  <span class="prio-label prio-label-{{ tprio }}">
+                    {% if tprio==1 %}Alta{% elif tprio==3 %}Baja{% else %}Media{% endif %}
+                  </span>
+                </div>
               </div>
             </td>
 
+            <!-- COLUMNA: Código + Descripción + Badges (fusionadas) -->
+            <td data-label="Descripción" class="td-desc">
+              <!-- Código como etiqueta sutil -->
+              {% if tcod %}
+              <div class="task-code-tag">{{ tcod }}</div>
+              {% endif %}
+              <!-- Descripción: expandible solo si tiene notas o subtareas -->
+              {% if tnotas or tsubs %}
+              <details class="task-details">
+                <summary class="desc-summary">
+                  <span style="filter:none; opacity:1;">{{ tdesc }}</span>
+                  {% if tsubs %}
+                  <span class="badge-g subtask-badge {{ 'subtask-done' if n_hechas==tsubs|length else '' }}"
+                        title="{{ n_hechas }}/{{ tsubs|length }} subtareas completadas">
+                    ✓ {{ n_hechas }}/{{ tsubs|length }}
+                  </span>
+                  {% endif %}
+                  {% if tnotas %}
+                  <span style="font-size:.82rem; color:var(--text-muted);" title="Tiene notas">📝</span>
+                  {% endif %}
+                </summary>
+                <div class="task-inline-detail">
+                  {% if tnotas %}
+                  <div class="detail-section">
+                    <div class="detail-section-title">📝 Notas</div>
+                    <form method="POST" action="/editar/{{ tid }}" class="d-flex gap-2 align-items-start">
+                      <input type="hidden" name="codigo"      value="{{ tcod or '' }}">
+                      <input type="hidden" name="descripcion" value="{{ tdesc }}">
+                      <input type="hidden" name="categoria"   value="{{ tcat }}">
+                      <input type="hidden" name="fecha"       value="{{ tfecha or '' }}">
+                      <input type="hidden" name="completada"  value="{{ tcomp }}">
+                      <input type="hidden" name="prioridad"   value="{{ tprio }}">
+                      <textarea name="notas" class="form-control" rows="2"
+                                style="font-size:.82rem; resize:vertical;"
+                                placeholder="Escribe notas sobre esta tarea…">{{ tnotas }}</textarea>
+                      <button type="submit" class="btn btn-g-primary btn-sm"
+                              style="white-space:nowrap;">💾 Guardar</button>
+                    </form>
+                  </div>
+                  {% endif %}
+                  {% if tsubs %}
+                  <div class="detail-section">
+                    <div class="detail-section-title">
+                      ☑ Subtareas
+                      <span style="font-weight:400; color:var(--text-muted); font-size:.75rem; margin-left:.4rem;">
+                        {{ n_hechas }}/{{ tsubs|length }} completadas
+                      </span>
+                    </div>
+                    <ul class="subtask-list">
+                      {% for s in tsubs %}
+                      <li class="subtask-item {{ 'hecha' if s.hecha else '' }}">
+                        <a href="/subtarea/toggle/{{ s.id }}" class="subtask-check">
+                          {{ '☑' if s.hecha else '☐' }}
+                        </a>
+                        <span class="subtask-texto">{{ s.texto }}</span>
+                        <a href="/subtarea/eliminar/{{ s.id }}" class="subtask-del"
+                           onclick="return confirm('¿Eliminar subtarea?')">×</a>
+                      </li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                  {% endif %}
+                </div>
+              </details>
+              {% else %}
+              <div class="desc-summary" style="cursor:default;">
+                <span style="filter:none; opacity:1;">{{ tdesc }}</span>
+              </div>
+              {% endif %}
+            </td>
+
+            <!-- COLUMNA: Categoría -->
             <td data-label="Categoría">
               <span class="badge-g badge-cat" style="cursor:pointer;"
                     onclick="setCat('{{ tcat }}')" title="Filtrar por categoría">{{ tcat }}</span>
             </td>
 
-            <td data-label="Fecha" style="font-family:var(--mono); font-size:.78rem; white-space:nowrap;">
-              {{ tfecha if tfecha else '—' }}
-            </td>
-
-            <td data-label="Acciones" style="white-space:nowrap;">
-              {% if tcomp==0 %}
-                <a href="/completar/{{ tid }}" class="btn btn-g-success btn-sm" title="Completar">✔</a>
+            <!-- COLUMNA: Fecha -->
+            <td data-label="Fecha" class="td-fecha">
+              {% if tfecha %}
+                {% set parts = tfecha.split('-') %}
+                <span class="fecha-val">{{ parts[2] }}/{{ parts[1] }}/{{ parts[0] }}</span>
               {% else %}
-                <span class="btn btn-g-ghost btn-sm" style="cursor:default;opacity:.4;">✔</span>
+                <span style="color:var(--text-muted); font-size:.8rem;">—</span>
               {% endif %}
-              <a href="/editar/{{ tid }}"   class="btn btn-g-warning btn-sm" title="Editar">✏</a>
-              <a href="/duplicar/{{ tid }}" class="btn btn-g-ghost   btn-sm" title="Duplicar tarea">⧉</a>
-              <a href="/eliminar/{{ tid }}" class="btn btn-g-danger  btn-sm"
-                 onclick="return confirm('¿Eliminar esta tarea?')" title="Eliminar">🗑</a>
             </td>
-          </tr>
 
-          <!-- Panel de detalle: notas + subtareas -->
-          <tr class="detail-row" id="detail-{{ tid }}" style="display:none;">
-            <td colspan="8" style="padding:0; background:var(--bg3); border-bottom:2px solid var(--border);">
-              <div class="task-detail-panel">
-
-                <!-- Notas -->
-                <div class="detail-section">
-                  <div class="detail-section-title">📝 Notas</div>
-                  <form method="POST" action="/editar/{{ tid }}" class="d-flex gap-2 align-items-start">
-                    <input type="hidden" name="codigo"      value="{{ tcod or '' }}">
-                    <input type="hidden" name="descripcion" value="{{ tdesc }}">
-                    <input type="hidden" name="categoria"   value="{{ tcat }}">
-                    <input type="hidden" name="fecha"       value="{{ tfecha or '' }}">
-                    <input type="hidden" name="completada"  value="{{ tcomp }}">
-                    <input type="hidden" name="prioridad"   value="{{ tprio }}">
-                    <textarea name="notas" class="form-control" rows="2"
-                              style="font-size:.82rem; resize:vertical;"
-                              placeholder="Escribe notas sobre esta tarea…">{{ tnotas }}</textarea>
-                    <button type="submit" class="btn btn-g-primary btn-sm"
-                            style="white-space:nowrap;">💾 Guardar</button>
-                  </form>
-                </div>
-
-                <!-- Subtareas -->
-                <div class="detail-section">
-                  <div class="detail-section-title">
-                    ☑ Subtareas
-                    {% if tsubs %}
-                    <span style="font-weight:400; color:var(--text-muted); font-size:.75rem; margin-left:.4rem;">
-                      {{ n_hechas }}/{{ tsubs|length }} completadas
-                    </span>
-                    {% endif %}
-                  </div>
-                  {% if tsubs %}
-                  <ul class="subtask-list">
-                    {% for s in tsubs %}
-                    <li class="subtask-item {{ 'hecha' if s.hecha else '' }}">
-                      <a href="/subtarea/toggle/{{ s.id }}" class="subtask-check">
-                        {{ '☑' if s.hecha else '☐' }}
-                      </a>
-                      <span class="subtask-texto">{{ s.texto }}</span>
-                      <a href="/subtarea/eliminar/{{ s.id }}" class="subtask-del"
-                         onclick="return confirm('¿Eliminar subtarea?')">×</a>
-                    </li>
-                    {% endfor %}
-                  </ul>
-                  {% endif %}
-                  <form method="POST" action="/subtarea/agregar/{{ tid }}"
-                        class="d-flex gap-2 mt-2">
-                    <input type="text" name="texto" class="form-control"
-                           placeholder="Nueva subtarea…" autocomplete="off"
-                           style="font-size:.82rem;">
-                    <button type="submit" class="btn btn-g-primary btn-sm"
-                            style="white-space:nowrap;">＋ Añadir</button>
-                  </form>
-                </div>
-
+            <!-- COLUMNA: Acciones -->
+            <td data-label="Acciones" class="td-acciones">
+              <div class="acciones-group">
+                {% if tcomp==0 %}
+                  <a href="/completar/{{ tid }}" class="btn btn-g-success btn-sm" title="Completar">✔</a>
+                {% else %}
+                  <span class="btn btn-g-ghost btn-sm" style="cursor:default;opacity:.35;">✔</span>
+                {% endif %}
+                <a href="/editar/{{ tid }}"   class="btn btn-g-warning btn-sm" title="Editar">✏</a>
+                <a href="/duplicar/{{ tid }}" class="btn btn-g-ghost   btn-sm" title="Duplicar tarea">⧉</a>
+                <a href="/eliminar/{{ tid }}" class="btn btn-g-danger  btn-sm"
+                   onclick="return confirm('¿Eliminar esta tarea?')" title="Eliminar">🗑</a>
               </div>
             </td>
           </tr>
-
-          {% else %}
+{% else %}
           <tr id="empty-row">
-            <td colspan="8" style="text-align:center; padding:3rem; color:var(--text-muted);">
+            <td colspan="5" style="text-align:center; padding:3rem; color:var(--text-muted);">
               <div style="font-size:2rem; margin-bottom:.5rem;">📋</div>
               No hay tareas todavía. ¡Agrega la primera!
             </td>
@@ -283,7 +297,7 @@
 
     <!-- Paginación -->
     {% if total_pages > 1 %}
-    {%- set base = "?estado=" ~ filtro_estado ~ "&cat=" ~ (filtro_cat|urlencode) ~ "&q=" ~ (filtro_q|urlencode) ~ "&prio=" ~ filtro_prio ~ "&fav=" ~ filtro_fav -%}
+    {%- set base = "?estado=" ~ filtro_estado ~ "&cat=" ~ (filtro_cat|urlencode) ~ "&q=" ~ (filtro_q|urlencode) ~ "&prio=" ~ filtro_prio ~ "&fav=" ~ filtro_fav ~ "&user=" ~ (filtro_user|default('')|urlencode) -%}
     <div class="py-3 border-top" style="border-color:var(--border)!important;">
       <ul class="gpagination">
         <li class="{{ 'disabled' if page<=1 else '' }}">
@@ -311,6 +325,35 @@
 
 {% block scripts %}
 <style>
+/* ── Descripción siempre visible ────────────────────────────────────── */
+.task-toggle, .desc-text {
+  filter: none !important;
+  cursor: pointer;
+}
+
+/* ── Panel de detalle inline (details/summary) ──────────────────────── */
+.task-details { width: 100%; }
+.task-details > .desc-summary {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  flex-wrap: wrap;
+  cursor: pointer;
+  list-style: none;
+  filter: none !important;
+  opacity: 1 !important;
+}
+.task-details > .desc-summary::-webkit-details-marker { display: none; }
+.task-details > .desc-summary::marker { display: none; }
+.task-inline-detail {
+  margin-top: .6rem;
+  padding: .75rem;
+  background: var(--bg3);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+/* ── Privacidad ─────────────────────────────────────────────────────── */
 .priv-field {
   filter: blur(4px);
   transition: filter .2s ease;
@@ -321,7 +364,96 @@
   filter: none;
   cursor: default;
 }
+
+/* ── Stripe de prioridad (borde izquierdo de cada fila) ─────────────── */
+.task-row.row-prio-1 { border-left: 3px solid #ef4444; }
+.task-row.row-prio-2 { border-left: 3px solid #eab308; }
+.task-row.row-prio-3 { border-left: 3px solid #22c55e; }
+
+/* ── Dot de prioridad ───────────────────────────────────────────────── */
+.prio-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.prio-dot-high { background: #ef4444; box-shadow: 0 0 5px #ef444466; }
+.prio-dot-med  { background: #eab308; box-shadow: 0 0 5px #eab30866; }
+.prio-dot-low  { background: #22c55e; box-shadow: 0 0 5px #22c55e66; }
+
+/* ── Etiqueta de prioridad (texto pequeño) ──────────────────────────── */
+.prio-label {
+  font-size: .65rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  opacity: .7;
+}
+.prio-label-1 { color: #ef4444; }
+.prio-label-2 { color: #eab308; }
+.prio-label-3 { color: #22c55e; }
+
+/* ── Celda Estado ───────────────────────────────────────────────────── */
+.td-estado { padding: .55rem .75rem !important; }
+.estado-cell { display: flex; flex-direction: column; gap: .3rem; }
+.estado-top  { display: flex; align-items: center; gap: .4rem; }
+.estado-meta { display: flex; align-items: center; gap: .5rem; padding-left: .1rem; }
+
+/* ── Celda Descripción ──────────────────────────────────────────────── */
+.td-desc { padding: .55rem .75rem !important; }
+
+/* Código como pill compacta */
+.task-code-tag {
+  display: inline-block;
+  font-family: var(--mono, monospace);
+  font-size: .67rem;
+  color: var(--text-muted);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: .05rem .4rem;
+  margin-bottom: .28rem;
+  letter-spacing: .03em;
+}
+
+/* Fila de descripción + badges */
+.desc-row {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  flex-wrap: wrap;
+}
+
+/* Badge subtareas */
+.subtask-badge {
+  font-size: .62rem;
+  background: var(--bg3);
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+.subtask-badge.subtask-done { color: var(--accent); }
+
+/* Icono de notas */
+.notes-icon {
+  font-size: .82rem;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+/* ── Celda Fecha ────────────────────────────────────────────────────── */
+.td-fecha { font-family: var(--mono, monospace); font-size: .78rem; white-space: nowrap; }
+.fecha-val { color: var(--text-muted); }
+
+/* ── Celda Acciones ─────────────────────────────────────────────────── */
+.td-acciones { white-space: nowrap; padding: .45rem .6rem !important; }
+.acciones-group {
+  display: flex;
+  align-items: center;
+  gap: .2rem;
+}
 </style>
+
 <script>
 (function () {
   const form      = document.getElementById('filter-form');
@@ -329,6 +461,7 @@
   const hidCat    = document.getElementById('hid-cat');
   const hidPrio   = document.getElementById('hid-prio');
   const hidFav    = document.getElementById('hid-fav');
+  const hidUser   = document.getElementById('hid-user');
   const badge     = document.getElementById('cnt-badge');
 
   // ── Badge ─────────────────────────────────────────────────────────────
@@ -376,6 +509,17 @@
       form.submit();
     });
   });
+
+  // ── Select usuario ───────────────────────────────────────────────────────
+  const userSelect = document.getElementById('user-select');
+  if (userSelect) {
+    userSelect.classList.toggle('active', userSelect.value !== '');
+    userSelect.addEventListener('change', () => {
+      if (hidUser) hidUser.value = userSelect.value;
+      userSelect.classList.toggle('active', userSelect.value !== '');
+      form.submit();
+    });
+  }
 
   // ── Select categoría ──────────────────────────────────────────────────
   const catSelect = document.getElementById('cat-select');
@@ -430,11 +574,46 @@
   });
 
   // ── Toggle panel detalle ──────────────────────────────────────────────
-  window.toggleDetail = function (id) {
-    const row = document.getElementById('detail-' + id);
-    if (!row) return;
-    row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
-  };
+  // Se redefine con setTimeout para sobreescribir cualquier versión del base.html
+  setTimeout(function () {
+    window.toggleDetail = function (id) {
+      const row = document.getElementById('detail-' + id);
+      if (!row) return;
+      row.classList.toggle('detail-hidden');
+      row.classList.toggle('detail-open');
+    };
+    // Adjuntar listeners directamente a los spans de descripción
+    document.querySelectorAll('[data-toggle-id]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        window.toggleDetail(el.dataset.toggleId);
+      });
+    });
+  }, 0);
+  // ── Ordenar por más reciente cuando no hay categoría filtrada ─────────
+  (function () {
+    const catActiva = document.getElementById('hid-cat').value;
+    if (catActiva !== '') return; // solo actúa en "Todas las categorías"
+
+    const tbody = document.getElementById('task-tbody');
+    if (!tbody) return;
+
+    // Recoge pares [tr-principal, tr-detalle] y ordena por tid desc
+    const pairs = [];
+    const rows  = Array.from(tbody.children);
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row.classList.contains('task-row')) continue;
+      const tid    = parseInt(row.dataset.tid || '0', 10);
+      // el siguiente hermano puede ser la fila de detalle (detail-row) — no existe ya,
+      // pero lo dejamos preparado por si vuelve
+      pairs.push({ tid, row });
+    }
+
+    pairs.sort((a, b) => b.tid - a.tid);
+
+    // Re-insertar en orden
+    pairs.forEach(({ row }) => tbody.appendChild(row));
+  })();
 })();
 </script>
 

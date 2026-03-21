@@ -5,277 +5,315 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Registro — Gestor Garisto</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
+    /* ══════════════════════════════════════
+       THEME TOKENS — sincronizados con components.css
+    ══════════════════════════════════════ */
     :root {
-      --bg:      #0c0b0a;
-      --surface: #141311;
-      --border:  #242220;
-      --ink:     #f0ede8;
-      --ink2:    #7a756f;
-      --ink3:    #3d3a36;
-      --red:     #c8290a;
-      --red-dim: rgba(200,41,10,.12);
-      --green:   #16a34a;
+      /* Dark mode (default) */
+      --bg:           #252b3b;
+      --surface:      #2e3549;
+      --surface2:     #38405a;
+      --border:       #4a536e;
+      --border2:      #5a6480;
+      --ink:          #f0f4ff;
+      --ink2:         #b0bbd8;
+      --ink3:         #6e7a99;
+      --accent:       #c8290a;   /* rojo de marca — fijo en ambos temas */
+      --accent-lt:    rgba(200,41,10,.12);
+      --accent-md:    rgba(200,41,10,.22);
+      --blue:         #7dd3fc;
+      --blue-lt:      rgba(125,211,252,.1);
+      --green:        #4ade80;
+      --green-lt:     rgba(74,222,128,.1);
+    }
+
+    body.light {
+      --bg:           #f2ebe0;
+      --surface:      #fdf8f0;
+      --surface2:     #e8e0d2;
+      --border:       #cec5b5;
+      --border2:      #b8ae9e;
+      --ink:          #1a1510;
+      --ink2:         #3d3328;
+      --ink3:         #6b5f52;
+      --accent:       #c8290a;   /* rojo de marca — fijo */
+      --accent-lt:    rgba(200,41,10,.08);
+      --accent-md:    rgba(200,41,10,.16);
+      --blue:         #1e40af;
+      --blue-lt:      rgba(30,64,175,.08);
+      --green:        #166534;
+      --green-lt:     rgba(22,101,52,.08);
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'DM Sans', sans-serif;
+      font-family: 'Instrument Sans', sans-serif;
       background: var(--bg);
       color: var(--ink);
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 2rem;
+      padding: 2.5rem 1.5rem;
       position: relative;
+      overflow-x: hidden;
     }
 
     body::before {
       content: '';
-      position: fixed; inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-      pointer-events: none; z-index: 0; opacity: .45;
+      position: fixed; top: -200px; right: -200px;
+      width: 650px; height: 650px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(200,41,10,.07) 0%, transparent 65%);
+      pointer-events: none;
     }
-
     body::after {
       content: '';
-      position: fixed;
-      bottom: -200px; left: 50%; transform: translateX(-50%);
-      width: 600px; height: 400px;
-      background: radial-gradient(ellipse, rgba(200,41,10,.18) 0%, transparent 65%);
-      pointer-events: none; z-index: 0;
+      position: fixed; bottom: -180px; left: -180px;
+      width: 550px; height: 550px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(37,99,235,.06) 0%, transparent 65%);
+      pointer-events: none;
     }
 
+    /* ── UN SOLO RECUADRO GRANDE ── */
     .card {
       position: relative; z-index: 1;
-      width: 100%; max-width: 420px;
-      animation: rise .5s cubic-bezier(.22,1,.36,1) both;
+      width: 100%; max-width: 860px;
+      background: var(--surface);
+      border: 2px solid rgba(200,41,10,.3);
+      border-radius: 24px;
+      padding: 3.5rem 4rem;
+      box-shadow:
+        0 1px 2px rgba(200,41,10,.06),
+        0 4px 24px rgba(200,41,10,.12),
+        0 20px 56px rgba(200,41,10,.08);
+      animation: rise .55s cubic-bezier(.22,1,.36,1) both;
     }
 
     @keyframes rise {
-      from { opacity: 0; transform: translateY(18px); }
+      from { opacity: 0; transform: translateY(24px); }
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    .mark {
-      display: flex; align-items: center; gap: .6rem;
-      margin-bottom: 2.8rem;
+    /* ── CABECERA CENTRADA ── */
+    .card-top {
+      text-align: center;
+      margin-bottom: 2.2rem;
     }
-    .mark-icon {
-      width: 34px; height: 34px;
-      background: var(--red); border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1rem;
-      box-shadow: 0 0 20px rgba(200,41,10,.35);
+
+    .mark {
+      display: inline-flex; align-items: center; gap: .65rem;
+      margin-bottom: 1.6rem;
+    }
+    .mark-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(200,41,10,.45);
+      animation: pulse 2.8s ease-in-out infinite; flex-shrink: 0;
+    }
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 10px rgba(200,41,10,.45); }
+      50%      { box-shadow: 0 0 22px rgba(200,41,10,.75); }
     }
     .mark-name {
-      font-size: .72rem; font-weight: 500;
-      letter-spacing: .1em; text-transform: uppercase;
-      color: var(--ink2);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .68rem; font-weight: 400;
+      letter-spacing: .13em; text-transform: uppercase;
+      color: var(--ink3);
+    }
+
+    .eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .6rem; font-weight: 500;
+      letter-spacing: .14em; text-transform: uppercase;
+      color: var(--ink3); margin-bottom: .6rem;
+      display: block;
     }
 
     h1 {
-      font-family: 'DM Serif Display', serif;
-      font-size: 2.4rem; line-height: 1.05;
-      letter-spacing: -.02em;
-      margin-bottom: .5rem;
+      font-family: 'Instrument Serif', serif;
+      font-size: 2.8rem; line-height: 1.05;
+      letter-spacing: -.03em; font-weight: 400;
+      margin-bottom: .4rem; color: var(--ink);
     }
-    h1 em { font-style: italic; color: var(--red); }
+    h1 em { font-style: italic; color: var(--accent); }
 
-    .sub {
-      font-size: .83rem; color: var(--ink2);
-      margin-bottom: 2.2rem; font-weight: 300;
-    }
+    .sub { font-size: .82rem; color: var(--ink2); font-weight: 300; }
     .sub a {
-      color: var(--red); text-decoration: none; font-weight: 500;
-      border-bottom: 1px solid rgba(200,41,10,.3);
-      transition: border-color .15s;
+      color: var(--accent); text-decoration: none; font-weight: 500;
+      border-bottom: 1px solid rgba(200,41,10,.25); transition: border-color .15s;
     }
-    .sub a:hover { border-color: var(--red); }
+    .sub a:hover { border-color: var(--accent); }
 
-    .divider { height: 1px; background: var(--border); margin-bottom: 2rem; }
+    .divider { height: 1px; background: var(--border); margin-bottom: 1.8rem; }
 
     /* Alertas */
     .alert {
-      border-radius: 8px; font-size: .82rem; font-weight: 400;
+      border-radius: 9px; font-size: .8rem;
       padding: .65rem .9rem; margin-bottom: 1.4rem;
-      display: flex; align-items: flex-start; gap: .4rem;
-      line-height: 1.45;
-      animation: rise .3s ease both;
+      display: flex; align-items: center; gap: .45rem;
+      line-height: 1.4; animation: rise .3s ease both;
     }
-    .alert-error  { background: rgba(185,28,28,.1);  border: 1px solid rgba(185,28,28,.25); color: #f87171; }
-    .alert-notice { background: rgba(200,41,10,.07); border: 1px solid rgba(200,41,10,.18); color: #b07060; }
-    .alert-notice strong { color: #e07050; }
+    .alert-error  { background: rgba(185,28,28,.05); border: 1px solid rgba(185,28,28,.18); color: #b91c1c; }
+    .alert-notice { background: var(--blue-lt); border: 1px solid rgba(37,99,235,.2); color: var(--blue); }
+    .alert-notice strong { color: #1d4ed8; }
 
-    /* Campos de texto */
-    .field { margin-bottom: 1.1rem; }
+    /* ── CAMPOS EN UNA FILA ── */
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr auto;
+      gap: 0 1rem;
+      align-items: start;
+      margin-bottom: 1.6rem;
+    }
+    .field { margin-bottom: 0; }
     .field label {
-      display: block;
-      font-size: .67rem; font-weight: 500;
+      display: block; font-size: .62rem; font-weight: 600;
       letter-spacing: .1em; text-transform: uppercase;
-      color: var(--ink2); margin-bottom: .38rem;
+      color: var(--ink2); margin-bottom: .35rem;
     }
     .field input {
-      width: 100%;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--ink);
-      font-family: 'DM Sans', sans-serif;
-      font-size: .88rem; font-weight: 300;
-      padding: .7rem 1rem;
-      transition: border-color .15s, box-shadow .15s;
-      outline: none;
+      width: 100%; background: var(--surface2);
+      border: 1.5px solid var(--border); border-radius: 10px;
+      color: var(--ink); font-family: 'Instrument Sans', sans-serif;
+      font-size: .88rem; font-weight: 300; padding: .75rem 1rem;
+      transition: border-color .15s, box-shadow .15s, background .15s; outline: none;
     }
     .field input:focus {
-      border-color: rgba(200,41,10,.6);
-      box-shadow: 0 0 0 3px rgba(200,41,10,.08);
+      border-color: var(--accent); background: var(--surface);
+      box-shadow: 0 0 0 3px rgba(200,41,10,.07);
     }
     .field input::placeholder { color: var(--ink3); }
-    .field-hint {
-      font-size: .68rem; color: var(--ink3);
-      margin-top: .3rem; font-weight: 300;
-    }
+    .field-hint { font-size: .65rem; color: var(--ink3); margin-top: .25rem; font-weight: 300; }
 
-    /* ── Selector de perfil ─────────────────────────────────────────── */
-    .perfil-section { margin-bottom: 1.4rem; }
+    .field-btn { min-width: 130px; }
+    .field-btn .btn { margin-top: 0; height: 44px; padding: 0 1.4rem; white-space: nowrap; width: 100%; }
 
-    .perfil-section > .section-label {
-      font-size: .67rem; font-weight: 500;
+    /* ── SELECTOR DE PERFIL ── */
+    .perfil-section { margin-bottom: 1.8rem; }
+    .section-label {
+      font-size: .62rem; font-weight: 600;
       letter-spacing: .1em; text-transform: uppercase;
-      color: var(--ink2); margin-bottom: .75rem;
-      display: block;
+      color: var(--ink2); margin-bottom: .75rem; display: block;
     }
-
     .perfil-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: .55rem;
+      grid-template-columns: repeat(4, 1fr);
+      gap: .6rem;
     }
 
-    .perfil-option {
-      position: relative;
-    }
-    .perfil-option input[type="radio"] {
-      position: absolute; opacity: 0; width: 0; height: 0;
-    }
+    .perfil-option { position: relative; }
+    .perfil-option input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
     .perfil-option label {
-      display: flex;
-      flex-direction: column;
-      gap: .25rem;
-      padding: .75rem .9rem;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--surface);
-      cursor: pointer;
+      display: flex; flex-direction: column; gap: .22rem;
+      padding: .85rem .9rem;
+      border: 1.5px solid var(--border); border-radius: 12px;
+      background: var(--surface2); cursor: pointer;
       transition: border-color .15s, background .15s, box-shadow .15s;
-      user-select: none;
+      user-select: none; position: relative;
     }
-    .perfil-option label:hover {
-      border-color: rgba(200,41,10,.4);
-      background: rgba(200,41,10,.04);
-    }
+    .perfil-option label:hover { border-color: rgba(200,41,10,.35); background: var(--surface); }
     .perfil-option input[type="radio"]:checked + label {
-      border-color: var(--red);
-      background: rgba(200,41,10,.09);
-      box-shadow: 0 0 0 2px rgba(200,41,10,.18);
+      border-color: var(--accent);
+      background: var(--accent-lt);
+      box-shadow: 0 0 0 2px rgba(200,41,10,.1);
     }
-
-    /* Indicador de selección (check) */
     .perfil-option label::after {
       content: '';
-      position: absolute; top: .55rem; right: .65rem;
-      width: 14px; height: 14px;
-      border-radius: 50%;
-      border: 1.5px solid var(--border);
-      background: var(--bg);
+      position: absolute; top: .65rem; right: .65rem;
+      width: 13px; height: 13px; border-radius: 50%;
+      border: 1.5px solid var(--border2); background: var(--surface);
       transition: background .15s, border-color .15s;
     }
     .perfil-option input[type="radio"]:checked + label::after {
-      background: var(--red);
-      border-color: var(--red);
+      background: var(--accent); border-color: var(--accent);
     }
-
-    /* ── Coordinador en construcción ── */
     .perfil-option.wip input[type="radio"] { pointer-events: none; }
-    .perfil-option.wip label {
-      cursor: not-allowed; opacity: .5;
-      border-style: dashed; border-color: var(--ink3);
-    }
-    .perfil-option.wip label:hover {
-      border-color: var(--ink3);
-      background: var(--surface);
-    }
+    .perfil-option.wip label { cursor: not-allowed; opacity: .45; border-style: dashed; }
+    .perfil-option.wip label:hover { border-color: var(--border); background: var(--surface2); }
     .perfil-option.wip label::after { display: none; }
     .wip-badge {
-      display: inline-flex; align-items: center; gap: .28rem;
-      font-size: .6rem; font-weight: 500; letter-spacing: .05em;
-      color: var(--ink2); background: rgba(255,255,255,.04);
-      border: 1px solid var(--ink3); border-radius: 4px;
-      padding: .15rem .4rem; margin-top: .15rem; width: fit-content;
+      display: inline-flex; align-items: center; gap: .25rem;
+      font-size: .58rem; font-weight: 500;
+      color: var(--ink3); background: rgba(0,0,0,.03);
+      border: 1px solid var(--border); border-radius: 4px;
+      padding: .1rem .35rem; width: fit-content;
     }
 
-    .p-icon  { font-size: 1.3rem; line-height: 1; }
-    .p-name  {
-      font-size: .82rem; font-weight: 500; color: var(--ink);
-      padding-right: 1.2rem; /* espacio para el check */
-      line-height: 1.2;
-    }
-    .p-desc  { font-size: .7rem; color: var(--ink2); font-weight: 300; line-height: 1.35; }
+    .p-icon { font-size: 1.3rem; line-height: 1; }
+    .p-name { font-size: .8rem; font-weight: 500; color: var(--ink); padding-right: 1.1rem; line-height: 1.2; }
+    .p-desc { font-size: .67rem; color: var(--ink2); font-weight: 300; line-height: 1.35; }
 
-    /* Botón */
+    /* ── BOTÓN PRINCIPAL ── */
     .btn {
-      width: 100%; padding: .75rem 1rem;
-      background: var(--red); color: #fff;
-      font-family: 'DM Sans', sans-serif;
-      font-weight: 500; font-size: .9rem;
-      border: none; border-radius: 8px; cursor: pointer;
-      margin-top: .8rem;
       display: flex; align-items: center; justify-content: center; gap: .5rem;
-      transition: background .15s, box-shadow .15s, transform .1s;
-      letter-spacing: .01em;
+      background: var(--accent); color: #fff;
+      font-family: 'Instrument Sans', sans-serif;
+      font-weight: 600; font-size: .9rem;
+      border: none; border-radius: 10px; cursor: pointer;
+      transition: background .15s, box-shadow .15s, transform .12s;
     }
-    .btn:hover {
-      background: #d93010;
-      box-shadow: 0 0 24px rgba(200,41,10,.3);
-      transform: translateY(-1px);
-    }
+    .btn:hover { background: #d93010; box-shadow: 0 4px 20px rgba(200,41,10,.3); transform: translateY(-1px); }
     .btn:active { transform: translateY(0); }
-    .btn .arr  { transition: transform .15s; display: inline-block; }
+    .btn .arr { transition: transform .15s; }
     .btn:hover .arr { transform: translateX(4px); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
 
-    /* Pie */
+    .btn-submit-full {
+      width: 100%; padding: .82rem 1rem; margin-top: .4rem;
+    }
+
     .foot {
-      margin-top: 2.5rem;
-      font-size: .67rem; color: var(--ink2);
-      text-align: center; letter-spacing: .05em;
-      text-transform: uppercase;
+      margin-top: 2rem; font-size: .62rem; color: var(--ink3);
+      text-align: center; letter-spacing: .07em; text-transform: uppercase;
+      border-top: 1px solid var(--border); padding-top: 1.4rem;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 760px) {
+      .card { padding: 2.5rem 2rem; }
+      .form-row { grid-template-columns: 1fr 1fr; }
+      .field-btn { grid-column: 1 / -1; }
+      .field-btn .btn { height: auto; padding: .78rem 1rem; }
+      .perfil-grid { grid-template-columns: 1fr 1fr; }
     }
 
     @media (max-width: 480px) {
+      body { padding: 1.2rem .8rem; }
+      .card { padding: 1.8rem 1.4rem; border-radius: 18px; }
       h1 { font-size: 2rem; }
-      .perfil-grid { grid-template-columns: 1fr; }
+      .form-row { grid-template-columns: 1fr; }
+      .field-btn { grid-column: auto; }
     }
   </style>
 </head>
 <body>
+  <!-- Theme toggle — sincronizado con el resto de la app -->
+  <button onclick="toggleLight()" id="theme-btn"
+          style="position:fixed;top:1rem;right:1rem;z-index:999;
+                 font-size:.8rem;padding:.35rem .65rem;border-radius:6px;
+                 border:1px solid var(--border);background:var(--surface);
+                 color:var(--ink2);cursor:pointer;transition:all .18s;"
+          title="Cambiar tema">◐</button>
+
 
 <div class="card">
 
-  <div class="mark">
-    <div class="mark-icon">🗂</div>
-    <span class="mark-name">Gestor Garisto</span>
+  <!-- ── CABECERA CENTRADA ── -->
+  <div class="card-top">
+    <div class="mark">
+      <div class="mark-dot"></div>
+      <span class="mark-name">Gestor Garisto</span>
+    </div>
+    <div class="eyebrow">Nueva cuenta</div>
+    <h1>Crear <em>cuenta.</em></h1>
+    <p class="sub">¿Ya tienes cuenta? <a href="{{ url_for('auth.login') }}">Inicia sesión</a></p>
   </div>
-
-  <h1>Crear<br><em>cuenta.</em></h1>
-  <p class="sub">¿Ya tienes cuenta? <a href="{{ url_for('auth.login') }}">Inicia sesión</a></p>
 
   <div class="divider"></div>
 
-  <!-- Aviso de permisos -->
   <div class="alert alert-notice">
     Para los perfiles <strong>Admin</strong> o <strong>SuperAdmin</strong> contacta con el administrador del sistema.
   </div>
@@ -286,37 +324,40 @@
 
   <form method="POST" action="{{ url_for('auth.registro') }}">
 
-    <!-- Datos básicos -->
-    <div class="field">
-      <label>Nombre de usuario</label>
-      <input type="text" name="username" placeholder="ej: maria_garcia"
-             required autocomplete="username">
+    <!-- ── CAMPOS EN UNA FILA ── -->
+    <div class="form-row">
+      <div class="field">
+        <label>Nombre de usuario</label>
+        <input type="text" name="username" placeholder="ej: maria_garcia"
+               required autocomplete="username">
+      </div>
+      <div class="field">
+        <label>Correo electrónico</label>
+        <input type="email" name="email" placeholder="correo@ejemplo.com"
+               required autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input type="password" name="password" placeholder="••••••••"
+               required autocomplete="new-password" minlength="6">
+        <div class="field-hint">Mínimo 6 caracteres</div>
+      </div>
+      <div class="field field-btn">
+        <label>&nbsp;</label>
+        <button type="submit" id="btn-registro" class="btn">
+          Crear cuenta <span class="arr">→</span>
+        </button>
+      </div>
     </div>
 
-    <div class="field">
-      <label>Correo electrónico</label>
-      <input type="email" name="email" placeholder="correo@ejemplo.com"
-             required autocomplete="email">
-    </div>
+    <p class="field-hint" style="margin-top:.3rem; margin-bottom:.4rem;">* Contraseña: mínimo 6 caracteres</p>
 
-    <div class="field">
-      <label>Contraseña</label>
-      <input type="password" name="password" placeholder="••••••••"
-             required autocomplete="new-password" minlength="6">
-      <div class="field-hint">Mínimo 6 caracteres</div>
-    </div>
-
-    <!-- Selector de perfil -->
+    <!-- ── SELECTOR DE PERFIL ── -->
     <div class="perfil-section">
       <span class="section-label">¿Qué vas a gestionar?</span>
       <div class="perfil-grid">
 
-        {% set iconos = {
-          1: '🎓',
-          2: '✅',
-          3: '🎓✅',
-          4: '🏗'
-        } %}
+        {% set iconos = { 1: '🎓', 2: '✅', 3: '🎓✅', 4: '🏗' } %}
 
         {% for valor, nombre, descripcion in perfiles %}
         <div class="perfil-option{% if valor == 4 %} wip{% endif %}">
@@ -342,55 +383,59 @@
       </div>
     </div>
 
-    <button type="submit" id="btn-registro" class="btn">
-      Crear cuenta <span class="arr">→</span>
-    </button>
-
   </form>
 
-  <script>
-    // ── SHA-256: Web Crypto API con fallback JS puro ──
-    async function sha256hex(str) {
-      const crypto = window.crypto || window.msCrypto;
-      if (crypto && crypto.subtle) {
-        const data = new TextEncoder().encode(str);
-        const buf  = await crypto.subtle.digest('SHA-256', data);
-        return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
-      }
-      function rightRotate(v,a){ return (v>>>a)|(v<<(32-a)); }
-      const mp=Math.pow,mw=mp(2,32);let res='',words=[],abl=str.length*8,hash=[],k=[],pc=0,ic={};
-      for(let c=2;pc<64;c++){if(!ic[c]){for(let i=c*c;i<313;i+=c)ic[i]=true;hash[pc]=(mp(c,.5)*mw)|0;k[pc++]=(mp(c,1/3)*mw)|0;}}
-      str+='\x80';while(str.length%64-56)str+='\x00';
-      for(let i=0;i<str.length;i++){const j=str.charCodeAt(i);if(j>>8)return'';words[i>>2]|=j<<((3-i)%4)*8;}
-      words[words.length]=((abl/mw)|0);words[words.length]=(abl|0);
-      for(let j=0;j<words.length;){const w=words.slice(j,j+=16),oh=hash.slice(0);
-        for(let i=0;i<64;i++){const w15=w[i-15],w2=w[i-2],a=hash[0],e=hash[4];
-          const t1=hash[7]+(rightRotate(e,6)^rightRotate(e,11)^rightRotate(e,25))+((e&hash[5])^(~e&hash[6]))+k[i]+(w[i]=(i<16)?w[i]:(w[i-16]+(rightRotate(w15,7)^rightRotate(w15,18)^(w15>>>3))+w[i-7]+(rightRotate(w2,17)^rightRotate(w2,19)^(w2>>>10)))|0);
-          const t2=(rightRotate(a,2)^rightRotate(a,13)^rightRotate(a,22))+((a&hash[1])^(a&hash[2])^(hash[1]&hash[2]));
-          hash=[(t1+t2)|0].concat(hash);hash[4]=(hash[4]+t1)|0;hash.length=8;}
-        for(let i=0;i<8;i++)hash[i]=(hash[i]+oh[i])|0;}
-      for(let i=0;i<8;i++)for(let j=3;j+1;j--){const b=(hash[i]>>(j*8))&255;res+=((b<16)?'0':'')+b.toString(16);}
-      return res;
-    }
-
-    document.querySelector('form').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const passField = document.querySelector('input[name=password]');
-      const btn       = document.getElementById('btn-registro');
-      if (passField.value.length < 6) {
-        passField.setCustomValidity('Mínimo 6 caracteres');
-        passField.reportValidity();
-        return;
-      }
-      btn.disabled    = true;
-      passField.value = await sha256hex(passField.value);
-      this.submit();
-    });
-  </script>
-
   <div class="foot">© 2026 Ricardo Garisto</div>
-
 </div>
 
+<script>
+  async function sha256hex(str) {
+    const crypto = window.crypto || window.msCrypto;
+    if (crypto && crypto.subtle) {
+      const data = new TextEncoder().encode(str);
+      const buf  = await crypto.subtle.digest('SHA-256', data);
+      return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+    function rightRotate(v,a){ return (v>>>a)|(v<<(32-a)); }
+    const mp=Math.pow,mw=mp(2,32);let res='',words=[],abl=str.length*8,hash=[],k=[],pc=0,ic={};
+    for(let c=2;pc<64;c++){if(!ic[c]){for(let i=c*c;i<313;i+=c)ic[i]=true;hash[pc]=(mp(c,.5)*mw)|0;k[pc++]=(mp(c,1/3)*mw)|0;}}
+    str+='\x80';while(str.length%64-56)str+='\x00';
+    for(let i=0;i<str.length;i++){const j=str.charCodeAt(i);if(j>>8)return'';words[i>>2]|=j<<((3-i)%4)*8;}
+    words[words.length]=((abl/mw)|0);words[words.length]=(abl|0);
+    for(let j=0;j<words.length;){const w=words.slice(j,j+=16),oh=hash.slice(0);
+      for(let i=0;i<64;i++){const w15=w[i-15],w2=w[i-2],a=hash[0],e=hash[4];
+        const t1=hash[7]+(rightRotate(e,6)^rightRotate(e,11)^rightRotate(e,25))+((e&hash[5])^(~e&hash[6]))+k[i]+(w[i]=(i<16)?w[i]:(w[i-16]+(rightRotate(w15,7)^rightRotate(w15,18)^(w15>>>3))+w[i-7]+(rightRotate(w2,17)^rightRotate(w2,19)^(w2>>>10)))|0);
+        const t2=(rightRotate(a,2)^rightRotate(a,13)^rightRotate(a,22))+((a&hash[1])^(a&hash[2])^(hash[1]&hash[2]));
+        hash=[(t1+t2)|0].concat(hash);hash[4]=(hash[4]+t1)|0;hash.length=8;}
+      for(let i=0;i<8;i++)hash[i]=(hash[i]+oh[i])|0;}
+    for(let i=0;i<8;i++)for(let j=3;j+1;j--){const b=(hash[i]>>(j*8))&255;res+=((b<16)?'0':'')+b.toString(16);}
+    return res;
+  }
+
+  document.querySelector('form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const passField = document.querySelector('input[name=password]');
+    const btn = document.getElementById('btn-registro');
+    if (passField.value.length < 6) {
+      passField.setCustomValidity('Mínimo 6 caracteres');
+      passField.reportValidity(); return;
+    }
+    btn.disabled = true;
+    passField.value = await sha256hex(passField.value);
+    this.submit();
+  });
+</script>
+
+  <script>
+    (function(){
+      if(localStorage.getItem('theme') !== 'dark'){
+        document.body.classList.add('light');
+      }
+    })();
+    function toggleLight(){
+      document.body.classList.toggle('light');
+      localStorage.setItem('theme', document.body.classList.contains('light') ? 'light' : 'dark');
+    }
+  </script>
 </body>
 </html>

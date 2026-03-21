@@ -13,7 +13,7 @@
   <div class="d-flex gap-2 flex-wrap">
     <button onclick="exportarCursoExcel()" class="btn btn-g-primary" id="btn-exportar-curso"
       title="Exportar curso seleccionado en el filtro"
-      style="width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;">
+      style="width:210px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
       📊 Excel — Todos
     </button>
     <a href="{{ url_for('formacion.formacion_alarmas') }}" class="btn btn-g-warning"
@@ -37,10 +37,10 @@
       ">{{ archivados_count }}</span>
       {% endif %}
     </a>
-    <a href="{{ url_for('formacion.formacion_dashboard') }}" class="btn btn-g-primary">
+    <a href="{{ url_for('formacion.formacion_dashboard') }}" class="btn btn-g-blue">
       ◈ Ver Dashboard
     </a>
-    <a href="{{ url_for('formacion.formacion_ia') }}" class="btn btn-g-primary">
+    <a href="{{ url_for('formacion.formacion_ia') }}" class="btn btn-g-purple">
       🤖 IA
     </a>
     <a href="{{ url_for('cursos.repositorio_cursos') }}" class="btn btn-g-ghost">
