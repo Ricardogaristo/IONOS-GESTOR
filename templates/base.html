@@ -82,7 +82,7 @@
         </li>
         {% endif %}
 
-        {% if session.get('es_admin', 0) >= 1 %}
+        {% if session.get('es_admin', 0) >= 2 %}
         <li class="nav-item">
           <a class="nav-link{{ ' active' if path == '/accesos_rapidos' else '' }}" href="/accesos_rapidos">
             ⚙ Accesos Rápidos

@@ -643,12 +643,21 @@ def cambiar_perfil_usuario(uid: int):
 @admin_required
 def admin_cambiar_password(uid: int):
     """Admin cambia la contraseña de otro usuario.
-    El cliente envía sha256(nueva_contraseña) directamente."""
+    Admin (10) no puede cambiar la de otro Admin ni SuperAdmin."""
     data  = request.get_json(force=True) or {}
     nueva = data.get("nueva", "")  # ya es sha256 (64 chars)
 
     if len(nueva) != 64:
         return jsonify({"ok": False, "error": "Error en el formato de contraseña."})
+
+    # Comprobar jerarquía: Admin no puede tocar a otro Admin o SuperAdmin
+    perfil_admin = session.get("perfil", 0)
+    if perfil_admin < PERFIL_SUPERADMIN:
+        conn   = _conn()
+        target = conn.execute("SELECT perfil FROM usuarios WHERE id=%s", (uid,)).fetchone()
+        conn.close()
+        if target and target["perfil"] >= PERFIL_ADMIN:
+            return jsonify({"ok": False, "error": "No tienes permiso para cambiar la contraseña de un administrador."}), 403
 
     conn = _conn()
     conn.execute(

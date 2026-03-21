@@ -245,9 +245,9 @@ def index():
 
     filtros, params = [], []
     # Solo SuperAdmin (es_admin=2) ve tareas de todos. Admin ve solo las suyas.
-    if es_admin < 1:
+    if es_admin < 2:
         filtros.append("usuario_id = %s"); params.append(user_id)
-    elif filtro_user and es_admin >= 1:
+    elif filtro_user and es_admin >= 2:
         filtros.append("usuario_id = (SELECT id FROM usuarios WHERE username = %s LIMIT 1)"); params.append(filtro_user)
     if filtro_estado == "pending":
         filtros.append("completada = 0")
@@ -291,7 +291,7 @@ def index():
     categorias_lista = [r["cat"] for r in cats]
 
     usuarios_lista = []
-    if es_admin >= 1:
+    if es_admin >= 2:
         usuarios_lista = [r["username"] for r in conn.execute(
             "SELECT DISTINCT u.username FROM usuarios u "
             "INNER JOIN tareas t ON t.usuario_id = u.id ORDER BY u.username"
@@ -566,13 +566,22 @@ def usuarios():
     # Usuarios que necesitan reset (pw_format=0 → no pueden entrar)
     necesitan_reset = [u for u in usuarios_lista if (u["pw_format"] or 0) == 0]
 
+    perfil_actual = session.get("perfil", 0)
+
+    # Admin solo puede asignar perfiles 1-10; SuperAdmin puede asignar hasta 20
+    if perfil_actual >= PERFIL_SUPERADMIN:
+        perfiles_disponibles = PERFILES_TODOS                         # todos, incluido SuperAdmin
+    else:
+        perfiles_disponibles = [p for p in PERFILES_TODOS if p[0] <= PERFIL_ADMIN]
+
     return render_template(
         "usuarios.html",
         usuarios=usuarios_lista,
         categorias=categorias,
-        perfiles=PERFILES_TODOS,
+        perfiles=perfiles_disponibles,          # opciones filtradas para el modal
         perfil_labels=PERFIL_LABELS,
         necesitan_reset=necesitan_reset,
+        perfil_actual=perfil_actual,            # perfil del admin logueado → controla botones
     )
 
 
@@ -581,6 +590,18 @@ def usuarios():
 def usuario_eliminar(uid):
     if uid == session["user_id"]:
         return redirect("/usuarios")
+
+    # Admin (10) no puede eliminar a otro Admin ni a SuperAdmin
+    perfil_admin  = session.get("perfil", 0)
+    if perfil_admin < PERFIL_SUPERADMIN:
+        conn   = get_connection()
+        target = conn.execute("SELECT perfil FROM usuarios WHERE id=%s", (uid,)).fetchone()
+        conn.close()
+        if target and target["perfil"] >= PERFIL_ADMIN:
+            from flask import flash
+            flash("No tienes permiso para eliminar a un administrador.", "danger")
+            return redirect("/usuarios")
+
     conn = get_connection()
     conn.execute("DELETE FROM tareas   WHERE usuario_id = %s", (uid,))
     conn.execute("DELETE FROM usuarios WHERE id = %s",         (uid,))
@@ -608,22 +629,32 @@ def usuario_asignar_tarea(uid):
 @app.route("/usuarios/cambiar_perfil/<int:uid>", methods=["POST"])
 @admin_required
 def usuario_cambiar_perfil(uid):
-    """Admin cambia el perfil de cualquier usuario. Solo SuperAdmin puede asignar perfil 20."""
+    """Admin cambia el perfil de usuarios de menor rango. Solo SuperAdmin puede tocar Admins/SuperAdmins."""
     from flask import jsonify
     data         = request.get_json(force=True) or {}
     nuevo_perfil = int(data.get("perfil", 2))
-
     perfil_admin = session.get("perfil", 0)
 
-    # Solo SuperAdmin puede elevar a SuperAdmin (20)
-    if nuevo_perfil == 20 and perfil_admin != 20:
+    # Comprobar el perfil actual del usuario destino
+    conn   = get_connection()
+    target = conn.execute("SELECT perfil FROM usuarios WHERE id=%s", (uid,)).fetchone()
+    conn.close()
+    if not target:
+        return jsonify({"ok": False, "error": "Usuario no encontrado."}), 404
+
+    # Admin (10) no puede editar a otro Admin ni a SuperAdmin
+    if perfil_admin < PERFIL_SUPERADMIN and target["perfil"] >= PERFIL_ADMIN:
+        return jsonify({"ok": False, "error": "No tienes permiso para modificar a un administrador."}), 403
+
+    # Solo SuperAdmin puede asignar perfil 20
+    if nuevo_perfil == PERFIL_SUPERADMIN and perfil_admin < PERFIL_SUPERADMIN:
         return jsonify({"ok": False, "error": "Solo el SuperAdmin puede asignar ese perfil."}), 403
 
     perfiles_validos = [1, 2, 3, 4, 10, 20]
     if nuevo_perfil not in perfiles_validos:
         return jsonify({"ok": False, "error": "Perfil no válido."}), 400
 
-    # Sincronizar es_admin para compatibilidad
+    # Sincronizar es_admin para compatibilidad retroactiva
     es_admin_val = 2 if nuevo_perfil == 20 else (1 if nuevo_perfil == 10 else 0)
 
     conn = get_connection()

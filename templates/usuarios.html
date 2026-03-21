@@ -137,34 +137,47 @@
             </td>
 
             <td style="white-space:nowrap;">
-              <!-- Asignar tarea -->
+              {% set es_superadmin_actual = (perfil_actual >= 20) %}
+              {% set objetivo_es_admin    = (p >= 10) %}
+              {% set puede_editar         = es_superadmin_actual or not objetivo_es_admin %}
+
+              <!-- Asignar tarea: todos los admins pueden -->
               <button type="button" class="btn btn-g-primary btn-sm"
                       onclick="abrirAsignar({{ u.id }}, '{{ u.username }}')"
                       title="Asignar tarea a {{ u.username }}">
                 ＋ Tarea
               </button>
 
-              {% if u.id != session.get('user_id') %}
-              <!-- Cambiar perfil -->
-              <button type="button" class="btn btn-g-warning btn-sm"
-                      onclick="abrirCambiarPerfil({{ u.id }}, '{{ u.username }}', {{ p }})"
-                      title="Cambiar perfil de {{ u.username }}">
-                ✎ Perfil
-              </button>
-
-              <!-- Cambiar contraseña -->
+              <!-- Cambiar contraseña: cualquier admin puede cambiar la suya propia -->
               <button type="button" class="btn btn-g-ghost btn-sm"
                       onclick="abrirCambiarPassword({{ u.id }}, '{{ u.username }}')"
                       title="Cambiar contraseña de {{ u.username }}">
                 🔑
               </button>
 
-              <!-- Eliminar -->
-              <form method="POST" action="/usuarios/eliminar/{{ u.id }}"
-                    style="display:inline;"
-                    onsubmit="return confirm('¿Eliminar a {{ u.username }}? Se borrarán también todas sus tareas.')">
-                <button type="submit" class="btn btn-g-danger btn-sm" title="Eliminar usuario">🗑</button>
-              </form>
+              {% if u.id != session.get('user_id') %}
+
+                {% if puede_editar %}
+                <!-- Cambiar perfil -->
+                <button type="button" class="btn btn-g-warning btn-sm"
+                        onclick="abrirCambiarPerfil({{ u.id }}, '{{ u.username }}', {{ p }})"
+                        title="Cambiar perfil de {{ u.username }}">
+                  ✎ Perfil
+                </button>
+
+                <!-- Eliminar -->
+                <form method="POST" action="/usuarios/eliminar/{{ u.id }}"
+                      style="display:inline;"
+                      onsubmit="return confirm('¿Eliminar a {{ u.username }}? Se borrarán también todas sus tareas.')">
+                  <button type="submit" class="btn btn-g-danger btn-sm" title="Eliminar usuario">🗑</button>
+                </form>
+                {% else %}
+                <!-- Admin viendo a otro Admin/SuperAdmin: solo lectura -->
+                <span style="font-size:.7rem; color:var(--text-muted); font-style:italic;">
+                  🔒 Solo SuperAdmin
+                </span>
+                {% endif %}
+
               {% endif %}
             </td>
           </tr>
@@ -267,67 +280,18 @@
 
       <div id="perfil-opciones" style="display:flex; flex-direction:column; gap:.5rem;">
 
-        <label class="perfil-radio-row" data-val="1">
-          <input type="radio" name="nuevo_perfil" value="1" style="display:none;">
-          <span class="p-ico">🎓</span>
+        {% set ico_map = {1:'🎓', 2:'✅', 3:'🎓✅', 4:'🏢', 10:'⚙', 20:'👑'} %}
+        {% for val, nombre, desc in perfiles %}
+        <label class="perfil-radio-row" data-val="{{ val }}">
+          <input type="radio" name="nuevo_perfil" value="{{ val }}" style="display:none;">
+          <span class="p-ico">{{ ico_map.get(val, '👤') }}</span>
           <span class="p-info">
-            <span class="p-nombre">Formador</span>
-            <span class="p-desc">Solo accede a la sección de Formación.</span>
+            <span class="p-nombre">{{ nombre }}</span>
+            <span class="p-desc">{{ desc }}</span>
           </span>
           <span class="p-check">✓</span>
         </label>
-
-        <label class="perfil-radio-row" data-val="2">
-          <input type="radio" name="nuevo_perfil" value="2" style="display:none;">
-          <span class="p-ico">✅</span>
-          <span class="p-info">
-            <span class="p-nombre">Tareas</span>
-            <span class="p-desc">Solo accede a la sección de Tareas.</span>
-          </span>
-          <span class="p-check">✓</span>
-        </label>
-
-        <label class="perfil-radio-row" data-val="3">
-          <input type="radio" name="nuevo_perfil" value="3" style="display:none;">
-          <span class="p-ico">🎓✅</span>
-          <span class="p-info">
-            <span class="p-nombre">Formador y Tareas</span>
-            <span class="p-desc">Accede a Formación y a Tareas.</span>
-          </span>
-          <span class="p-check">✓</span>
-        </label>
-
-        <label class="perfil-radio-row" data-val="4">
-          <input type="radio" name="nuevo_perfil" value="4" style="display:none;">
-          <span class="p-ico">🏢</span>
-          <span class="p-info">
-            <span class="p-nombre">Coordinador</span>
-            <span class="p-desc">Tareas con visión de equipo.</span>
-          </span>
-          <span class="p-check">✓</span>
-        </label>
-
-        <label class="perfil-radio-row" data-val="10">
-          <input type="radio" name="nuevo_perfil" value="10" style="display:none;">
-          <span class="p-ico">⚙</span>
-          <span class="p-info">
-            <span class="p-nombre">Admin</span>
-            <span class="p-desc">Gestión de usuarios, tareas y formación.</span>
-          </span>
-          <span class="p-check">✓</span>
-        </label>
-
-        {% if session.get('es_admin') == 2 %}
-        <label class="perfil-radio-row" data-val="20">
-          <input type="radio" name="nuevo_perfil" value="20" style="display:none;">
-          <span class="p-ico">👑</span>
-          <span class="p-info">
-            <span class="p-nombre">SuperAdmin</span>
-            <span class="p-desc">Acceso total y gráficos globales.</span>
-          </span>
-          <span class="p-check">✓</span>
-        </label>
-        {% endif %}
+        {% endfor %}
 
       </div>
 
