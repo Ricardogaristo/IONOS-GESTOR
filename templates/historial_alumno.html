@@ -66,6 +66,14 @@
         <option value="4-6">4 – 6 cursos</option>
         <option value="7+">7 o más</option>
       </select>
+      <select id="filtro-estado" class="form-select"
+              style="font-size:.82rem; max-width:160px;"
+              onchange="aplicarFiltros()">
+        <option value="">▶ / 📦 Todos</option>
+        <option value="activo">🟢 En ejecución</option>
+        <option value="archivado">📦 Archivados</option>
+        <option value="mixto">🔀 Mixtos</option>
+      </select>
       <button type="button" onclick="limpiarFiltrosAlumnos()"
               class="btn btn-g-ghost btn-sm" title="Limpiar filtros">✕</button>
     </div>
@@ -82,6 +90,7 @@
          data-cursos="{{ a.cursos | join('||') | lower }}"
          data-supera="{{ 1 if a.supera == 1 else 0 }}"
          data-ncursos="{{ a.n_cursos }}"
+         data-estado="{% if a.n_activos > 0 and a.n_archivados > 0 %}mixto{% elif a.n_activos > 0 %}activo{% else %}archivado{% endif %}"
          style="display:flex; align-items:center; gap:.5rem;
                 padding:.42rem .65rem; border-radius:7px;
                 border:1px solid {{ 'var(--accent)' if es_activo else 'var(--border)' }};
@@ -655,6 +664,7 @@ function aplicarFiltros() {
   const curso    = (document.getElementById('filtro-curso')?.value    || '').toLowerCase().trim();
   const supera   = (document.getElementById('filtro-supera')?.value   || '').trim();
   const ncursos  = (document.getElementById('filtro-ncursos')?.value  || '').trim();
+  const estado   = (document.getElementById('filtro-estado')?.value   || '').trim();
   const badge    = document.getElementById('badge-total');
   const noRes    = document.getElementById('sin-resultados');
   const items    = document.querySelectorAll('.alumno-item');
@@ -665,6 +675,7 @@ function aplicarFiltros() {
     const elCursos  = (el.dataset.cursos || '').toLowerCase();
     const elSupera  = String(el.dataset.supera  || '0').trim();
     const elN       = parseInt(el.dataset.ncursos || '0', 10);
+    const elEstado  = (el.dataset.estado || '').trim();
 
     const matchNombre  = !nombre  || elNombre.includes(nombre);
     const matchCurso   = !curso   || elCursos.split('||').some(c => c.trim().includes(curso));
@@ -675,7 +686,8 @@ function aplicarFiltros() {
     else if (ncursos === '4-6') matchN = elN >= 4 && elN <= 6;
     else if (ncursos === '7+')  matchN = elN >= 7;
 
-    const show = matchNombre && matchCurso && matchSupera && matchN;
+    const matchEstado = estado === '' || elEstado === estado;
+    const show = matchNombre && matchCurso && matchSupera && matchN && matchEstado;
     el.style.display = show ? '' : 'none';
     if (show) visible++;
   });
@@ -689,10 +701,12 @@ function limpiarFiltrosAlumnos() {
   const fc = document.getElementById('filtro-curso');
   const fs = document.getElementById('filtro-supera');
   const fn2 = document.getElementById('filtro-ncursos');
+  const fe  = document.getElementById('filtro-estado');
   if (fn)  fn.value  = '';
   if (fc)  fc.value  = '';
   if (fs)  fs.value  = '';
   if (fn2) fn2.value = '';
+  if (fe)  fe.value  = '';
   aplicarFiltros();
 }
 </script>
