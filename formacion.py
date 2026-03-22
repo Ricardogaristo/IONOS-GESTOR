@@ -2342,3 +2342,164 @@ def alumno_gestion(alumno_id):
     conn.close()
 
     return jsonify({"ok": True})
+
+# ══════════════════════════════════════════════════════════════════════════════
+# EXPEDIENTE DIGITAL DEL ALUMNO
+# ══════════════════════════════════════════════════════════════════════════════
+
+@formacion_bp.route("/formacion/alumno/<int:alumno_id>/expediente")
+@login_required
+def expediente_alumno(alumno_id):
+    """Vista completa del expediente de un alumno: historial, eventos y observaciones."""
+    tutor_id = session["user_id"]
+    conn     = get_form_conn()
+
+    alumno = conn.execute(
+        "SELECT * FROM alumnos WHERE id=%s AND tutor_id=%s",
+        (alumno_id, tutor_id)
+    ).fetchone()
+    if not alumno:
+        conn.close()
+        return redirect(url_for("formacion.formacion"))
+
+    historial = conn.execute("""
+        SELECT fecha_import, progreso, examenes, delta_progreso, avanzo
+        FROM progreso_historial
+        WHERE alumno_id=%s AND tutor_id=%s
+        ORDER BY fecha_import DESC LIMIT 20
+    """, (alumno_id, tutor_id)).fetchall()
+
+    eventos = conn.execute("""
+        SELECT id, tipo, texto, created_at
+        FROM expediente_eventos
+        WHERE alumno_id=%s AND tutor_id=%s
+        ORDER BY created_at DESC
+    """, (alumno_id, tutor_id)).fetchall()
+
+    observaciones = conn.execute("""
+        SELECT id, texto, created_at
+        FROM observaciones_alumno
+        WHERE alumno_id=%s AND tutor_id=%s
+        ORDER BY created_at DESC
+    """, (alumno_id, tutor_id)).fetchall()
+
+    conn.close()
+
+    return render_template(
+        "expediente_alumno.html",
+        alumno=dict(alumno),
+        historial=[dict(h) for h in historial],
+        eventos=[dict(e) for e in eventos],
+        observaciones=[dict(o) for o in observaciones],
+    )
+
+
+@formacion_bp.route("/formacion/alumno/<int:alumno_id>/expediente/evento", methods=["POST"])
+@login_required
+def expediente_agregar_evento(alumno_id):
+    """AJAX: añade un evento al expediente del alumno."""
+    tutor_id = session["user_id"]
+    data     = request.get_json(force=True) or {}
+    tipo     = str(data.get("tipo",  "nota")).strip()[:30]
+    texto    = str(data.get("texto", "")).strip()
+
+    if not texto:
+        return jsonify({"ok": False, "error": "El texto no puede estar vacío."})
+
+    tipos_validos = {"nota", "llamada", "whatsapp", "email", "reunion", "incidencia"}
+    if tipo not in tipos_validos:
+        tipo = "nota"
+
+    conn = get_form_conn()
+    row = conn.execute(
+        "SELECT id FROM alumnos WHERE id=%s AND tutor_id=%s", (alumno_id, tutor_id)
+    ).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"ok": False, "error": "Alumno no encontrado."}), 404
+
+    conn.execute("""
+        INSERT INTO expediente_eventos (alumno_id, tutor_id, tipo, texto)
+        VALUES (%s, %s, %s, %s)
+    """, (alumno_id, tutor_id, tipo, texto))
+    conn.commit()
+
+    nuevo = conn.execute("""
+        SELECT id, tipo, texto, created_at
+        FROM expediente_eventos
+        WHERE alumno_id=%s AND tutor_id=%s
+        ORDER BY id DESC LIMIT 1
+    """, (alumno_id, tutor_id)).fetchone()
+    conn.close()
+
+    return jsonify({"ok": True, "evento": dict(nuevo)})
+
+
+@formacion_bp.route("/formacion/alumno/<int:alumno_id>/expediente/evento/<int:evento_id>/eliminar", methods=["POST"])
+@login_required
+def expediente_eliminar_evento(alumno_id, evento_id):
+    """AJAX: elimina un evento del expediente."""
+    tutor_id = session["user_id"]
+    conn     = get_form_conn()
+    conn.execute(
+        "DELETE FROM expediente_eventos WHERE id=%s AND tutor_id=%s",
+        (evento_id, tutor_id)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+# ── Observaciones del alumno ──────────────────────────────────────────────────
+
+@formacion_bp.route("/formacion/alumno/observaciones/<int:alumno_id>", methods=["GET"])
+@login_required
+def observaciones_alumno_get(alumno_id):
+    tutor_id = session["user_id"]
+    conn = get_form_conn()
+    rows = conn.execute("""
+        SELECT id, texto, DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') AS fecha
+        FROM observaciones_alumno
+        WHERE alumno_id=%s AND tutor_id=%s
+        ORDER BY created_at DESC
+    """, (alumno_id, tutor_id)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@formacion_bp.route("/formacion/alumno/observaciones/<int:alumno_id>", methods=["POST"])
+@login_required
+def observaciones_alumno_post(alumno_id):
+    tutor_id = session["user_id"]
+    data  = request.get_json(force=True) or {}
+    texto = str(data.get("texto", "")).strip()
+    if not texto:
+        return jsonify({"error": "Texto vacío"}), 400
+    conn = get_form_conn()
+    conn.execute(
+        "INSERT INTO observaciones_alumno (alumno_id, tutor_id, texto) VALUES (%s, %s, %s)",
+        (alumno_id, tutor_id, texto)
+    )
+    conn.commit()
+    nuevo = conn.execute("""
+        SELECT id, texto, DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') AS fecha
+        FROM observaciones_alumno
+        WHERE alumno_id=%s AND tutor_id=%s
+        ORDER BY id DESC LIMIT 1
+    """, (alumno_id, tutor_id)).fetchone()
+    conn.close()
+    return jsonify(dict(nuevo))
+
+
+@formacion_bp.route("/formacion/alumno/observaciones/borrar/<int:obs_id>", methods=["POST"])
+@login_required
+def observaciones_alumno_borrar(obs_id):
+    tutor_id = session["user_id"]
+    conn = get_form_conn()
+    conn.execute(
+        "DELETE FROM observaciones_alumno WHERE id=%s AND tutor_id=%s",
+        (obs_id, tutor_id)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})

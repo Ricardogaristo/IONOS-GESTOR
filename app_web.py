@@ -15,6 +15,7 @@ from openpyxl.cell.cell import MergedCell
 from db_mysql import get_tareas_conn, column_exists
 from formacion import formacion_bp, inicializar_formacion
 from cursos import cursos_bp
+from historial_alumno_bp import historial_alumno_bp
 from auth import (
     auth_bp,
     init_oauth,
@@ -64,6 +65,7 @@ app.config.update(
 app.register_blueprint(formacion_bp)
 app.register_blueprint(cursos_bp)
 app.register_blueprint(auth_bp)
+app.register_blueprint(historial_alumno_bp)
 init_oauth(app)
 
 # ── Cabeceras de seguridad HTTP ────────────────────────────────────────────────

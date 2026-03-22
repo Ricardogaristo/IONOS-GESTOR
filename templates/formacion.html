@@ -46,6 +46,9 @@
     <a href="{{ url_for('cursos.repositorio_cursos') }}" class="btn btn-g-ghost">
       📦 Repositorio
     </a>
+    <a href="{{ url_for('historial_alumno.historial_buscar') }}" class="btn btn-g-ghost">
+      📊 Historial alumno
+    </a>
   </div>
 </div>
 
@@ -182,15 +185,15 @@
       <table class="gtable" id="tablaAlumnos">
         <thead>
           <tr>
-            <th style="max-width:160px;">Curso</th>
+            <th style="max-width:120px;">Curso</th>
             <th>Nombre</th>
-            <th style="min-width:120px;">Progreso</th>
+            <th style="min-width:100px;">Progreso</th>
             <th style="text-align:center;">Exam.</th>
             <th style="text-align:center; white-space:nowrap;">Import.</th>
             <th style="white-space:nowrap;">Inicio / Fin</th>
             <th style="text-align:center;">Estado</th>
-            <th style="min-width:140px;">Teléfono</th>
-            <th style="text-align:center;">Acciones</th>
+            <th style="min-width:110px;">Teléfono</th>
+            <th class="col-acciones">Acciones</th>
           </tr>
         </thead>
         <tbody id="tbody-alumnos">
@@ -240,7 +243,7 @@
               {% endif %}
             </td>
 
-            <td data-label="Progreso" style="min-width:120px;">
+            <td data-label="Progreso" style="min-width:100px;">
               <div style="display:flex; align-items:center; gap:.4rem;">
                 <div style="flex:1; height:6px; background:var(--bg3); border-radius:99px; overflow:hidden; min-width:55px;">
                   <div style="height:100%; width:{{ [a['progreso'], 100]|min }}%;
@@ -323,7 +326,7 @@
             </td>
 
             <!-- Teléfono editable inline -->
-            <td data-label="Teléfono" style="min-width:140px;">
+            <td data-label="Teléfono" style="min-width:110px;">
               <form method="POST" action="{{ url_for('formacion.editar_alumno', alumno_id=a['id']) }}"
                     style="display:flex; gap:.3rem; align-items:center;">
                 <input type="text" name="telefono"
@@ -334,19 +337,15 @@
               </form>
             </td>
 
-            <td data-label="Acciones" style="white-space:nowrap; text-align:center;">
-              <div style="display:flex; gap:.3rem; align-items:center; justify-content:center;">
+            <td data-label="Acciones" class="col-acciones">
+              <div style="display:flex; gap:.2rem; align-items:center; justify-content:center;">
                 {% if a['telefono'] %}
                   <a href="{{ url_for('formacion.whatsapp_alumno', alumno_id=a['id']) }}"
-                     target="_blank" class="btn btn-g-success btn-sm" title="Enviar WhatsApp"
-                     style="padding:.28rem .5rem; font-size:.78rem;">💬</a>
+                     target="_blank" class="btn btn-g-success btn-sm" title="WhatsApp">💬</a>
                 {% else %}
-                  <span class="btn btn-g-ghost btn-sm" style="opacity:.3; cursor:default; padding:.28rem .5rem; font-size:.78rem;" title="Sin teléfono">💬</span>
+                  <span class="btn btn-g-ghost btn-sm" style="opacity:.25;cursor:default;" title="Sin teléfono">💬</span>
                 {% endif %}
-                <button type="button"
-                        class="btn btn-g-primary btn-sm"
-                        title="Redactar mensaje para Moodle"
-                        style="padding:.28rem .5rem; font-size:.78rem;"
+                <button type="button" class="btn btn-g-primary btn-sm" title="Mensaje Moodle"
                         onclick="abrirMoodle({
                           nombre:   '{{ nombre_val | replace("'","&#39;") }}',
                           curso:    '{{ curso_val  | replace("'","&#39;") }}',
@@ -356,16 +355,15 @@
                           inicio:   '{{ a["fecha_inicio"] if a["fecha_inicio"] else "" }}',
                           fin:      '{{ a["fecha_fin"]    if a["fecha_fin"]    else "" }}'
                         })">📨</button>
-                <button type="button"
-                        class="btn btn-g-ghost btn-sm btn-ia-alumno"
-                        data-id="{{ a['id'] }}"
-                        data-nombre="{{ nombre_val }}"
-                        data-curso="{{ curso_val }}"
-                        title="Analizar con IA"
-                        style="padding:.28rem .5rem; font-size:.78rem;">🤖</button>
+                <button type="button" class="btn btn-g-ghost btn-sm btn-ia-alumno"
+                        data-id="{{ a['id'] }}" data-nombre="{{ nombre_val }}"
+                        data-curso="{{ curso_val }}" title="Analizar con IA">🤖</button>
+                <a href="{{ url_for('historial_alumno.historial_por_id', alumno_id=a['id']) }}"
+                   class="btn btn-g-blue btn-sm" title="Historial">📊</a>
+                <a href="{{ url_for('formacion.expediente_alumno', alumno_id=a['id']) }}"
+                   class="btn btn-g-ghost btn-sm" title="Expediente">📋</a>
                 <a href="{{ url_for('formacion.eliminar_alumno', alumno_id=a['id']) }}"
-                   class="btn btn-g-danger btn-sm"
-                   style="padding:.28rem .5rem; font-size:.78rem;"
+                   class="btn btn-g-danger btn-sm" title="Eliminar"
                    onclick="return confirm('¿Eliminar a {{ nombre_val }}? Esta acción no se puede deshacer.')">🗑</a>
               </div>
             </td>

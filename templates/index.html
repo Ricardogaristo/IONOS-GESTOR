@@ -452,6 +452,30 @@
   align-items: center;
   gap: .2rem;
 }
+
+/* ── Responsive: selects de categoría/usuario en móvil ─────────────── */
+@media (max-width: 576px) {
+  .filter-row { flex-wrap: wrap !important; }
+
+  .filter-row > .ms-auto {
+    flex: 0 0 100% !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: .5rem;
+  }
+
+  .filter-row > .ms-auto .cat-select-wrap {
+    flex: 1 1 140px !important;
+    min-width: 0;
+  }
+
+  .filter-row > .ms-auto .cat-select {
+    width: 100% !important;
+    max-width: none !important;
+  }
+}
 </style>
 
 <script>

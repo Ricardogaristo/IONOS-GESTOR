@@ -213,6 +213,39 @@
     }
     .btn:hover { transform: translateY(-1px); }
     .btn:active { transform: translateY(0); }
+    /* ── btn-sm: iconos en tabla ── */
+    .btn-sm {
+      font-size:      .95rem  !important;
+      line-height:    1       !important;
+      padding:        .32rem .38rem !important;
+      border-radius:  5px     !important;
+      min-width:      30px;
+      min-height:     30px;
+      justify-content: center;
+      align-items:    center;
+    }
+
+    /* ── Columna acciones: ancho fijo ── */
+    .gtable th.col-acciones,
+    .gtable td.col-acciones {
+      min-width: 220px;
+      width:     220px;
+      text-align: center;
+      padding-left:  .3rem !important;
+      padding-right: .3rem !important;
+    }
+
+    /* ── btn-sm: botones de icono en tabla de alumnos ── */
+    .btn-sm {
+      font-size:     1.05rem  !important;   /* emojis a tamaño natural */
+      line-height:   1        !important;   /* sin recorte vertical    */
+      padding:       .42rem .52rem !important;
+      border-radius: 6px      !important;
+      min-width:     34px;
+      min-height:    34px;
+      justify-content: center;
+      align-items:   center;
+    }
 
     .btn-g-primary {
       background: var(--accent);
@@ -319,7 +352,7 @@
       text-transform: uppercase;
       background: var(--bg3);
       border-bottom: 1px solid var(--border);
-      padding: .75rem 1rem;
+      padding: .55rem .55rem;
       white-space: nowrap;
     }
     .gtable tbody tr {
@@ -329,8 +362,8 @@
     .gtable tbody tr:hover { background: rgba(48,54,61,.4); }
     .gtable tbody tr:last-child td { border-bottom: none; }
     .gtable tbody td {
-      font-size: .85rem;
-      padding: .7rem 1rem;
+      font-size: .82rem;
+      padding: .5rem .55rem;
       vertical-align: middle;
       color: var(--text);
       border-bottom: 1px solid var(--border-soft);

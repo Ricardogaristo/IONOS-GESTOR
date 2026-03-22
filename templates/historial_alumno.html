@@ -1,0 +1,700 @@
+{% extends "base.html" %}
+{% block title %}Historial alumno{% endblock %}
+
+{% block content %}
+
+<!-- ── HEADER ─────────────────────────────────────────────────────────────── -->
+<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+  <div>
+    <div style="font-size:.75rem; color:var(--text-muted); margin-bottom:.2rem;">
+      <a href="{{ url_for('formacion.formacion') }}"
+         style="color:var(--text-muted); text-decoration:none;">🎓 Formación</a>
+      <span style="margin:0 .4rem;">›</span> Historial alumno
+    </div>
+    <h4 style="font-weight:700; margin:0;">
+      📊 Historial: Todos los cursos del alumno{% if alumno_nombre %} — {{ alumno_nombre }}{% endif %}
+    </h4>
+  </div>
+  <a href="{{ url_for('formacion.formacion') }}" class="btn btn-g-ghost">← Volver</a>
+</div>
+
+<!-- ── SELECTOR DE ALUMNO ─────────────────────────────────────────────────── -->
+{% if not alumno_nombre %}
+<div class="gcard mb-4">
+  <div class="gcard-header">
+    <span>👤</span>
+    <span class="gcard-title">Seleccionar alumno</span>
+    <span id="badge-total" class="badge-g badge-pending ms-auto" style="font-size:.65rem;">
+      {{ nombres_sugeridos | length }} alumnos
+    </span>
+  </div>
+  <div class="gcard-body" style="padding-bottom:.75rem;">
+
+    <!-- Fila de filtros -->
+    <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.75rem; align-items:center;">
+      <div style="position:relative; flex:1; min-width:180px;">
+        <span style="position:absolute; left:.7rem; top:50%; transform:translateY(-50%);
+                     color:var(--text-muted); font-size:.85rem; pointer-events:none;">🔍</span>
+        <input id="filtro-nombre" type="text" class="form-control"
+               placeholder="Filtrar por nombre…" autocomplete="off"
+               style="padding-left:2rem; font-size:.84rem;"
+               oninput="aplicarFiltros()">
+      </div>
+      <select id="filtro-curso" class="form-select"
+              style="font-size:.82rem; max-width:220px; flex:1;"
+              onchange="aplicarFiltros()">
+        <option value="">Todos los cursos</option>
+        {% if todos_cursos is defined %}
+          {% for c in todos_cursos %}
+          <option value="{{ c | lower }}">{{ c }}</option>
+          {% endfor %}
+        {% endif %}
+      </select>
+      <select id="filtro-supera" class="form-select"
+              style="font-size:.82rem; max-width:160px;"
+              onchange="aplicarFiltros()">
+        <option value="">Todos</option>
+        <option value="1">✔ Superaron ≥75%</option>
+        <option value="0">● No superaron</option>
+      </select>
+      <select id="filtro-ncursos" class="form-select"
+              style="font-size:.82rem; max-width:150px;"
+              onchange="aplicarFiltros()">
+        <option value="">Nº cursos</option>
+        <option value="1">1 curso</option>
+        <option value="2-3">2 – 3 cursos</option>
+        <option value="4-6">4 – 6 cursos</option>
+        <option value="7+">7 o más</option>
+      </select>
+      <button type="button" onclick="limpiarFiltrosAlumnos()"
+              class="btn btn-g-ghost btn-sm" title="Limpiar filtros">✕</button>
+    </div>
+
+    <!-- Grid de alumnos -->
+    <div id="grid-alumnos"
+         style="display:grid; grid-template-columns:repeat(auto-fill, minmax(210px,1fr));
+                gap:.35rem; max-height:300px; overflow-y:auto; padding-right:.2rem;">
+      {% for a in nombres_sugeridos %}
+      {% set es_activo = (q == a.nombre) %}
+      <a href="{{ url_for('historial_alumno.historial_buscar', q=a.nombre) }}"
+         class="alumno-item {{ 'alumno-activo' if es_activo else '' }}"
+         data-nombre="{{ a.nombre | lower }}"
+         data-cursos="{{ a.cursos | join('||') | lower }}"
+         data-supera="{{ 1 if a.supera == 1 else 0 }}"
+         data-ncursos="{{ a.n_cursos }}"
+         style="display:flex; align-items:center; gap:.5rem;
+                padding:.42rem .65rem; border-radius:7px;
+                border:1px solid {{ 'var(--accent)' if es_activo else 'var(--border)' }};
+                background:{{ 'var(--accent-dim)' if es_activo else 'var(--bg2)' }};
+                color:{{ 'var(--accent)' if es_activo else 'var(--text)' }};
+                text-decoration:none; font-size:.81rem; font-weight:500;
+                transition:background .12s, border-color .12s;"
+         onmouseover="if(!this.classList.contains('alumno-activo')){this.style.background='var(--bg3)';this.style.borderColor='var(--accent)';}"
+         onmouseout="if(!this.classList.contains('alumno-activo')){this.style.background='var(--bg2)';this.style.borderColor='var(--border)';}">
+        <span style="font-size:.65rem; flex-shrink:0;
+                     color:{{ 'var(--accent)' if a.supera == 1 else 'var(--red)' }};">
+          {{ '✔' if a.supera == 1 else '●' }}
+        </span>
+        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">
+          {{ a.nombre | title }}
+        </span>
+        <div style="display:flex; flex-direction:column; align-items:flex-end;
+                    flex-shrink:0; gap:.05rem; min-width:28px; text-align:right;">
+          {% set n_act = a.get('n_activos',   0) if a is mapping else 0 %}
+          {% set n_arc = a.get('n_archivados', 0) if a is mapping else 0 %}
+          {% if n_act > 0 %}
+          <span style="font-size:.6rem; font-family:var(--mono);
+                       color:var(--accent); line-height:1.2;">{{ n_act }}▶</span>
+          {% endif %}
+          {% if n_arc > 0 %}
+          <span style="font-size:.6rem; font-family:var(--mono);
+                       color:var(--text-muted); line-height:1.2;">{{ n_arc }}📦</span>
+          {% endif %}
+          {% if n_act == 0 and n_arc == 0 %}
+          <span style="font-size:.6rem; font-family:var(--mono);
+                       color:var(--text-muted); line-height:1.2;">{{ a.n_cursos }}c</span>
+          {% endif %}
+        </div>
+      </a>
+      {% else %}
+      <div style="color:var(--text-muted); font-size:.84rem; padding:.5rem;">
+        No hay alumnos registrados aún.
+      </div>
+      {% endfor %}
+    </div>
+
+    <div id="sin-resultados" style="display:none; text-align:center;
+         padding:1.25rem; color:var(--text-muted); font-size:.84rem;">
+      Sin alumnos que coincidan con los filtros.
+    </div>
+
+  </div>
+</div>
+{% endif %}
+
+<!-- ── SIN RESULTADOS ─────────────────────────────────────────────────────── -->
+{% if q and not cursos_alumno %}
+<div class="gcard">
+  <div class="gcard-body" style="text-align:center; padding:3rem; color:var(--text-muted);">
+    <div style="font-size:2rem; margin-bottom:.75rem;">🔍</div>
+    <div style="font-weight:600; margin-bottom:.4rem;">Sin resultados para «{{ q }}»</div>
+    <div style="font-size:.84rem;">Comprueba que el nombre coincide o usa el autocompletado.</div>
+  </div>
+</div>
+
+{% elif cursos_alumno %}
+
+{# ── KPIs globales ── #}
+{% set n_cursos    = cursos_alumno | length %}
+{% set prom_prog   = (cursos_alumno | sum(attribute='progreso') / n_cursos) | round(1) %}
+{% set n_superados = cursos_alumno | selectattr('supera_75', 'equalto', 1) | list | length %}
+{% set pct_exito   = (n_superados / n_cursos * 100) | round(0) | int %}
+{% set n_activos   = cursos_alumno | selectattr('archivado', 'equalto', 0) | list | length %}
+{% set n_archivados = cursos_alumno | selectattr('archivado', 'equalto', 1) | list | length %}
+
+<!-- ── KPI STRIP ──────────────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+
+  <div class="col-6 col-md-3">
+    <div class="stat-card blue">
+      <div class="stat-label">Cursos realizados</div>
+      <div class="stat-value">{{ n_cursos }}</div>
+      <div style="font-size:.72rem; color:var(--text-muted);">
+        {{ n_activos }} activo{{ 's' if n_activos != 1 else '' }}
+        · {{ n_archivados }} archivado{{ 's' if n_archivados != 1 else '' }}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="stat-card {{ 'green' if prom_prog >= 75 else ('amber' if prom_prog >= 50 else 'red') }}">
+      <div class="stat-label">Progreso medio</div>
+      <div class="stat-value"
+           style="color:{{ 'var(--accent)' if prom_prog >= 75 else ('var(--amber)' if prom_prog >= 50 else 'var(--red)') }};">
+        {{ prom_prog }}%
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="stat-card {{ 'green' if n_superados == n_cursos else ('amber' if n_superados > 0 else 'red') }}">
+      <div class="stat-label">Cursos superados</div>
+      <div class="stat-value"
+           style="color:{{ 'var(--accent)' if n_superados == n_cursos else ('var(--amber)' if n_superados > 0 else 'var(--red)') }};">
+        {{ n_superados }} / {{ n_cursos }}
+      </div>
+      <div style="font-size:.72rem; color:var(--text-muted);">{{ pct_exito }}% tasa de éxito</div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="stat-card">
+      <div class="stat-label">Último curso</div>
+      <div style="font-size:.8rem; font-weight:600; margin-top:.4rem; line-height:1.4;
+                  overflow:hidden; text-overflow:ellipsis; max-height:2.5rem;">
+        {{ cursos_alumno[-1].curso or '—' }}
+      </div>
+      <div style="font-size:.72rem; color:var(--text-muted);">
+        {{ cursos_alumno[-1].progreso }}%
+        {% if cursos_alumno[-1].supera_75 == 1 %}✔{% else %}●{% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── GRÁFICOS ───────────────────────────────────────────────────────────── -->
+<div class="row g-4 mb-4">
+
+  {% if n_cursos == 1 %}
+  {# ── Un solo curso: evolución + exámenes ── #}
+  {% set c = cursos_alumno[0] %}
+  {% set ph = c.progreso_historial %}
+
+  <div class="col-12 col-md-7">
+    <div class="gcard" style="height:100%;">
+      <div class="gcard-header">
+        <span>📈</span>
+        <span class="gcard-title">Evolución del progreso</span>
+        <span style="margin-left:auto; font-size:.72rem; color:var(--text-muted);">
+          {{ c.curso or 'Sin curso' }}
+        </span>
+      </div>
+      <div class="gcard-body" style="position:relative; height:220px;">
+        {% if ph %}
+        <canvas id="chart-evolucion"></canvas>
+        {% else %}
+        <div style="display:flex; align-items:center; justify-content:center; height:100%;
+                    color:var(--text-muted); font-size:.84rem;">
+          Sin historial de importaciones aún.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-5">
+    <div class="gcard" style="height:100%;">
+      <div class="gcard-header">
+        <span>📝</span>
+        <span class="gcard-title">Exámenes</span>
+      </div>
+      <div class="gcard-body" style="position:relative; height:220px;">
+        <canvas id="chart-examenes"></canvas>
+      </div>
+    </div>
+  </div>
+
+  {% else %}
+  {# ── Múltiples cursos: comparativa + tasa de éxito ── #}
+
+  <div class="col-12 col-md-8">
+    <div class="gcard" style="height:100%;">
+      <div class="gcard-header">
+        <span>📊</span>
+        <span class="gcard-title">Comparativa de progreso por curso</span>
+      </div>
+      <div class="gcard-body" style="position:relative; height:260px;">
+        <canvas id="chart-comparativa"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-4">
+    <div class="gcard" style="height:100%;">
+      <div class="gcard-header">
+        <span>🏆</span>
+        <span class="gcard-title">Tasa de éxito</span>
+      </div>
+      <div class="gcard-body" style="position:relative; height:260px;">
+        <canvas id="chart-exito"></canvas>
+      </div>
+    </div>
+  </div>
+
+  {% endif %}
+</div>
+
+<!-- ── TARJETAS POR CURSO ─────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+  {% for c in cursos_alumno %}
+  {% set prog = c.progreso | float %}
+  {% set col  = 'var(--accent)' if prog >= 75 else ('var(--amber)' if prog >= 50 else 'var(--red)') %}
+  {% set ph   = c.progreso_historial %}
+
+  <div class="col-12 col-md-6 col-lg-4">
+    <div class="gcard" style="border-top:3px solid {{ col }}; height:100%;">
+
+      <!-- Cabecera tarjeta -->
+      <div class="gcard-header" style="padding-bottom:.5rem;">
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:.7rem; color:var(--text-muted); margin-bottom:.15rem;">
+            {% if c.archivado %}📦 Archivado{% else %}🟢 Activo{% endif %}
+          </div>
+          <div style="font-weight:700; font-size:.88rem; overflow:hidden;
+                      text-overflow:ellipsis; white-space:nowrap;"
+               title="{{ c.curso or '—' }}">
+            {{ c.curso or 'Sin curso' }}
+          </div>
+        </div>
+        {% if c.supera_75 == 1 %}
+        <span class="badge-g badge-done" style="font-size:.62rem; margin-left:.5rem; flex-shrink:0;">✔ OK</span>
+        {% else %}
+        <span class="badge-g badge-pending" style="font-size:.62rem; margin-left:.5rem; flex-shrink:0;">● &lt;75%</span>
+        {% endif %}
+      </div>
+
+      <!-- Cuerpo tarjeta -->
+      <div class="gcard-body" style="padding-top:.5rem;">
+
+        <!-- Barra de progreso -->
+        <div style="display:flex; align-items:center; gap:.5rem; margin-bottom:.85rem;">
+          <div style="flex:1; height:8px; background:var(--bg3); border-radius:99px; overflow:hidden;">
+            <div style="height:100%; width:{{ [prog,100]|min }}%;
+                        background:{{ col }}; border-radius:99px; transition:width .4s;"></div>
+          </div>
+          <span style="font-family:var(--mono); font-size:.82rem; font-weight:700;
+                       color:{{ col }}; min-width:36px; text-align:right;">{{ prog }}%</span>
+        </div>
+
+        <!-- Datos clave -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:.4rem; font-size:.78rem;">
+          {% set fi = c.fecha_inicio %}
+          {% set ff = c.fecha_fin %}
+          <div style="color:var(--text-muted);">Inicio</div>
+          <div style="font-family:var(--mono);">
+            {{ fi[8:10]+'/'+fi[5:7]+'/'+fi[0:4] if fi and fi|length>=10 else '—' }}
+          </div>
+          <div style="color:var(--text-muted);">Fin</div>
+          <div style="font-family:var(--mono);">
+            {{ ff[8:10]+'/'+ff[5:7]+'/'+ff[0:4] if ff and ff|length>=10 else '—' }}
+          </div>
+          <div style="color:var(--text-muted);">Exámenes</div>
+          <div style="font-family:var(--mono);">{{ c.examenes or '—' }}</div>
+          <div style="color:var(--text-muted);">Δ Progreso</div>
+          <div style="font-family:var(--mono);
+                      color:{{ 'var(--accent)' if c.delta_progreso > 0 else ('var(--red)' if c.delta_progreso < 0 else 'var(--text-muted)') }}">
+            {% if c.delta_progreso and c.delta_progreso != 0 %}
+              {{ '+' if c.delta_progreso > 0 else '' }}{{ c.delta_progreso }}%
+            {% else %}={% endif %}
+          </div>
+          <div style="color:var(--text-muted);">Importaciones</div>
+          <div style="font-family:var(--mono);">{{ ph | length }}</div>
+        </div>
+
+        <!-- Sparkline SVG inline -->
+        {% if ph | length > 1 %}
+        {% set valores = ph | map(attribute='progreso') | map('float') | list %}
+        {% set v_min = (valores | min) %}
+        {% set v_max = (valores | max) %}
+        {% set v_rng = v_max - v_min if v_max != v_min else 1 %}
+        {% set pad_x = 4 %}
+        {% set W = 300 %}
+        {% set H = 50 %}
+        {% set inner_h = H - 8 %}
+        {% set n = valores | length %}
+        {% set spark_color = 'var(--accent)' if c.progreso | float >= 75 else ('var(--amber)' if c.progreso | float >= 50 else 'var(--red)') %}
+        <div style="margin-top:.85rem;">
+          <div style="font-size:.68rem; color:var(--text-muted); margin-bottom:.3rem;">
+            Evolución ({{ ph | length }} registros)
+          </div>
+          <svg viewBox="0 0 {{ W }} {{ H }}" preserveAspectRatio="none"
+               style="width:100%; height:50px; display:block; overflow:visible;">
+            {%- set pts = namespace(val='') -%}
+            {%- for v in valores -%}
+              {%- set xi = (loop.index0 / (n - 1) * (W - pad_x * 2) + pad_x) | round(2) -%}
+              {%- set yi = ((1 - (v - v_min) / v_rng) * inner_h + 4) | round(2) -%}
+              {%- set pts.val = pts.val + xi|string + ',' + yi|string + ' ' -%}
+            {%- endfor -%}
+            <polyline
+              points="{{ pts.val | trim }}"
+              fill="none"
+              stroke="{{ spark_color }}"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            {%- for v in valores -%}
+              {%- set xi = (loop.index0 / (n - 1) * (W - pad_x * 2) + pad_x) | round(2) -%}
+              {%- set yi = ((1 - (v - v_min) / v_rng) * inner_h + 4) | round(2) -%}
+              <circle cx="{{ xi }}" cy="{{ yi }}" r="2.5" fill="{{ spark_color }}" opacity="0.7"/>
+            {%- endfor -%}
+          </svg>
+        </div>
+        {% endif %}
+
+        <!-- Último evento del expediente -->
+        {% if c.eventos_recientes %}
+        <div style="margin-top:.85rem; padding:.55rem .7rem; background:var(--bg3);
+                    border-radius:8px; font-size:.76rem; line-height:1.5;">
+          <span style="color:var(--text-muted);">Último evento:</span>
+          <span style="font-weight:600;">{{ c.eventos_recientes[0].tipo }}</span>
+          <div style="color:var(--text-muted); margin-top:.15rem;
+                      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+               title="{{ c.eventos_recientes[0].texto }}">
+            {{ c.eventos_recientes[0].texto }}
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Observaciones del tutor (si las hay) -->
+        {% if c.comentario %}
+        <div style="margin-top:.6rem; padding:.45rem .7rem; background:rgba(59,130,246,.07);
+                    border-left:3px solid var(--blue); border-radius:0 6px 6px 0;
+                    font-size:.76rem; color:var(--text-muted); line-height:1.5;">
+          💬 {{ c.comentario }}
+        </div>
+        {% endif %}
+
+        <!-- Enlace al expediente completo -->
+        <div style="margin-top:.85rem; text-align:right;">
+          <a href="{{ url_for('formacion.expediente_alumno', alumno_id=c.id) }}"
+             class="btn btn-g-ghost btn-sm"
+             style="font-size:.72rem; padding:.25rem .6rem;">
+            📋 Ver expediente
+          </a>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- ── TABLA RESUMEN ───────────────────────────────────────────────────────── -->
+<div class="gcard mb-4">
+  <div class="gcard-header">
+    <span>📋</span>
+    <span class="gcard-title">Resumen de todos los cursos</span>
+  </div>
+  <div class="gcard-body pb-0">
+    <div class="table-responsive">
+      <table class="gtable">
+        <thead>
+          <tr>
+            <th>Curso</th>
+            <th style="text-align:center;">Estado</th>
+            <th style="text-align:center;">Progreso</th>
+            <th style="text-align:center;">Exámenes</th>
+            <th style="text-align:center;">Importaciones</th>
+            <th style="white-space:nowrap;">Inicio → Fin</th>
+            <th style="text-align:center;">Δ</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in cursos_alumno %}
+          {% set prog = c.progreso | float %}
+          {% set col  = 'var(--accent)' if prog >= 75 else ('var(--amber)' if prog >= 50 else 'var(--red)') %}
+          {% set fi = c.fecha_inicio %}
+          {% set ff = c.fecha_fin %}
+          <tr>
+            <td style="font-weight:600; font-size:.84rem; max-width:180px;
+                       overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+                title="{{ c.curso or '—' }}">
+              {{ c.curso or '—' }}
+              {% if c.archivado %}
+              <span style="font-size:.6rem; color:var(--text-muted); margin-left:.3rem;">📦</span>
+              {% endif %}
+            </td>
+            <td style="text-align:center;">
+              <div style="display:flex; flex-direction:column; align-items:center; gap:.25rem;">
+                {% if c.supera_75 == 1 %}
+                <span class="badge-g badge-done" style="font-size:.62rem;">✔ OK</span>
+                {% else %}
+                <span class="badge-g badge-pending" style="font-size:.62rem;">● &lt;75%</span>
+                {% endif %}
+                {% if c.archivado %}
+                <span style="font-size:.6rem; color:var(--text-muted); white-space:nowrap;">📦 Archivado</span>
+                {% else %}
+                <span style="font-size:.6rem; color:var(--accent); white-space:nowrap;">🟢 En ejecución</span>
+                {% endif %}
+              </div>
+            </td>
+            <td style="text-align:center; font-family:var(--mono); font-size:.82rem; font-weight:700; color:{{ col }};">
+              {{ prog }}%
+            </td>
+            <td style="text-align:center; font-family:var(--mono); font-size:.8rem;">
+              {{ c.examenes or '—' }}
+            </td>
+            <td style="text-align:center; font-family:var(--mono); font-size:.8rem; color:var(--blue);">
+              {{ c.progreso_historial | length }}
+            </td>
+            <td style="font-family:var(--mono); font-size:.72rem; color:var(--text-muted); white-space:nowrap;">
+              {{ fi[8:10]+'/'+fi[5:7]+'/'+fi[0:4] if fi and fi|length>=10 else '—' }}
+              →
+              {{ ff[8:10]+'/'+ff[5:7]+'/'+ff[0:4] if ff and ff|length>=10 else '—' }}
+            </td>
+            <td style="text-align:center; font-family:var(--mono); font-size:.78rem;
+                       color:{{ 'var(--accent)' if c.delta_progreso > 0 else ('var(--red)' if c.delta_progreso < 0 else 'var(--text-muted)') }};">
+              {% if c.delta_progreso and c.delta_progreso != 0 %}
+                {{ '+' if c.delta_progreso > 0 else '' }}{{ c.delta_progreso }}%
+              {% else %}={% endif %}
+            </td>
+            <td>
+              <a href="{{ url_for('formacion.expediente_alumno', alumno_id=c.id) }}"
+                 class="btn btn-g-ghost btn-sm"
+                 style="font-size:.7rem; padding:.2rem .5rem; white-space:nowrap;">
+                📋 Expediente
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endif %}{# fin elif cursos_alumno #}
+
+
+
+<!-- ── JS / CHARTS ────────────────────────────────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const CSS   = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const ACCENT = CSS('--accent') || '#2D9D78';
+const BLUE   = CSS('--blue')   || '#3B82F6';
+const AMBER  = CSS('--amber')  || '#D4A017';
+const RED    = CSS('--red')    || '#C0392B';
+const MUTED  = CSS('--text-muted') || '#94A3B8';
+const BG3    = CSS('--bg3')    || '#1E293B';
+
+Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+Chart.defaults.font.size   = 11;
+Chart.defaults.color       = MUTED;
+
+{% if cursos_alumno %}
+
+{% if cursos_alumno | length == 1 %}
+{# ── Evolución (1 curso) ── #}
+{% set ph = cursos_alumno[0].progreso_historial %}
+{% if ph %}
+new Chart(document.getElementById('chart-evolucion'), {
+  type: 'line',
+  data: {
+    labels: {{ ph | map(attribute='fecha_import') | map('truncate', 10, true, '') | list | tojson }},
+    datasets: [{
+      label: 'Progreso %',
+      data:  {{ ph | map(attribute='progreso') | list | tojson }},
+      borderColor:     ACCENT,
+      backgroundColor: ACCENT + '22',
+      pointBackgroundColor: ACCENT,
+      pointRadius: 4,
+      fill: true,
+      tension: .35,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { min:0, max:100, grid:{ color: BG3 }, ticks: { callback: v => v + '%' } },
+      x: { grid:{ display: false } }
+    }
+  }
+});
+{% endif %}
+
+{# ── Exámenes donut ── #}
+{% set c0 = cursos_alumno[0] %}
+new Chart(document.getElementById('chart-examenes'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Superados', 'Realizados no superados', 'Pendientes'],
+    datasets: [{
+      data: [
+        {{ c0.ex_superados }},
+        {{ [c0.ex_realizados - c0.ex_superados, 0] | max }},
+        {{ [c0.ex_total - c0.ex_realizados, 0] | max }}
+      ],
+      backgroundColor: [ACCENT, AMBER, BG3],
+      borderWidth: 0,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    cutout: '65%',
+    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8 } } }
+  }
+});
+
+{% else %}
+{# ── Comparativa barras (múltiples cursos) ── #}
+const labelsComp   = {{ cursos_alumno | map(attribute='curso') | list | tojson }};
+const progresos    = {{ cursos_alumno | map(attribute='progreso') | list | tojson }};
+const archivados   = {{ cursos_alumno | map(attribute='archivado') | list | tojson }};
+const bgColors     = progresos.map(p =>
+  p >= 75 ? ACCENT + 'CC' : (p >= 50 ? AMBER + 'CC' : RED + 'CC')
+);
+
+new Chart(document.getElementById('chart-comparativa'), {
+  type: 'bar',
+  data: {
+    labels: labelsComp.map(l => l && l.length > 28 ? l.substring(0,26)+'…' : (l||'—')),
+    datasets: [{
+      label: 'Progreso %',
+      data:  progresos,
+      backgroundColor: bgColors,
+      borderRadius: 6,
+      borderSkipped: false,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          title: (items) => labelsComp[items[0].dataIndex] || '—',
+          label: (item) => {
+            const arc = archivados[item.dataIndex];
+            const est = arc ? '📦 Archivado' : '🟢 En ejecución';
+            return [' Progreso: ' + item.raw + '%', ' Estado: ' + est];
+          }
+        }
+      }
+    },
+    scales: {
+      y: { min:0, max:100, grid:{ color: BG3 }, ticks:{ callback: v => v+'%' } },
+      x: { grid:{ display: false } }
+    }
+  }
+});
+
+{# ── Donut tasa de éxito ── #}
+new Chart(document.getElementById('chart-exito'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Superados (≥75%)', 'No superados'],
+    datasets: [{
+      data: [{{ n_superados }}, {{ n_cursos - n_superados }}],
+      backgroundColor: [ACCENT, RED + '55'],
+      borderWidth: 0,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    cutout: '68%',
+    plugins: {
+      legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8 } },
+      tooltip: { callbacks: { label: i => ' ' + i.label + ': ' + i.raw } }
+    }
+  }
+});
+{% endif %}
+
+{# Sparklines: now rendered as inline SVG in the card loop above #}
+
+{% endif %}
+
+// ── Filtros del selector de alumnos ───────────────────────────────────────
+function aplicarFiltros() {
+  const nombre   = (document.getElementById('filtro-nombre')?.value   || '').toLowerCase().trim();
+  const curso    = (document.getElementById('filtro-curso')?.value    || '').toLowerCase().trim();
+  const supera   = (document.getElementById('filtro-supera')?.value   || '').trim();
+  const ncursos  = (document.getElementById('filtro-ncursos')?.value  || '').trim();
+  const badge    = document.getElementById('badge-total');
+  const noRes    = document.getElementById('sin-resultados');
+  const items    = document.querySelectorAll('.alumno-item');
+  let visible    = 0;
+
+  items.forEach(el => {
+    const elNombre  = (el.dataset.nombre || '').toLowerCase();
+    const elCursos  = (el.dataset.cursos || '').toLowerCase();
+    const elSupera  = String(el.dataset.supera  || '0').trim();
+    const elN       = parseInt(el.dataset.ncursos || '0', 10);
+
+    const matchNombre  = !nombre  || elNombre.includes(nombre);
+    const matchCurso   = !curso   || elCursos.split('||').some(c => c.trim().includes(curso));
+    const matchSupera  = supera  === '' || elSupera === supera;
+    let   matchN       = true;
+    if      (ncursos === '1')   matchN = elN === 1;
+    else if (ncursos === '2-3') matchN = elN >= 2 && elN <= 3;
+    else if (ncursos === '4-6') matchN = elN >= 4 && elN <= 6;
+    else if (ncursos === '7+')  matchN = elN >= 7;
+
+    const show = matchNombre && matchCurso && matchSupera && matchN;
+    el.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+
+  if (badge) badge.textContent = visible + ' alumno' + (visible !== 1 ? 's' : '');
+  if (noRes) noRes.style.display = visible === 0 ? 'block' : 'none';
+}
+
+function limpiarFiltrosAlumnos() {
+  const fn = document.getElementById('filtro-nombre');
+  const fc = document.getElementById('filtro-curso');
+  const fs = document.getElementById('filtro-supera');
+  const fn2 = document.getElementById('filtro-ncursos');
+  if (fn)  fn.value  = '';
+  if (fc)  fc.value  = '';
+  if (fs)  fs.value  = '';
+  if (fn2) fn2.value = '';
+  aplicarFiltros();
+}
+</script>
+
+{% endblock %}

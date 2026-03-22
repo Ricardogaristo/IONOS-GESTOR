@@ -1,0 +1,543 @@
+{% extends "base.html" %}
+{% block title %}Expediente — {{ alumno.nombre }}{% endblock %}
+
+{% block content %}
+
+<!-- ── HEADER ─────────────────────────────────────────────────────────────── -->
+<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+  <div>
+    <div style="font-size:.75rem; color:var(--text-muted); margin-bottom:.2rem;">
+      <a href="{{ url_for('formacion.formacion') }}"
+         style="color:var(--text-muted); text-decoration:none;">🎓 Formación</a>
+      <span style="margin:0 .4rem;">›</span>
+      <a href="{{ url_for('historial_alumno.historial_por_id', alumno_id=alumno.id) }}"
+         style="color:var(--text-muted); text-decoration:none;">Historial</a>
+      <span style="margin:0 .4rem;">›</span> Expediente
+    </div>
+    <h4 style="font-weight:700; margin:0;">
+      📋 Expediente — {{ alumno.nombre }}
+    </h4>
+    {% if alumno.curso %}
+    <div style="font-size:.8rem; color:var(--text-muted); margin-top:.2rem;">
+      {{ alumno.curso }}
+      {% if alumno.archivado %}
+        <span style="margin-left:.4rem; font-size:.68rem; background:rgba(148,163,184,.15);
+                     color:var(--text-muted); border-radius:4px; padding:.1rem .4rem;">📦 Archivado</span>
+      {% else %}
+        <span style="margin-left:.4rem; font-size:.68rem; background:rgba(45,157,120,.12);
+                     color:var(--accent); border-radius:4px; padding:.1rem .4rem;">🟢 Activo</span>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('historial_alumno.historial_por_id', alumno_id=alumno.id) }}"
+       class="btn btn-g-ghost">📊 Historial</a>
+    <a href="{{ url_for('formacion.formacion') }}" class="btn btn-g-ghost">← Volver</a>
+  </div>
+</div>
+
+<!-- ── FICHA RÁPIDA ────────────────────────────────────────────────────────── -->
+{% set prog = alumno.progreso | float %}
+{% set col  = 'var(--accent)' if prog >= 75 else ('var(--amber)' if prog >= 50 else 'var(--red)') %}
+
+<div class="row g-3 mb-4">
+
+  <div class="col-12 col-md-4">
+    <div class="gcard" style="border-left:4px solid {{ col }}; height:100%;">
+      <div class="gcard-body">
+        <div style="font-size:.7rem; color:var(--text-muted); text-transform:uppercase;
+                    letter-spacing:.06em; margin-bottom:.5rem;">Progreso actual</div>
+        <div style="display:flex; align-items:center; gap:.75rem; margin-bottom:.6rem;">
+          <div style="flex:1; height:10px; background:var(--bg3); border-radius:99px; overflow:hidden;">
+            <div style="height:100%; width:{{ [prog,100]|min }}%; background:{{ col }};
+                        border-radius:99px; transition:width .4s;"></div>
+          </div>
+          <span style="font-family:var(--mono); font-size:1.1rem; font-weight:800;
+                       color:{{ col }}; min-width:44px; text-align:right;">{{ prog }}%</span>
+        </div>
+        <div style="display:flex; gap:.5rem; flex-wrap:wrap; font-size:.75rem;">
+          {% if alumno.supera_75 == 1 %}
+          <span class="badge-g badge-done">✔ Supera 75%</span>
+          {% else %}
+          <span class="badge-g badge-pending">● Bajo 75%</span>
+          {% endif %}
+          {% if alumno.delta_progreso and alumno.delta_progreso != 0 %}
+          <span style="font-family:var(--mono); font-size:.72rem;
+                       color:{{ 'var(--accent)' if alumno.delta_progreso > 0 else 'var(--red)' }};">
+            {{ '+' if alumno.delta_progreso > 0 else '' }}{{ alumno.delta_progreso }}% último cambio
+          </span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-4">
+    <div class="gcard" style="height:100%;">
+      <div class="gcard-body">
+        <div style="font-size:.7rem; color:var(--text-muted); text-transform:uppercase;
+                    letter-spacing:.06em; margin-bottom:.75rem;">Datos del curso</div>
+        <div style="display:grid; grid-template-columns:auto 1fr; gap:.3rem .75rem; font-size:.8rem;">
+          {% set fi = alumno.fecha_inicio %}
+          {% set ff = alumno.fecha_fin %}
+          <span style="color:var(--text-muted);">Inicio</span>
+          <span style="font-family:var(--mono);">
+            {{ fi[8:10]+'/'+fi[5:7]+'/'+fi[0:4] if fi and fi|length>=10 else '—' }}
+          </span>
+          <span style="color:var(--text-muted);">Fin</span>
+          <span style="font-family:var(--mono);">
+            {{ ff[8:10]+'/'+ff[5:7]+'/'+ff[0:4] if ff and ff|length>=10 else '—' }}
+          </span>
+          <span style="color:var(--text-muted);">Exámenes</span>
+          <span style="font-family:var(--mono);">{{ alumno.examenes or '—' }}</span>
+          <span style="color:var(--text-muted);">Importaciones</span>
+          <span style="font-family:var(--mono);">{{ historial | length }}</span>
+          <span style="color:var(--text-muted);">Estado</span>
+          <span>
+            {% if alumno.archivado %}
+            <span style="font-size:.72rem; background:rgba(148,163,184,.15);
+                         color:var(--text-muted); border-radius:4px;
+                         padding:.15rem .5rem; white-space:nowrap;">📦 Archivado</span>
+            {% else %}
+            <span style="font-size:.72rem; background:rgba(45,157,120,.12);
+                         color:var(--accent); border-radius:4px;
+                         padding:.15rem .5rem; white-space:nowrap;">🟢 En ejecución</span>
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-4">
+    <div class="gcard" style="height:100%;">
+      <div class="gcard-body">
+        <div style="font-size:.7rem; color:var(--text-muted); text-transform:uppercase;
+                    letter-spacing:.06em; margin-bottom:.75rem;">Contacto</div>
+        <div style="display:grid; grid-template-columns:auto 1fr; gap:.3rem .75rem; font-size:.8rem;">
+          <span style="color:var(--text-muted);">Teléfono</span>
+          <span style="font-family:var(--mono);">
+            {% if alumno.telefono %}
+              <a href="https://wa.me/{{ alumno.telefono | replace('+','') | replace(' ','') }}"
+                 target="_blank" style="color:var(--accent); text-decoration:none;">
+                {{ alumno.telefono }} 💬
+              </a>
+            {% else %}—{% endif %}
+          </span>
+          <span style="color:var(--text-muted);">Gestión</span>
+          <span>
+            {% if alumno.gestionado == 1 %}
+              <span class="badge-g badge-done" style="font-size:.65rem;">✔ Gestionado</span>
+            {% else %}
+              <span class="badge-g badge-pending" style="font-size:.65rem;">● Pendiente</span>
+            {% endif %}
+          </span>
+          {% if alumno.tipo_gestion %}
+          <span style="color:var(--text-muted);">Tipo</span>
+          <span style="font-size:.78rem;">{{ alumno.tipo_gestion }}</span>
+          {% endif %}
+          {% if alumno.comentario %}
+          <span style="color:var(--text-muted);">Nota</span>
+          <span style="font-size:.76rem; color:var(--text-muted);">{{ alumno.comentario }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── CUERPO: dos columnas ────────────────────────────────────────────────── -->
+<div class="row g-4">
+
+  <!-- ── COL IZQUIERDA: eventos + historial importaciones ────────────────── -->
+  <div class="col-12 col-lg-7">
+
+    <!-- Nuevo evento -->
+    <div class="gcard mb-4">
+      <div class="gcard-header">
+        <span>✏️</span>
+        <span class="gcard-title">Registrar evento</span>
+      </div>
+      <div class="gcard-body">
+        <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.6rem;">
+          {% for tipo, emoji in [('nota','📝'),('llamada','📞'),('whatsapp','💬'),('email','📧'),('reunion','🤝'),('incidencia','⚠️')] %}
+          <button type="button"
+                  onclick="selTipo('{{ tipo }}')"
+                  id="btn-tipo-{{ tipo }}"
+                  class="btn btn-g-ghost btn-sm"
+                  style="font-size:.75rem; padding:.3rem .65rem;">
+            {{ emoji }} {{ tipo | capitalize }}
+          </button>
+          {% endfor %}
+        </div>
+        <input type="hidden" id="tipo-evento" value="nota">
+        <textarea id="texto-evento" class="form-control" rows="3"
+                  placeholder="Escribe el evento, llamada, observación…"
+                  style="font-size:.84rem; resize:vertical; margin-bottom:.5rem;"></textarea>
+        <button type="button" onclick="guardarEvento()" class="btn btn-g-primary btn-sm">
+          💾 Guardar evento
+        </button>
+      </div>
+    </div>
+
+    <!-- Cronología de eventos -->
+    <div class="gcard mb-4">
+      <div class="gcard-header">
+        <span>🕐</span>
+        <span class="gcard-title">Cronología</span>
+        <span id="badge-eventos" class="badge-g badge-pending ms-auto" style="font-size:.65rem;">
+          {{ eventos | length }} evento{{ 's' if eventos | length != 1 else '' }}
+        </span>
+      </div>
+      <div class="gcard-body" id="lista-eventos" style="display:flex; flex-direction:column; gap:.6rem; min-height:60px;">
+        {% if not eventos %}
+        <div id="eventos-empty" style="text-align:center; padding:1.5rem; color:var(--text-muted); font-size:.84rem;">
+          Sin eventos registrados aún.
+        </div>
+        {% endif %}
+        {% for ev in eventos %}
+        <div data-ev-id="{{ ev.id }}"
+             style="display:flex; gap:.6rem; align-items:flex-start;
+                    background:var(--bg2); border-radius:8px; padding:.6rem .75rem;
+                    border:1px solid var(--border);">
+          <div style="flex-shrink:0; font-size:.85rem; margin-top:.05rem;">
+            {{ {'nota':'📝','llamada':'📞','whatsapp':'💬','email':'📧','reunion':'🤝','incidencia':'⚠️'}.get(ev.tipo, '📝') }}
+          </div>
+          <div style="flex:1; min-width:0;">
+            <div style="display:flex; gap:.4rem; align-items:center; margin-bottom:.2rem;">
+              <span style="font-size:.7rem; font-weight:700; text-transform:uppercase;
+                           letter-spacing:.05em; color:var(--text-muted);">{{ ev.tipo }}</span>
+              <span style="font-size:.68rem; color:var(--text-muted); font-family:var(--mono);">
+                {{ ev.created_at | string | truncate(16, true, '') if ev.created_at else '' }}
+              </span>
+            </div>
+            <div style="font-size:.82rem; line-height:1.5; white-space:pre-wrap; word-break:break-word;">{{ ev.texto }}</div>
+          </div>
+          <button onclick="borrarEvento({{ ev.id }}, this)"
+                  style="background:none; border:none; color:var(--text-muted); cursor:pointer;
+                         font-size:.8rem; padding:.1rem .3rem; border-radius:4px; flex-shrink:0; line-height:1;"
+                  onmouseover="this.style.color='var(--red)'"
+                  onmouseout="this.style.color='var(--text-muted)'"
+                  title="Eliminar evento">✕</button>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Historial de importaciones -->
+    <div class="gcard">
+      <div class="gcard-header">
+        <span>📥</span>
+        <span class="gcard-title">Historial de importaciones</span>
+        <span class="badge-g badge-pending ms-auto" style="font-size:.65rem;">
+          {{ historial | length }} registro{{ 's' if historial | length != 1 else '' }}
+        </span>
+      </div>
+      <div class="gcard-body pb-0">
+        {% if historial %}
+        <div class="table-responsive">
+          <table class="gtable">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th style="text-align:center;">Progreso</th>
+                <th style="text-align:center;">Exámenes</th>
+                <th style="text-align:center;">Δ</th>
+                <th style="text-align:center;">Tendencia</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for h in historial %}
+              {% set hprog = h.progreso | float %}
+              {% set hcol  = 'var(--accent)' if hprog >= 75 else ('var(--amber)' if hprog >= 50 else 'var(--red)') %}
+              <tr>
+                <td style="font-family:var(--mono); font-size:.78rem; color:var(--text-muted);">
+                  {{ h.fecha_import }}
+                </td>
+                <td style="text-align:center;">
+                  <span style="font-family:var(--mono); font-size:.82rem; font-weight:700; color:{{ hcol }};">
+                    {{ hprog }}%
+                  </span>
+                </td>
+                <td style="text-align:center; font-family:var(--mono); font-size:.78rem;">
+                  {{ h.examenes or '—' }}
+                </td>
+                <td style="text-align:center; font-family:var(--mono); font-size:.78rem;
+                           color:{{ 'var(--accent)' if h.delta_progreso > 0 else ('var(--red)' if h.delta_progreso < 0 else 'var(--text-muted)') }};">
+                  {% if h.delta_progreso and h.delta_progreso != 0 %}
+                    {{ '+' if h.delta_progreso > 0 else '' }}{{ h.delta_progreso }}%
+                  {% else %}={% endif %}
+                </td>
+                <td style="text-align:center; font-size:.9rem;">
+                  {% if h.avanzo == 1 %}▲{% elif h.avanzo == -1 %}▼{% else %}═{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div style="text-align:center; padding:2rem; color:var(--text-muted); font-size:.84rem;">
+          Sin importaciones registradas.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── COL DERECHA: gráfico evolución + observaciones ──────────────────── -->
+  <div class="col-12 col-lg-5">
+
+    <!-- Gráfico de evolución -->
+    <div class="gcard mb-4">
+      <div class="gcard-header">
+        <span>📈</span>
+        <span class="gcard-title">Evolución del progreso</span>
+      </div>
+      <div class="gcard-body" style="position:relative; height:220px;">
+        {% if historial | length > 1 %}
+        <canvas id="chart-evolucion"></canvas>
+        {% elif historial | length == 1 %}
+        <div style="display:flex; align-items:center; justify-content:center; height:100%;
+                    flex-direction:column; gap:.5rem; color:var(--text-muted); font-size:.84rem;">
+          <div style="font-size:1.5rem;">📊</div>
+          Solo hay 1 importación. El gráfico aparecerá con la siguiente.
+        </div>
+        {% else %}
+        <div style="display:flex; align-items:center; justify-content:center; height:100%;
+                    color:var(--text-muted); font-size:.84rem;">
+          Sin datos de historial aún.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Observaciones del tutor -->
+    <div class="gcard">
+      <div class="gcard-header">
+        <span>💬</span>
+        <span class="gcard-title">Observaciones</span>
+        <span id="obs-count" class="badge-g badge-pending ms-auto" style="font-size:.65rem;">
+          {% if observaciones %}{{ observaciones | length }} nota{{ 's' if observaciones | length != 1 else '' }}{% endif %}
+        </span>
+      </div>
+      <div class="gcard-body">
+
+        <!-- Input nueva observación -->
+        <div style="display:flex; gap:.4rem; margin-bottom:.75rem;">
+          <textarea id="obs-input" class="form-control" rows="2"
+                    placeholder="Añadir observación…"
+                    style="font-size:.82rem; resize:none;"></textarea>
+          <button type="button" onclick="guardarObservacion()"
+                  class="btn btn-g-primary btn-sm"
+                  style="white-space:nowrap; align-self:flex-end;">💾</button>
+        </div>
+
+        <!-- Lista de observaciones -->
+        <div id="obs-lista" style="display:flex; flex-direction:column; gap:.5rem;">
+          {% if not observaciones %}
+          <div id="obs-empty" style="text-align:center; padding:1rem;
+                color:var(--text-muted); font-size:.8rem;">
+            Sin observaciones aún.
+          </div>
+          {% endif %}
+          {% for o in observaciones %}
+          <div data-obs-id="{{ o.id }}"
+               style="background:var(--bg2); border-radius:7px; padding:.55rem .7rem;
+                      border:1px solid var(--border); display:flex; gap:.5rem; align-items:flex-start;">
+            <div style="flex:1;">
+              <div style="font-size:.82rem; line-height:1.45; white-space:pre-wrap;
+                          word-break:break-word;">{{ o.texto }}</div>
+              <div style="font-size:.68rem; color:var(--text-muted); margin-top:.25rem;
+                          font-family:var(--mono);">
+                {{ o.created_at | string | truncate(16, true, '') if o.created_at else '' }}
+              </div>
+            </div>
+            <button onclick="borrarObservacion({{ o.id }}, this)"
+                    style="background:none; border:none; color:var(--text-muted); cursor:pointer;
+                           font-size:.85rem; padding:.1rem .3rem; border-radius:4px;
+                           flex-shrink:0; line-height:1;"
+                    onmouseover="this.style.color='var(--red)'"
+                    onmouseout="this.style.color='var(--text-muted)'">✕</button>
+          </div>
+          {% endfor %}
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── JS ─────────────────────────────────────────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const ALUMNO_ID = {{ alumno.id }};
+const CSS   = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const ACCENT = CSS('--accent') || '#2D9D78';
+const AMBER  = CSS('--amber')  || '#D4A017';
+const RED    = CSS('--red')    || '#C0392B';
+const MUTED  = CSS('--text-muted') || '#94A3B8';
+const BG3    = CSS('--bg3')    || '#1E293B';
+
+// ── Gráfico evolución ──────────────────────────────────────────────────────
+{% if historial | length > 1 %}
+{% set ph = historial | list | reverse | list %}
+new Chart(document.getElementById('chart-evolucion'), {
+  type: 'line',
+  data: {
+    labels: {{ ph | map(attribute='fecha_import') | list | tojson }},
+    datasets: [{
+      label: 'Progreso %',
+      data:  {{ ph | map(attribute='progreso')    | list | tojson }},
+      borderColor:          ACCENT,
+      backgroundColor:      ACCENT + '22',
+      pointBackgroundColor: ACCENT,
+      pointRadius: 4,
+      fill: true,
+      tension: .35,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { min:0, max:100, grid:{ color: BG3 }, ticks:{ callback: v => v+'%' } },
+      x: { grid:{ display: false } }
+    }
+  }
+});
+{% endif %}
+
+// ── Selector de tipo de evento ─────────────────────────────────────────────
+function selTipo(tipo) {
+  document.getElementById('tipo-evento').value = tipo;
+  document.querySelectorAll('[id^="btn-tipo-"]').forEach(b => {
+    b.style.borderColor = '';
+    b.style.color = '';
+  });
+  const btn = document.getElementById('btn-tipo-' + tipo);
+  if (btn) {
+    btn.style.borderColor = 'var(--accent)';
+    btn.style.color = 'var(--accent)';
+  }
+}
+// Seleccionar "nota" por defecto al cargar
+selTipo('nota');
+
+// ── Guardar evento ─────────────────────────────────────────────────────────
+async function guardarEvento() {
+  const tipo  = document.getElementById('tipo-evento').value;
+  const texto = document.getElementById('texto-evento').value.trim();
+  if (!texto) return;
+
+  const resp = await fetch('/formacion/alumno/' + ALUMNO_ID + '/expediente/evento', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tipo, texto })
+  });
+  const data = await resp.json();
+  if (!data.ok) return;
+
+  document.getElementById('texto-evento').value = '';
+
+  const ev = data.evento;
+  const emojis = {nota:'📝',llamada:'📞',whatsapp:'💬',email:'📧',reunion:'🤝',incidencia:'⚠️'};
+
+  const div = document.createElement('div');
+  div.dataset.evId = ev.id;
+  div.style.cssText = 'display:flex;gap:.6rem;align-items:flex-start;background:var(--bg2);border-radius:8px;padding:.6rem .75rem;border:1px solid var(--border);';
+  div.innerHTML = `
+    <div style="flex-shrink:0;font-size:.85rem;margin-top:.05rem;">${emojis[ev.tipo] || '📝'}</div>
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;gap:.4rem;align-items:center;margin-bottom:.2rem;">
+        <span style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);">${ev.tipo}</span>
+        <span style="font-size:.68rem;color:var(--text-muted);font-family:var(--mono);">${(ev.created_at||'').toString().substring(0,16)}</span>
+      </div>
+      <div style="font-size:.82rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;">${_esc(ev.texto)}</div>
+    </div>
+    <button onclick="borrarEvento(${ev.id},this)"
+            style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.8rem;padding:.1rem .3rem;border-radius:4px;flex-shrink:0;line-height:1;"
+            onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
+  `;
+
+  const lista = document.getElementById('lista-eventos');
+  const empty = document.getElementById('eventos-empty');
+  if (empty) empty.remove();
+  lista.insertBefore(div, lista.firstChild);
+
+  const n = lista.querySelectorAll('[data-ev-id]').length;
+  document.getElementById('badge-eventos').textContent = n + ' evento' + (n===1?'':'s');
+}
+
+// ── Borrar evento ──────────────────────────────────────────────────────────
+async function borrarEvento(ev_id, btn) {
+  if (!confirm('¿Eliminar este evento?')) return;
+  await fetch('/formacion/alumno/' + ALUMNO_ID + '/expediente/evento/' + ev_id + '/eliminar', { method: 'POST' });
+  const fila = btn.closest('[data-ev-id]');
+  if (fila) fila.remove();
+  const lista = document.getElementById('lista-eventos');
+  const n = lista.querySelectorAll('[data-ev-id]').length;
+  document.getElementById('badge-eventos').textContent = n + ' evento' + (n===1?'':'s');
+  if (!n) lista.innerHTML = '<div id="eventos-empty" style="text-align:center;padding:1.5rem;color:var(--text-muted);font-size:.84rem;">Sin eventos registrados aún.</div>';
+}
+
+// ── Guardar observación ────────────────────────────────────────────────────
+async function guardarObservacion() {
+  const ta    = document.getElementById('obs-input');
+  const texto = ta.value.trim();
+  if (!texto) return;
+
+  const resp = await fetch('/formacion/alumno/observaciones/' + ALUMNO_ID, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texto })
+  });
+  const obs = await resp.json();
+  if (obs.error) return;
+  ta.value = '';
+
+  const div = document.createElement('div');
+  div.dataset.obsId = obs.id;
+  div.style.cssText = 'background:var(--bg2);border-radius:7px;padding:.55rem .7rem;border:1px solid var(--border);display:flex;gap:.5rem;align-items:flex-start;';
+  div.innerHTML = `
+    <div style="flex:1;">
+      <div style="font-size:.82rem;line-height:1.45;white-space:pre-wrap;word-break:break-word;">${_esc(obs.texto)}</div>
+      <div style="font-size:.68rem;color:var(--text-muted);margin-top:.25rem;font-family:var(--mono);">${obs.fecha||''}</div>
+    </div>
+    <button onclick="borrarObservacion(${obs.id},this)"
+            style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.85rem;padding:.1rem .3rem;border-radius:4px;flex-shrink:0;line-height:1;"
+            onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
+  `;
+
+  const lista = document.getElementById('obs-lista');
+  const empty = document.getElementById('obs-empty');
+  if (empty) empty.remove();
+  lista.insertBefore(div, lista.firstChild);
+
+  const n = lista.querySelectorAll('[data-obs-id]').length;
+  document.getElementById('obs-count').textContent = n + ' nota' + (n===1?'':'s');
+}
+
+// ── Borrar observación ─────────────────────────────────────────────────────
+async function borrarObservacion(obs_id, btn) {
+  if (!confirm('¿Eliminar esta observación?')) return;
+  await fetch('/formacion/alumno/observaciones/borrar/' + obs_id, { method: 'POST' });
+  const fila = btn.closest('[data-obs-id]');
+  if (fila) fila.remove();
+  const lista = document.getElementById('obs-lista');
+  const n = lista.querySelectorAll('[data-obs-id]').length;
+  document.getElementById('obs-count').textContent = n ? n+' nota'+(n===1?'':'s') : '';
+  if (!n) lista.innerHTML = '<div id="obs-empty" style="text-align:center;padding:1rem;color:var(--text-muted);font-size:.8rem;">Sin observaciones aún.</div>';
+}
+
+// ── Utilidad: escapar HTML ─────────────────────────────────────────────────
+function _esc(t) {
+  return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+
+{% endblock %}
