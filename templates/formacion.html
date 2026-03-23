@@ -1652,8 +1652,8 @@ function abrirModalCurso(el) {
   const progreso = parseFloat(el.dataset.progreso) || 0;
 
   document.getElementById('mc-nombre').textContent  = curso;
-  document.getElementById('mc-finicio').textContent = finicio || '—';
-  document.getElementById('mc-ffin').textContent    = ffin    || '—';
+  document.getElementById('mc-finicio').textContent = fmtFechaCorta(finicio) || '—';
+  document.getElementById('mc-ffin').textContent    = fmtFechaCorta(ffin)    || '—';
 
   let diasTotal = '—', diasTrans = '—', pctTiempo = null;
   const hoy = new Date(); hoy.setHours(0,0,0,0);
