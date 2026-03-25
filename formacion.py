@@ -1921,7 +1921,7 @@ def exportar_curso_excel():
     ws.title = titulo_curso[:28] if len(titulo_curso) > 28 else titulo_curso
 
     # ── Título ──
-    ws.merge_cells("A1:I1")
+    ws.merge_cells("A1:M1")
     c = ws["A1"]
     c.value     = f"{titulo_curso}  ·  {_dt.now().strftime('%d/%m/%Y')}  ·  {len(alumnos)} alumnos"
     c.font      = Font(bold=True, size=13, color=C_DARK, name="Arial")
@@ -1959,8 +1959,8 @@ def exportar_curso_excel():
     ws.row_dimensions[5].height = 5
 
     # ── Cabeceras ──
-    COLS = ["#", "Nombre", "Progreso (%)", "Ex. Realizados", "Ex. Superados", "Ex. Totales", "Fecha Inicio", "Fecha Fin", "Supera 75%", "Teléfono", "Estado", "Observaciones"]
-    ws.row_dimensions[6].height = 30
+    COLS = ["#", "Nombre", "Progreso (%)", "Ex. Realizados", "Ex. Superados", "Ex. Totales", "Fecha Inicio", "Fecha Fin", "Supera 75%", "Teléfono", "Progreso General", "% Exámenes realizados", "Observaciones"]
+    ws.row_dimensions[6].height = 40
     for c_i, h in enumerate(COLS, 1):
         hdr(ws.cell(6, c_i), h, bg="4A6FA5" if h == "Observaciones" else None)
 
@@ -2002,8 +2002,26 @@ def exportar_curso_excel():
         estado = "✅ Supera 75%" if a.get("supera_75") else "⚠ Bajo 75%"
         dc(11, estado, center=True, bold=True,
            color=C_GREEN if a.get("supera_75") else C_AMBER)
+        # % Exámenes realizados
+        _ep_pct = _parse_examenes(a.get("examenes"))
+        if _ep_pct[2] > 0:
+            pct_ex = round(_ep_pct[0] / _ep_pct[2] * 100, 1)
+            pct_ex_color = C_GREEN if pct_ex >= 75 else (C_AMBER if pct_ex >= 34 else C_RED_TXT)
+            pct_ex_val = pct_ex
+            pct_ex_fmt = '0.0"%"'
+        else:
+            pct_ex_val = "—"
+            pct_ex_color = "64748B"
+            pct_ex_fmt = None
+        dc(12, pct_ex_val, fmt=pct_ex_fmt, center=True, bold=True, color=pct_ex_color)
+        pct_ex_cell = ws.cell(r_i, 12)
+        pct_ex_cell.fill = PatternFill("solid", fgColor=(
+            "D4EDDA" if (isinstance(pct_ex_val, float) and pct_ex_val >= 75) else
+            "FFF3CD" if (isinstance(pct_ex_val, float) and pct_ex_val >= 34) else
+            "F8D7DA" if isinstance(pct_ex_val, float) else bg_row
+        ))
         # Observaciones
-        obs_cell = ws.cell(r_i, 12, obs_texto or "—")
+        obs_cell = ws.cell(r_i, 13, obs_texto or "—")
         obs_cell.fill      = rf
         obs_cell.font      = Font(name="Arial", size=8, italic=bool(obs_texto), color="334155")
         obs_cell.border    = thin()
@@ -2012,7 +2030,7 @@ def exportar_curso_excel():
     last = 6 + len(alumnos)
     ws.auto_filter.ref = f"A6:{get_column_letter(len(COLS))}{last}"
     ws.freeze_panes    = "A7"
-    for i, w in enumerate([4, 28, 14, 10, 10, 10, 14, 14, 12, 18, 16, 40], 1):
+    for i, w in enumerate([4, 28, 14, 10, 10, 10, 14, 14, 12, 18, 16, 12, 40], 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
     # ── Leyenda ──
@@ -2091,7 +2109,7 @@ def exportar_excel():
     ws.title = "Alumnos"
 
     # Título
-    ws.merge_cells("A1:N1")
+    ws.merge_cells("A1:O1")
     c = ws["A1"]
     c.value     = f"Informe de Formación — {_dt.now().strftime('%d/%m/%Y %H:%M')}  ·  {len(alumnos)} alumnos"
     c.font      = Font(bold=True, size=13, color=C_DARK, name="Arial")
@@ -2102,7 +2120,7 @@ def exportar_excel():
 
     # Cabeceras
     COLS = ["#","Curso","Nombre","Progreso (%)","Ex. Realizados","Ex. Superados","Ex. Totales","Fecha Inicio",
-            "Fecha Fin","Supera 75%","Teléfono","Estado","Importado","Observaciones"]
+            "Fecha Fin","Supera 75%","Teléfono","Progreso General","% Exámenes","Importado","Observaciones"]
     ws.row_dimensions[3].height = 30
     for c_i, h in enumerate(COLS, 1):
         hdr(ws.cell(3, c_i), h, bg="4A6FA5" if h == "Observaciones" else None)
@@ -2140,9 +2158,27 @@ def exportar_excel():
         dc(12, "✅ Supera 75%" if a.get("supera_75") else "⚠ Bajo 75%",
            center=True, bold=True,
            color=C_GREEN if a.get("supera_75") else C_AMBER)
-        dc(13, (a.get("created_at","") or "")[:10], center=True, color="64748B")
+        # % Exámenes realizados
+        _ep2_pct = _parse_examenes(a.get("examenes"))
+        if _ep2_pct[2] > 0:
+            pct_ex2 = round(_ep2_pct[0] / _ep2_pct[2] * 100, 1)
+            pct_ex2_color = C_GREEN if pct_ex2 >= 75 else (C_AMBER if pct_ex2 >= 34 else C_RED)
+            pct_ex2_val = pct_ex2
+            pct_ex2_fmt = '0.0"%"'
+        else:
+            pct_ex2_val = "—"
+            pct_ex2_color = "64748B"
+            pct_ex2_fmt = None
+        dc(13, pct_ex2_val, fmt=pct_ex2_fmt, center=True, bold=True, color=pct_ex2_color)
+        pct_ex2_cell = ws.cell(r, 13)
+        pct_ex2_cell.fill = PatternFill("solid", fgColor=(
+            "D4EDDA" if (isinstance(pct_ex2_val, float) and pct_ex2_val >= 75) else
+            "FFF3CD" if (isinstance(pct_ex2_val, float) and pct_ex2_val >= 34) else
+            "F8D7DA" if isinstance(pct_ex2_val, float) else (C_ALT if r % 2 == 0 else C_WHITE)
+        ))
+        dc(14, (a.get("created_at","") or "")[:10], center=True, color="64748B")
         # Observaciones
-        obs_cell2 = ws.cell(r, 14, obs_texto2 or "—")
+        obs_cell2 = ws.cell(r, 15, obs_texto2 or "—")
         obs_cell2.fill      = rf
         obs_cell2.font      = Font(name="Arial", size=8, italic=bool(obs_texto2), color="334155")
         obs_cell2.border    = thin()
@@ -2156,7 +2192,7 @@ def exportar_excel():
         )
     ws.auto_filter.ref = f"A3:{get_column_letter(len(COLS))}{last_data}"
     ws.freeze_panes    = "A4"
-    for i, w in enumerate([5,32,22,14,10,10,10,14,14,12,18,16,18,40], 1):
+    for i, w in enumerate([5,32,22,14,10,10,10,14,14,12,18,16,12,18,40], 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
     # ════════════════════════════════════════
@@ -2418,21 +2454,47 @@ def expediente_agregar_evento(alumno_id):
         conn.close()
         return jsonify({"ok": False, "error": "Alumno no encontrado."}), 404
 
+    _emojis_tipo = {
+        "nota": "📝", "llamada": "📞", "whatsapp": "💬",
+        "email": "📧", "reunion": "🤝", "incidencia": "⚠️"
+    }
+
+    # Guardar en cronología
     conn.execute("""
         INSERT INTO expediente_eventos (alumno_id, tutor_id, tipo, texto)
         VALUES (%s, %s, %s, %s)
     """, (alumno_id, tutor_id, tipo, texto))
+
+    # Guardar también en observaciones
+    texto_obs = f"{_emojis_tipo.get(tipo, '📝')} [{tipo.capitalize()}] {texto}"
+    conn.execute(
+        "INSERT INTO observaciones_alumno (alumno_id, tutor_id, texto) VALUES (%s, %s, %s)",
+        (alumno_id, tutor_id, texto_obs)
+    )
+
     conn.commit()
 
-    nuevo = conn.execute("""
-        SELECT id, tipo, texto, created_at
+    nuevo_ev = conn.execute("""
+        SELECT id, tipo, texto, DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') AS fecha_fmt, created_at
         FROM expediente_eventos
         WHERE alumno_id=%s AND tutor_id=%s
         ORDER BY id DESC LIMIT 1
     """, (alumno_id, tutor_id)).fetchone()
+
+    nueva_obs = conn.execute("""
+        SELECT id, texto, DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') AS fecha
+        FROM observaciones_alumno
+        WHERE alumno_id=%s AND tutor_id=%s
+        ORDER BY id DESC LIMIT 1
+    """, (alumno_id, tutor_id)).fetchone()
+
     conn.close()
 
-    return jsonify({"ok": True, "evento": dict(nuevo)})
+    ev_dict = dict(nuevo_ev)
+    if ev_dict.get("created_at"):
+        ev_dict["created_at"] = str(ev_dict["created_at"])[:16]
+
+    return jsonify({"ok": True, "evento": ev_dict, "obs": dict(nueva_obs)})
 
 
 @formacion_bp.route("/formacion/alumno/<int:alumno_id>/expediente/evento/<int:evento_id>/eliminar", methods=["POST"])
@@ -2476,19 +2538,34 @@ def observaciones_alumno_post(alumno_id):
     if not texto:
         return jsonify({"error": "Texto vacío"}), 400
     conn = get_form_conn()
+    # Guardar en observaciones
     conn.execute(
         "INSERT INTO observaciones_alumno (alumno_id, tutor_id, texto) VALUES (%s, %s, %s)",
         (alumno_id, tutor_id, texto)
     )
+    # Guardar también en cronología como evento tipo nota
+    conn.execute("""
+        INSERT INTO expediente_eventos (alumno_id, tutor_id, tipo, texto)
+        VALUES (%s, %s, "nota", %s)
+    """, (alumno_id, tutor_id, texto))
     conn.commit()
-    nuevo = conn.execute("""
+    nueva_obs = conn.execute("""
         SELECT id, texto, DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') AS fecha
         FROM observaciones_alumno
         WHERE alumno_id=%s AND tutor_id=%s
         ORDER BY id DESC LIMIT 1
     """, (alumno_id, tutor_id)).fetchone()
+    nuevo_ev = conn.execute("""
+        SELECT id, tipo, texto, DATE_FORMAT(created_at, '%d/%m/%Y %H:%i') AS fecha_fmt, created_at
+        FROM expediente_eventos
+        WHERE alumno_id=%s AND tutor_id=%s
+        ORDER BY id DESC LIMIT 1
+    """, (alumno_id, tutor_id)).fetchone()
     conn.close()
-    return jsonify(dict(nuevo))
+    ev_dict = dict(nuevo_ev)
+    if ev_dict.get("created_at"):
+        ev_dict["created_at"] = str(ev_dict["created_at"])[:16]
+    return jsonify({"obs": dict(nueva_obs), "evento": ev_dict})
 
 
 @formacion_bp.route("/formacion/alumno/observaciones/borrar/<int:obs_id>", methods=["POST"])

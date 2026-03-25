@@ -965,8 +965,8 @@ function abrirModalAlumno(a) {
     exBox.style.border     = '1.5px solid transparent';
     exWarn.style.display   = 'none';
   }
-  document.getElementById('ma-inicio').textContent   = a.inicio || '—';
-  document.getElementById('ma-fin').textContent      = a.fin    || '—';
+  document.getElementById('ma-inicio').textContent   = a.inicio ? fmtFechaCorta(a.inicio) : '—';
+  document.getElementById('ma-fin').textContent      = a.fin    ? fmtFechaCorta(a.fin)    : '—';
 
   const estadoEl = document.getElementById('ma-estado');
   if (a.supera) {

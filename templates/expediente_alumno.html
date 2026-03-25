@@ -176,7 +176,7 @@
         <textarea id="texto-evento" class="form-control" rows="3"
                   placeholder="Escribe el evento, llamada, observación…"
                   style="font-size:.84rem; resize:vertical; margin-bottom:.5rem;"></textarea>
-        <button type="button" onclick="guardarEvento()" class="btn btn-g-primary btn-sm">
+        <button type="button" onclick="guardarEvento();" class="btn btn-g-primary btn-sm">
           💾 Guardar evento
         </button>
       </div>
@@ -254,7 +254,8 @@
               {% set hcol  = 'var(--accent)' if hprog >= 75 else ('var(--amber)' if hprog >= 50 else 'var(--red)') %}
               <tr>
                 <td style="font-family:var(--mono); font-size:.78rem; color:var(--text-muted);">
-                  {{ h.fecha_import }}
+                  {% set fi = h.fecha_import | string %}
+                  {{ fi[8:10]+"/"+fi[5:7]+"/"+fi[0:4] if fi and fi|length>=10 else fi }}
                 </td>
                 <td style="text-align:center;">
                   <span style="font-family:var(--mono); font-size:.82rem; font-weight:700; color:{{ hcol }};">
@@ -428,7 +429,65 @@ function selTipo(tipo) {
 // Seleccionar "nota" por defecto al cargar
 selTipo('nota');
 
-// ── Guardar evento ─────────────────────────────────────────────────────────
+// ── Helpers DOM ────────────────────────────────────────────────────────────
+const EMOJIS_TIPO = {nota:'📝',llamada:'📞',whatsapp:'💬',email:'📧',reunion:'🤝',incidencia:'⚠️'};
+
+function _crearDivEvento(ev) {
+  const div = document.createElement('div');
+  div.dataset.evId = ev.id;
+  div.style.cssText = 'display:flex;gap:.6rem;align-items:flex-start;background:var(--bg2);border-radius:8px;padding:.6rem .75rem;border:1px solid var(--border);';
+  const fecha = ev.fecha_fmt || (ev.created_at||'').toString().substring(0,16);
+  div.innerHTML = `
+    <div style="flex-shrink:0;font-size:.85rem;margin-top:.05rem;">${EMOJIS_TIPO[ev.tipo] || '📝'}</div>
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;gap:.4rem;align-items:center;margin-bottom:.2rem;">
+        <span style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);">${ev.tipo}</span>
+        <span style="font-size:.68rem;color:var(--text-muted);font-family:var(--mono);">${fecha}</span>
+      </div>
+      <div style="font-size:.82rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;">${_esc(ev.texto)}</div>
+    </div>
+    <button onclick="borrarEvento(${ev.id},this)"
+            style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.8rem;padding:.1rem .3rem;border-radius:4px;flex-shrink:0;line-height:1;"
+            onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
+  `;
+  return div;
+}
+
+function _crearDivObs(obs) {
+  const div = document.createElement('div');
+  div.dataset.obsId = obs.id;
+  div.style.cssText = 'background:var(--bg2);border-radius:7px;padding:.55rem .7rem;border:1px solid var(--border);display:flex;gap:.5rem;align-items:flex-start;';
+  div.innerHTML = `
+    <div style="flex:1;">
+      <div style="font-size:.82rem;line-height:1.45;white-space:pre-wrap;word-break:break-word;">${_esc(obs.texto)}</div>
+      <div style="font-size:.68rem;color:var(--text-muted);margin-top:.25rem;font-family:var(--mono);">${obs.fecha||''}</div>
+    </div>
+    <button onclick="borrarObservacion(${obs.id},this)"
+            style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.85rem;padding:.1rem .3rem;border-radius:4px;flex-shrink:0;line-height:1;"
+            onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
+  `;
+  return div;
+}
+
+function _insertarEvento(ev) {
+  const lista = document.getElementById('lista-eventos');
+  const empty = document.getElementById('eventos-empty');
+  if (empty) empty.remove();
+  lista.insertBefore(_crearDivEvento(ev), lista.firstChild);
+  const n = lista.querySelectorAll('[data-ev-id]').length;
+  document.getElementById('badge-eventos').textContent = n + ' evento' + (n===1?'':'s');
+}
+
+function _insertarObs(obs) {
+  const lista = document.getElementById('obs-lista');
+  const empty = document.getElementById('obs-empty');
+  if (empty) empty.remove();
+  lista.insertBefore(_crearDivObs(obs), lista.firstChild);
+  const n = lista.querySelectorAll('[data-obs-id]').length;
+  document.getElementById('obs-count').textContent = n + ' nota' + (n===1?'':'s');
+}
+
+// ── Guardar evento → aparece en cronología Y en observaciones ──────────────
 async function guardarEvento() {
   const tipo  = document.getElementById('tipo-evento').value;
   const texto = document.getElementById('texto-evento').value.trim();
@@ -444,33 +503,10 @@ async function guardarEvento() {
 
   document.getElementById('texto-evento').value = '';
 
-  const ev = data.evento;
-  const emojis = {nota:'📝',llamada:'📞',whatsapp:'💬',email:'📧',reunion:'🤝',incidencia:'⚠️'};
-
-  const div = document.createElement('div');
-  div.dataset.evId = ev.id;
-  div.style.cssText = 'display:flex;gap:.6rem;align-items:flex-start;background:var(--bg2);border-radius:8px;padding:.6rem .75rem;border:1px solid var(--border);';
-  div.innerHTML = `
-    <div style="flex-shrink:0;font-size:.85rem;margin-top:.05rem;">${emojis[ev.tipo] || '📝'}</div>
-    <div style="flex:1;min-width:0;">
-      <div style="display:flex;gap:.4rem;align-items:center;margin-bottom:.2rem;">
-        <span style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);">${ev.tipo}</span>
-        <span style="font-size:.68rem;color:var(--text-muted);font-family:var(--mono);">${(ev.created_at||'').toString().substring(0,16)}</span>
-      </div>
-      <div style="font-size:.82rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;">${_esc(ev.texto)}</div>
-    </div>
-    <button onclick="borrarEvento(${ev.id},this)"
-            style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.8rem;padding:.1rem .3rem;border-radius:4px;flex-shrink:0;line-height:1;"
-            onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
-  `;
-
-  const lista = document.getElementById('lista-eventos');
-  const empty = document.getElementById('eventos-empty');
-  if (empty) empty.remove();
-  lista.insertBefore(div, lista.firstChild);
-
-  const n = lista.querySelectorAll('[data-ev-id]').length;
-  document.getElementById('badge-eventos').textContent = n + ' evento' + (n===1?'':'s');
+  // Actualizar cronología
+  _insertarEvento(data.evento);
+  // Actualizar observaciones
+  if (data.obs) _insertarObs(data.obs);
 }
 
 // ── Borrar evento ──────────────────────────────────────────────────────────
@@ -485,7 +521,7 @@ async function borrarEvento(ev_id, btn) {
   if (!n) lista.innerHTML = '<div id="eventos-empty" style="text-align:center;padding:1.5rem;color:var(--text-muted);font-size:.84rem;">Sin eventos registrados aún.</div>';
 }
 
-// ── Guardar observación ────────────────────────────────────────────────────
+// ── Guardar observación → aparece en observaciones Y en cronología ─────────
 async function guardarObservacion() {
   const ta    = document.getElementById('obs-input');
   const texto = ta.value.trim();
@@ -496,30 +532,14 @@ async function guardarObservacion() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ texto })
   });
-  const obs = await resp.json();
-  if (obs.error) return;
+  const data = await resp.json();
+  if (data.error) return;
   ta.value = '';
 
-  const div = document.createElement('div');
-  div.dataset.obsId = obs.id;
-  div.style.cssText = 'background:var(--bg2);border-radius:7px;padding:.55rem .7rem;border:1px solid var(--border);display:flex;gap:.5rem;align-items:flex-start;';
-  div.innerHTML = `
-    <div style="flex:1;">
-      <div style="font-size:.82rem;line-height:1.45;white-space:pre-wrap;word-break:break-word;">${_esc(obs.texto)}</div>
-      <div style="font-size:.68rem;color:var(--text-muted);margin-top:.25rem;font-family:var(--mono);">${obs.fecha||''}</div>
-    </div>
-    <button onclick="borrarObservacion(${obs.id},this)"
-            style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.85rem;padding:.1rem .3rem;border-radius:4px;flex-shrink:0;line-height:1;"
-            onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text-muted)'">✕</button>
-  `;
-
-  const lista = document.getElementById('obs-lista');
-  const empty = document.getElementById('obs-empty');
-  if (empty) empty.remove();
-  lista.insertBefore(div, lista.firstChild);
-
-  const n = lista.querySelectorAll('[data-obs-id]').length;
-  document.getElementById('obs-count').textContent = n + ' nota' + (n===1?'':'s');
+  // Actualizar observaciones
+  if (data.obs) _insertarObs(data.obs);
+  // Actualizar cronología
+  if (data.evento) _insertarEvento(data.evento);
 }
 
 // ── Borrar observación ─────────────────────────────────────────────────────
