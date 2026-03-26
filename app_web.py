@@ -121,6 +121,7 @@ def inicializar_todo():
         ("google_id", "VARCHAR(128)"),
         ("avatar",    "VARCHAR(512)"),
         ("pw_format", "INT DEFAULT 0"),
+        ("tipo",      "VARCHAR(1) DEFAULT 'A'"),
     ]:
         if not column_exists(cursor, 'usuarios', col):
             cursor.execute(f"ALTER TABLE usuarios ADD COLUMN {col} {ddl}")
@@ -250,7 +251,10 @@ def index():
     if es_admin < 2:
         filtros.append("usuario_id = %s"); params.append(user_id)
     elif filtro_user and es_admin >= 2:
-        filtros.append("usuario_id = (SELECT id FROM usuarios WHERE username = %s LIMIT 1)"); params.append(filtro_user)
+        filtros.append("usuario_id = (SELECT id FROM usuarios WHERE username = %s AND COALESCE(tipo,'A')='A' LIMIT 1)"); params.append(filtro_user)
+    if es_admin >= 2:
+        # SuperAdmin: excluir siempre tareas de usuarios tipo B
+        filtros.append("usuario_id IN (SELECT id FROM usuarios WHERE COALESCE(tipo,'A')='A')")
     if filtro_estado == "pending":
         filtros.append("completada = 0")
     elif filtro_estado == "done":
@@ -287,7 +291,10 @@ def index():
             subtareas_map.setdefault(s["tarea_id"], []).append(dict(s))
 
     if es_admin >= 2:
-        cats = conn.execute("SELECT DISTINCT COALESCE(NULLIF(TRIM(categoria),''),'General') AS cat FROM tareas ORDER BY cat").fetchall()
+        cats = conn.execute(
+            "SELECT DISTINCT COALESCE(NULLIF(TRIM(categoria),''),'General') AS cat "
+            "FROM tareas WHERE usuario_id IN (SELECT id FROM usuarios WHERE COALESCE(tipo,'A')='A') ORDER BY cat"
+        ).fetchall()
     else:
         cats = conn.execute("SELECT DISTINCT COALESCE(NULLIF(TRIM(categoria),''),'General') AS cat FROM tareas WHERE usuario_id=%s ORDER BY cat", (user_id,)).fetchall()
     categorias_lista = [r["cat"] for r in cats]
@@ -296,7 +303,8 @@ def index():
     if es_admin >= 2:
         usuarios_lista = [r["username"] for r in conn.execute(
             "SELECT DISTINCT u.username FROM usuarios u "
-            "INNER JOIN tareas t ON t.usuario_id = u.id ORDER BY u.username"
+            "INNER JOIN tareas t ON t.usuario_id = u.id "
+            "WHERE COALESCE(u.tipo,'A')='A' ORDER BY u.username"
         ).fetchall()]
     conn.close()
 
@@ -334,6 +342,8 @@ def admin():
     per_page      = 20
 
     filtros, params = [], []
+    # Excluir siempre tareas de usuarios tipo B
+    filtros.append("COALESCE(u.tipo,'A') = 'A'")
     if filtro_cat:
         filtros.append("LOWER(TRIM(t.categoria)) = LOWER(TRIM(%s))"); params.append(filtro_cat)
     if filtro_est == "Completada":
@@ -349,7 +359,7 @@ def admin():
     where = ("WHERE " + " AND ".join(filtros)) if filtros else ""
 
     with get_connection() as conn:
-        # KPIs globales (sin filtro)
+        # KPIs globales (sin filtro de usuario, pero solo tipo A)
         kpi = conn.execute("""
             SELECT
                 COUNT(*)                                      AS total,
@@ -357,6 +367,7 @@ def admin():
                 SUM(CASE WHEN completada=0 THEN 1 ELSE 0 END) AS pendientes,
                 COUNT(DISTINCT usuario_id)                    AS n_usuarios
             FROM tareas
+            WHERE usuario_id IN (SELECT id FROM usuarios WHERE COALESCE(tipo,'A')='A')
         """).fetchone()
 
         # Total filtrado
@@ -400,27 +411,32 @@ def admin():
                    SUM(CASE WHEN t.completada=0 THEN 1 ELSE 0 END) AS pendientes
             FROM usuarios u
             LEFT JOIN tareas t ON t.usuario_id = u.id
+            WHERE COALESCE(u.tipo,'A') = 'A'
             GROUP BY u.id, u.username
             ORDER BY total DESC
         """).fetchall()]
 
         chart_categorias = [dict(r) for r in conn.execute("""
-            SELECT COALESCE(NULLIF(TRIM(categoria),''), 'General') AS categoria,
+            SELECT COALESCE(NULLIF(TRIM(t.categoria),''), 'General') AS categoria,
                    COUNT(*) AS total,
-                   SUM(CASE WHEN completada=1 THEN 1 ELSE 0 END) AS completadas
-            FROM tareas
-            GROUP BY categoria
+                   SUM(CASE WHEN t.completada=1 THEN 1 ELSE 0 END) AS completadas
+            FROM tareas t
+            LEFT JOIN usuarios u ON t.usuario_id = u.id
+            WHERE COALESCE(u.tipo,'A') = 'A'
+            GROUP BY t.categoria
             ORDER BY total DESC
             LIMIT 8
         """).fetchall()]
 
         chart_prioridades = [dict(r) for r in conn.execute("""
-            SELECT prioridad,
+            SELECT t.prioridad,
                    COUNT(*) AS total,
-                   SUM(CASE WHEN completada=1 THEN 1 ELSE 0 END) AS completadas
-            FROM tareas
-            GROUP BY prioridad
-            ORDER BY prioridad ASC
+                   SUM(CASE WHEN t.completada=1 THEN 1 ELSE 0 END) AS completadas
+            FROM tareas t
+            LEFT JOIN usuarios u ON t.usuario_id = u.id
+            WHERE COALESCE(u.tipo,'A') = 'A'
+            GROUP BY t.prioridad
+            ORDER BY t.prioridad ASC
         """).fetchall()]
 
         # Detalle tareas por usuario para modal
@@ -430,6 +446,7 @@ def admin():
                    t.prioridad, t.fecha, t.codigo
             FROM tareas t
             LEFT JOIN usuarios u ON t.usuario_id = u.id
+            WHERE COALESCE(u.tipo,'A') = 'A'
             ORDER BY t.completada ASC, t.prioridad ASC, t.id DESC
         """).fetchall():
             u = row["username"] or "—"
@@ -552,11 +569,12 @@ def usuarios():
     usuarios_lista = conn.execute("""
         SELECT u.id, u.username, u.email, u.es_admin, u.perfil,
                COALESCE(u.pw_format, 0)                          AS pw_format,
+               COALESCE(u.tipo, 'A')                             AS tipo,
                COUNT(t.id)                                        AS total_tareas,
                SUM(CASE WHEN t.completada=1 THEN 1 ELSE 0 END)   AS completadas,
                SUM(CASE WHEN t.completada=0 THEN 1 ELSE 0 END)   AS pendientes
         FROM usuarios u LEFT JOIN tareas t ON t.usuario_id = u.id
-        GROUP BY u.id, u.username, u.email, u.es_admin, u.perfil, u.pw_format
+        GROUP BY u.id, u.username, u.email, u.es_admin, u.perfil, u.pw_format, u.tipo
         ORDER BY u.perfil DESC, u.username
     """).fetchall()
     cats = conn.execute("""
@@ -667,6 +685,22 @@ def usuario_cambiar_perfil(uid):
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
+
+
+@app.route("/usuarios/cambiar_tipo/<int:uid>", methods=["POST"])
+@admin_required
+def usuario_cambiar_tipo(uid):
+    """Alterna el tipo de usuario entre A (visible en admin/dashboard) y B (oculto)."""
+    conn = get_connection()
+    row  = conn.execute("SELECT tipo FROM usuarios WHERE id=%s", (uid,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"ok": False, "error": "Usuario no encontrado."}), 404
+    nuevo_tipo = 'B' if (row["tipo"] or 'A') == 'A' else 'A'
+    conn.execute("UPDATE usuarios SET tipo=%s WHERE id=%s", (nuevo_tipo, uid))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "tipo": nuevo_tipo})
 
 
 # ── OPERACIONES TAREAS ─────────────────────────────────────────────────────────
@@ -800,8 +834,25 @@ def dashboard():
     es_admin = session.get("es_admin", 0)
     conn     = get_connection()
 
-    filtro = "" if es_admin >= 2 else "WHERE usuario_id = %s"
-    params = () if es_admin >= 2 else (user_id,)
+    # Filtro tipo B: SuperAdmin ve solo usuarios tipo A; usuario normal solo ve las suyas si es tipo A
+    if es_admin >= 2:
+        filtro = "WHERE usuario_id IN (SELECT id FROM usuarios WHERE COALESCE(tipo,'A')='A')"
+        params = ()
+    else:
+        # Usuario normal: sus propias tareas solo si él mismo es tipo A
+        tipo_propio = (conn.execute(
+            "SELECT COALESCE(tipo,'A') AS tipo FROM usuarios WHERE id=%s", (user_id,)
+        ).fetchone() or {}).get("tipo", "A")
+        if tipo_propio != "A":
+            conn.close()
+            return render_template("dashboard.html", total=0, completadas=0,
+                                   pendientes=0, porcentaje=0, nivel="Bajo",
+                                   color_nivel="danger",
+                                   fecha_actual=datetime.now().strftime("%d/%m/%Y"),
+                                   ultimas_tareas=[], categorias=[], cantidades=[],
+                                   todas_tareas=[])
+        filtro = "WHERE usuario_id = %s"
+        params = (user_id,)
 
     stats = conn.execute(f"""
         SELECT COUNT(*) AS total, SUM(CASE WHEN completada=1 THEN 1 ELSE 0 END) AS completadas
