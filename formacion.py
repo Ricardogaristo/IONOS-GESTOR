@@ -1988,7 +1988,7 @@ def exportar_curso_excel():
         nombre_val = a.get("nombre", "") + (" 🔕 NO Participa" if es_no_llamar else "")
         dc(1, r_i - 6,                                 center=True, color="64748B")
         dc(2, nombre_val,                              bold=True)
-        dc(3, p,                                       fmt='0.0"%"', center=True, bold=True, color=prog_color)
+        dc(3, f"{p:.1f}%",                             center=True, bold=True, color=prog_color)
         _ep = _parse_examenes(a.get("examenes"))
         _ex_color = "7C3AED" if (_ep[2] > 0 and (_ep[0] / _ep[2]) < 0.75) else None
         dc(4, _ep[0], center=True, color=_ex_color)
@@ -2007,8 +2007,8 @@ def exportar_curso_excel():
         if _ep_pct[2] > 0:
             pct_ex = round(_ep_pct[0] / _ep_pct[2] * 100, 1)
             pct_ex_color = C_GREEN if pct_ex >= 75 else (C_AMBER if pct_ex >= 34 else C_RED_TXT)
-            pct_ex_val = pct_ex
-            pct_ex_fmt = '0.0"%"'
+            pct_ex_val = f"{pct_ex:.1f}%"
+            pct_ex_fmt = None
         else:
             pct_ex_val = "—"
             pct_ex_color = "64748B"
@@ -2016,9 +2016,9 @@ def exportar_curso_excel():
         dc(12, pct_ex_val, fmt=pct_ex_fmt, center=True, bold=True, color=pct_ex_color)
         pct_ex_cell = ws.cell(r_i, 12)
         pct_ex_cell.fill = PatternFill("solid", fgColor=(
-            "D4EDDA" if (isinstance(pct_ex_val, float) and pct_ex_val >= 75) else
-            "FFF3CD" if (isinstance(pct_ex_val, float) and pct_ex_val >= 34) else
-            "F8D7DA" if isinstance(pct_ex_val, float) else bg_row
+            "D4EDDA" if (isinstance(pct_ex_val, str) and pct_ex_val != "—" and float(pct_ex_val[:-1]) >= 75) else
+            "FFF3CD" if (isinstance(pct_ex_val, str) and pct_ex_val != "—" and float(pct_ex_val[:-1]) >= 34) else
+            "F8D7DA" if (isinstance(pct_ex_val, str) and pct_ex_val != "—") else bg_row
         ))
         # Observaciones
         obs_cell = ws.cell(r_i, 13, obs_texto or "—")
@@ -2144,7 +2144,7 @@ def exportar_excel():
         dc(1,  r-3,                       center=True, color="64748B")
         dc(2,  a.get("curso","—") or "—")
         dc(3,  a.get("nombre",""),         bold=True)
-        dc(4,  p,                          fmt='0.0"%"', center=True, bold=True, color=prog_color)
+        dc(4,  f"{p:.1f}%",                        center=True, bold=True, color=prog_color)
         _ep2 = _parse_examenes(a.get("examenes"))
         _ex2_color = "7C3AED" if (_ep2[2] > 0 and (_ep2[0] / _ep2[2]) < 0.75) else None
         dc(5,  _ep2[0], center=True, color=_ex2_color)
@@ -2163,8 +2163,8 @@ def exportar_excel():
         if _ep2_pct[2] > 0:
             pct_ex2 = round(_ep2_pct[0] / _ep2_pct[2] * 100, 1)
             pct_ex2_color = C_GREEN if pct_ex2 >= 75 else (C_AMBER if pct_ex2 >= 34 else C_RED)
-            pct_ex2_val = pct_ex2
-            pct_ex2_fmt = '0.0"%"'
+            pct_ex2_val = f"{pct_ex2:.1f}%"
+            pct_ex2_fmt = None
         else:
             pct_ex2_val = "—"
             pct_ex2_color = "64748B"
@@ -2172,9 +2172,9 @@ def exportar_excel():
         dc(13, pct_ex2_val, fmt=pct_ex2_fmt, center=True, bold=True, color=pct_ex2_color)
         pct_ex2_cell = ws.cell(r, 13)
         pct_ex2_cell.fill = PatternFill("solid", fgColor=(
-            "D4EDDA" if (isinstance(pct_ex2_val, float) and pct_ex2_val >= 75) else
-            "FFF3CD" if (isinstance(pct_ex2_val, float) and pct_ex2_val >= 34) else
-            "F8D7DA" if isinstance(pct_ex2_val, float) else (C_ALT if r % 2 == 0 else C_WHITE)
+            "D4EDDA" if (isinstance(pct_ex2_val, str) and pct_ex2_val != "—" and float(pct_ex2_val[:-1]) >= 75) else
+            "FFF3CD" if (isinstance(pct_ex2_val, str) and pct_ex2_val != "—" and float(pct_ex2_val[:-1]) >= 34) else
+            "F8D7DA" if (isinstance(pct_ex2_val, str) and pct_ex2_val != "—") else (C_ALT if r % 2 == 0 else C_WHITE)
         ))
         dc(14, (a.get("created_at","") or "")[:10], center=True, color="64748B")
         # Observaciones
@@ -2238,14 +2238,14 @@ def exportar_excel():
         totales["exam"]   += d["exam"]
 
         for c_i, (val, fmt, center, bold, color) in enumerate([
-            (curso,   None,       False, True,  "1E293B"),
-            (n,       None,       True,  False, "1E293B"),
-            (sup,     None,       True,  True,  C_GREEN),
-            (n-sup,   None,       True,  False, C_AMBER),
-            (pct,     '0.0"%"',  True,  True,  C_GREEN if pct>=75 else (C_AMBER if pct>=50 else C_RED)),
-            (avg,     '0.0"%"',  True,  False, "1E293B"),
-            (d["exam"],None,      True,  False, "1E293B"),
-            (avg_e,   "0.0",     True,  False, "1E293B"),
+            (curso,          None,  False, True,  "1E293B"),
+            (n,              None,  True,  False, "1E293B"),
+            (sup,            None,  True,  True,  C_GREEN),
+            (n-sup,          None,  True,  False, C_AMBER),
+            (f"{pct:.1f}%",  None,  True,  True,  C_GREEN if pct>=75 else (C_AMBER if pct>=50 else C_RED)),
+            (f"{avg:.1f}%",  None,  True,  False, "1E293B"),
+            (d["exam"],      None,  True,  False, "1E293B"),
+            (avg_e,          "0.0", True,  False, "1E293B"),
         ], 1):
             cell = ws2.cell(r, c_i, val)
             cell.fill      = rf2
@@ -2264,7 +2264,7 @@ def exportar_excel():
     tae = round(te/tn, 1) if tn else 0
     for c_i, (val, fmt) in enumerate([
         ("TOTAL GENERAL",None),(tn,None),(tsu,None),(tn-tsu,None),
-        (tp,'0.0"%"'),(ta,'0.0"%"'),(te,None),(tae,"0.0"),
+        (f"{tp:.1f}%",None),(f"{ta:.1f}%",None),(te,None),(tae,"0.0"),
     ], 1):
         cell = ws2.cell(tr, c_i, val)
         cell.font      = Font(bold=True, color=C_WHITE, name="Arial", size=9)
@@ -2318,7 +2318,7 @@ def exportar_excel():
             (r-3,                                   None,      True,  False, "64748B"),
             (a.get("curso","—") or "—",             None,      False, False, "1E293B"),
             (a.get("nombre",""),                    None,      False, True,  "1E293B"),
-            (a.get("progreso",0),                   '0.0"%"', True,  True,  C_RED),
+            (f"{a.get('progreso',0):.1f}%",              None,     True,  True,  C_RED),
             (_fmt_examenes(a.get("examenes")),       None,      True,  False, "1E293B"),
             (a.get("fecha_inicio","—") or "—",      None,      True,  False, "1E293B"),
             (a.get("fecha_fin","—")    or "—",      None,      True,  False, "1E293B"),
