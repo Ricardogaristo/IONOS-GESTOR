@@ -74,7 +74,6 @@
             <th>Usuario</th>
             <th>Email</th>
             <th>Perfil</th>
-            <th>Tipo</th>
             <th>Tareas</th>
             <th>Progreso</th>
             <th>Acciones</th>
@@ -117,20 +116,6 @@
               {% else %}
                 <span class="badge-perfil badge-tareas">✅ Tareas</span>
               {% endif %}
-            </td>
-
-            <!-- ── Columna Tipo A/B ── -->
-            {% set tipo_u = u.tipo if u.tipo is defined else 'A' %}
-            <td>
-              <button type="button"
-                      id="tipo-btn-{{ u.id }}"
-                      class="btn btn-tipo btn-tipo-{{ tipo_u | lower }} btn-sm"
-                      onclick="toggleTipo({{ u.id }})"
-                      title="{{ 'Tipo A — tareas visibles en admin/dashboard. Clic para cambiar a B' if tipo_u == 'A' else 'Tipo B — tareas ocultas en admin/dashboard. Clic para cambiar a A' }}">
-                <span id="tipo-label-{{ u.id }}">
-                  {% if tipo_u == 'A' %}🟢 A{% else %}🔴 B{% endif %}
-                </span>
-              </button>
             </td>
 
             <td>
@@ -198,7 +183,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="7" style="text-align:center; padding:3rem; color:var(--text-muted);">
+            <td colspan="6" style="text-align:center; padding:3rem; color:var(--text-muted);">
               <div style="font-size:2rem; margin-bottom:.5rem;">👥</div>
               No hay usuarios registrados aún.
             </td>
@@ -333,22 +318,6 @@
 .badge-ft         { background:rgba(20,184,166,.12); border-color:rgba(20,184,166,.4); color:#2dd4bf; }
 .badge-form       { background:rgba(99,102,241,.12); border-color:rgba(99,102,241,.4); color:#a5b4fc; }
 .badge-tareas     { background:var(--bg3); border-color:var(--border); color:var(--text-muted); }
-
-/* ── Botón Tipo A/B ──────────────────────────────────────────── */
-.btn-tipo {
-  font-size:.72rem; font-weight:700; letter-spacing:.04em;
-  padding:.22rem .65rem; border-radius:8px;
-  border:1px solid transparent; cursor:pointer;
-  transition:all .18s;
-}
-.btn-tipo-a {
-  background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.4); color:#4ade80;
-}
-.btn-tipo-a:hover { background:rgba(34,197,94,.22); border-color:rgba(34,197,94,.7); }
-.btn-tipo-b {
-  background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.4); color:#f87171;
-}
-.btn-tipo-b:hover { background:rgba(239,68,68,.22); border-color:rgba(239,68,68,.7); }
 
 .perfil-radio-row {
   display:flex; align-items:center; gap:.7rem;
@@ -496,39 +465,7 @@ async function guardarPerfil() {
   }
 }
 
-// ── Toggle Tipo A/B ───────────────────────────────────────────────────────
-async function toggleTipo(uid) {
-  const btn   = document.getElementById('tipo-btn-' + uid);
-  const label = document.getElementById('tipo-label-' + uid);
-  if (!btn) return;
-
-  btn.disabled = true;
-  try {
-    const res  = await fetch('/usuarios/cambiar_tipo/' + uid, { method: 'POST' });
-    const data = await res.json();
-    if (data.ok) {
-      const nuevoTipo = data.tipo; // 'A' o 'B'
-      if (nuevoTipo === 'A') {
-        label.textContent = '🟢 A';
-        btn.classList.remove('btn-tipo-b');
-        btn.classList.add('btn-tipo-a');
-        btn.title = 'Tipo A — tareas visibles en admin/dashboard. Clic para cambiar a B';
-      } else {
-        label.textContent = '🔴 B';
-        btn.classList.remove('btn-tipo-a');
-        btn.classList.add('btn-tipo-b');
-        btn.title = 'Tipo B — tareas ocultas en admin/dashboard. Clic para cambiar a A';
-      }
-    } else {
-      alert('Error: ' + (data.error || 'No se pudo cambiar el tipo.'));
-    }
-  } catch (err) {
-    alert('Error de conexión.');
-  } finally {
-    btn.disabled = false;
-  }
-}
-
+// ── Cerrar con Escape ──────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     cerrarModalBtn();
