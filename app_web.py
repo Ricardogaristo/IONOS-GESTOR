@@ -286,7 +286,7 @@ def index():
     ids = [t["id"] for t in tareas]
     subtareas_map = {}
     if ids:
-        ph = ",".join(["%s"] * len(ids))
+        ph = ",".join("?" * len(ids))
         for s in conn.execute(f"SELECT * FROM subtareas WHERE tarea_id IN ({ph}) ORDER BY id", ids).fetchall():
             subtareas_map.setdefault(s["tarea_id"], []).append(dict(s))
 
@@ -834,23 +834,12 @@ def dashboard():
     es_admin = session.get("es_admin", 0)
     conn     = get_connection()
 
-    # Filtro tipo B: SuperAdmin ve solo usuarios tipo A; usuario normal solo ve las suyas si es tipo A
+
+    # SuperAdmin solo ve tareas de usuarios tipo A. Usuarios tipo B ven sus propias tareas con normalidad.
     if es_admin >= 2:
         filtro = "WHERE usuario_id IN (SELECT id FROM usuarios WHERE COALESCE(tipo,'A')='A')"
         params = ()
     else:
-        # Usuario normal: sus propias tareas solo si él mismo es tipo A
-        tipo_propio = (conn.execute(
-            "SELECT COALESCE(tipo,'A') AS tipo FROM usuarios WHERE id=%s", (user_id,)
-        ).fetchone() or {}).get("tipo", "A")
-        if tipo_propio != "A":
-            conn.close()
-            return render_template("dashboard.html", total=0, completadas=0,
-                                   pendientes=0, porcentaje=0, nivel="Bajo",
-                                   color_nivel="danger",
-                                   fecha_actual=datetime.now().strftime("%d/%m/%Y"),
-                                   ultimas_tareas=[], categorias=[], cantidades=[],
-                                   todas_tareas=[])
         filtro = "WHERE usuario_id = %s"
         params = (user_id,)
 
