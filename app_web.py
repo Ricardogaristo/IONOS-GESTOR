@@ -1152,7 +1152,9 @@ def debug_login():
 
 
 # ── ARRANCAR ───────────────────────────────────────────────────────────────────
+# Se ejecuta siempre, tambien con Gunicorn/uWSGI
+inicializar_todo()
+inicializar_formacion()
+
 if __name__ == "__main__":
-    inicializar_todo()
-    inicializar_formacion()
     app.run(debug=True, port=5000, use_reloader=False)
