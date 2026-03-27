@@ -53,16 +53,16 @@
   <div class="gcard-header">
     <span style="color:var(--accent)">▰</span>
     <span class="gcard-title">Progreso general</span>
-    <span style="margin-left:auto; font-family:var(--mono); font-size:.78rem; color:var(--accent);">
-      {{ porcentaje }}%
-    </span>
+    <span style="margin-left:auto; font-family:var(--mono); font-size:.78rem; color:var(--accent);">{{ porcentaje }}%</span>
   </div>
   <div class="gcard-body">
     <div style="height:10px; background:var(--bg3); border-radius:99px; overflow:hidden;">
-      <div style="height:100%; width:{{ porcentaje }}%; background:linear-gradient(90deg,var(--accent),#4dc663);
+      <div style="height:100%; width:{{ porcentaje }}%;
+                  background:linear-gradient(90deg,var(--accent),#4dc663);
                   border-radius:99px; transition:width 1s ease;"></div>
     </div>
-    <div class="d-flex justify-content-between mt-2" style="font-family:var(--mono); font-size:.72rem; color:var(--text-muted);">
+    <div class="d-flex justify-content-between mt-2"
+         style="font-family:var(--mono); font-size:.72rem; color:var(--text-muted);">
       <span>0%</span><span>50%</span><span>100%</span>
     </div>
   </div>
@@ -81,7 +81,6 @@
       </div>
     </div>
   </div>
-
   <div class="col-lg-5">
     <div class="gcard h-100">
       <div class="gcard-header">
@@ -91,7 +90,6 @@
       <div class="gcard-body p-0">
         <ul style="list-style:none; margin:0; padding:0;">
           {% for t in ultimas_tareas %}
-          {# t[0]=id t[1]=descripcion t[4]=completada t[5]=codigo #}
           <li style="display:flex; align-items:center; gap:.75rem;
                      padding:.75rem 1.25rem; border-bottom:1px solid var(--border-soft);">
             {% if t[4]==1 %}
@@ -102,9 +100,7 @@
             <span style="font-family:var(--mono); font-size:.72rem; color:var(--text-muted); flex-shrink:0;">
               {{ t[5] if t[5] else '—' }}
             </span>
-            <span class=""
-                  data-real="{{ t[1] | e }}"
-                  onclick="revealPriv(event, this)"
+            <span data-real="{{ t[1] | e }}" onclick="revealPriv(event, this)"
                   title="Clic para revelar"
                   style="font-size:.85rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;">
               {{ t[1] }}
@@ -121,7 +117,9 @@
   </div>
 </div>
 
-<!-- ── Quick actions ─────────────────────── -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- ── Accesos rápidos ─────────────────────────────────────────────── -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
 <div class="gcard mt-3">
   <div class="gcard-header">
     <span style="color:var(--text-muted)">⚡</span>
@@ -129,20 +127,58 @@
   </div>
   <div class="gcard-body">
     <div class="d-flex flex-wrap gap-2">
+
       <a href="/" class="btn btn-g-ghost">⊞ Ver tareas</a>
 
-      <!-- ══ BOTÓN CALENDARIO (nuevo) ══════════════════════════════════════ -->
+      <!-- Calendario -->
       <a href="/calendario" class="btn btn-g-ghost"
-         style="display:inline-flex; align-items:center; gap:.45rem;
-                border-color:var(--blue); color:var(--blue);"
-         onmouseover="this.style.background='rgba(31,111,235,.12)'"
+         style="border-color:var(--blue); color:var(--blue);"
+         onmouseover="this.style.background='rgba(31,111,235,.1)'"
          onmouseout="this.style.background=''">
-        <span style="font-size:1rem; line-height:1;">📅</span>
-        Calendario
+        📅 Calendario
       </a>
-      <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+      <!-- Buscador rápido (Ctrl+K) -->
+      <button onclick="abrirBuscador()" class="btn btn-g-ghost"
+              style="border-color:#a371f7; color:#a371f7;"
+              onmouseover="this.style.background='rgba(163,113,247,.1)'"
+              onmouseout="this.style.background=''">
+        🔍 Buscar tarea
+        <span style="margin-left:.4rem; font-family:var(--mono); font-size:.65rem;
+                     color:var(--text-muted); background:var(--bg3);
+                     padding:.05rem .35rem; border-radius:4px; border:1px solid var(--border-soft);">Ctrl K</span>
+      </button>
+
+      <!-- Informe de productividad -->
+      <a href="/informe" class="btn btn-g-ghost"
+         style="border-color:#e3b341; color:#e3b341;"
+         onmouseover="this.style.background='rgba(227,179,65,.1)'"
+         onmouseout="this.style.background=''">
+        📊 Informe
+      </a>
+
+      <!-- Archivar completadas -->
+      <button onclick="abrirModalArchivar()" class="btn btn-g-ghost"
+              onmouseover="this.style.background='var(--bg3)'"
+              onmouseout="this.style.background=''">
+        🗂 Archivar completadas
+      </button>
+
+      <!-- Restaurar archivadas -->
+      <button onclick="abrirModalRestaurar()" class="btn btn-g-ghost"
+              style="border-color:var(--blue); color:var(--blue);"
+              onmouseover="this.style.background='rgba(31,111,235,.1)'"
+              onmouseout="this.style.background=''">
+        ↩ Restaurar archivadas
+      </button>
 
       <a href="/exportar" class="btn btn-g-success">⬇ Exportar Excel</a>
+
+      <!-- Vista usuarios (admin) -->
+      {% if session.get('es_admin', 0) >= 1 %}
+      <a href="/usuarios/vista" class="btn btn-g-warning">👥 Vista usuarios</a>
+      {% endif %}
+
       {% if session.get('es_admin')==1 %}
       <a href="/admin" class="btn btn-g-warning">⚙ Panel Admin</a>
       {% endif %}
@@ -150,20 +186,16 @@
   </div>
 </div>
 
-<!-- ── Modal categoría ───────────────────── -->
-<div id="modal-cat" style="
-  display:none; position:fixed; inset:0; z-index:9999;
+
+<!-- ── Modal categoría (original) ──────────────── -->
+<div id="modal-cat" style="display:none; position:fixed; inset:0; z-index:9999;
   background:rgba(0,0,0,.65); backdrop-filter:blur(4px);
-  align-items:center; justify-content:center; padding:1rem;
-" onclick="if(event.target===this) cerrarModalCat()">
-  <div style="
-    background:var(--bg2); border:1px solid var(--border-soft);
-    border-radius:14px; width:100%; max-width:560px;
-    max-height:82vh; display:flex; flex-direction:column;
-    box-shadow:0 24px 60px rgba(0,0,0,.5);
-    animation: slideUp .22s cubic-bezier(.22,1,.36,1) both;
-  ">
-    <!-- Header -->
+  align-items:center; justify-content:center; padding:1rem;"
+  onclick="if(event.target===this) cerrarModalCat()">
+  <div style="background:var(--bg2); border:1px solid var(--border-soft);
+    border-radius:14px; width:100%; max-width:560px; max-height:82vh;
+    display:flex; flex-direction:column; box-shadow:0 24px 60px rgba(0,0,0,.5);
+    animation:slideUp .22s cubic-bezier(.22,1,.36,1) both;">
     <div style="display:flex; align-items:center; gap:.7rem;
                 padding:1.1rem 1.4rem; border-bottom:1px solid var(--border-soft); flex-shrink:0;">
       <span id="mcat-emoji" style="font-size:1.3rem;"></span>
@@ -171,13 +203,10 @@
         <div id="mcat-titulo" style="font-weight:700; font-size:1rem;"></div>
         <div id="mcat-sub" style="font-size:.72rem; color:var(--text-muted); font-family:var(--mono);"></div>
       </div>
-      <button onclick="cerrarModalCat()" style="
-        margin-left:auto; background:none; border:none; cursor:pointer;
-        color:var(--text-muted); font-size:1.2rem; line-height:1; padding:.2rem .4rem;
-        border-radius:6px; transition:background .15s;
-      " onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'">✕</button>
+      <button onclick="cerrarModalCat()" style="margin-left:auto; background:none; border:none; cursor:pointer;
+        color:var(--text-muted); font-size:1.2rem; padding:.2rem .4rem; border-radius:6px; transition:background .15s;"
+        onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'">✕</button>
     </div>
-    <!-- Progress bar -->
     <div style="padding:.85rem 1.4rem .6rem; flex-shrink:0; border-bottom:1px solid var(--border-soft);">
       <div style="display:flex; align-items:center; gap:.75rem;">
         <div style="flex:1; height:6px; background:var(--bg3); border-radius:99px; overflow:hidden;">
@@ -185,204 +214,570 @@
         </div>
         <span id="mcat-pct" style="font-family:var(--mono); font-size:.75rem; color:var(--accent); min-width:36px;"></span>
       </div>
-      <div id="mcat-stats" style="display:flex; gap:1.2rem; margin-top:.5rem; font-size:.72rem; color:var(--text-muted); font-family:var(--mono);"></div>
+      <div id="mcat-stats" style="display:flex; gap:1.2rem; margin-top:.5rem;
+           font-size:.72rem; color:var(--text-muted); font-family:var(--mono);"></div>
     </div>
-    <!-- Lista de tareas -->
     <div id="mcat-lista" style="overflow-y:auto; flex:1; padding:.5rem 0;"></div>
   </div>
 </div>
 
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- ── Modal Buscador ─────────────────────────────────────────────── -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div id="modal-buscar" onclick="if(event.target===this) cerrarBuscador()" style="
+  display:none; position:fixed; inset:0; z-index:10001;
+  background:rgba(0,0,0,.72); backdrop-filter:blur(6px);
+  align-items:flex-start; justify-content:center; padding:7vh 1rem 2rem;">
+  <div style="background:var(--bg2); border:1px solid var(--border-soft);
+    border-radius:14px; width:100%; max-width:600px;
+    box-shadow:0 32px 80px rgba(0,0,0,.6);
+    animation:slideUpQ .18s cubic-bezier(.22,1,.36,1) both;">
+    <div style="display:flex; align-items:center; gap:.7rem;
+                padding:.9rem 1.2rem; border-bottom:1px solid var(--border-soft);">
+      <span style="font-size:1.05rem; color:var(--text-muted); flex-shrink:0;">🔍</span>
+      <input id="buscar-input" type="text" autocomplete="off"
+             placeholder="Buscar por descripción, código o categoría…"
+             oninput="doBusqueda(this.value)"
+             style="flex:1; background:none; border:none; outline:none;
+                    color:var(--text); font-size:.93rem; font-family:inherit;">
+      <kbd style="font-size:.67rem; color:var(--text-muted); background:var(--bg3);
+                  border:1px solid var(--border-soft); border-radius:4px;
+                  padding:.15rem .4rem; flex-shrink:0; font-family:var(--mono);">Esc</kbd>
+    </div>
+    <div id="buscar-resultados" style="max-height:400px; overflow-y:auto;"></div>
+    <div style="padding:.5rem 1.2rem; border-top:1px solid var(--border-soft);
+                font-size:.68rem; color:var(--text-muted); font-family:var(--mono);
+                display:flex; gap:1rem;">
+      <span>↑↓ navegar</span><span>Enter abrir</span><span>Esc cerrar</span>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- ── Modal Archivar ─────────────────────────────────────────────── -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div id="modal-archivar" onclick="if(event.target===this) cerrarModalArchivar()" style="
+  display:none; position:fixed; inset:0; z-index:10001;
+  background:rgba(0,0,0,.72); backdrop-filter:blur(6px);
+  align-items:center; justify-content:center; padding:1rem;">
+  <div style="background:var(--bg2); border:1px solid var(--border-soft);
+    border-radius:14px; width:100%; max-width:420px; overflow:hidden;
+    box-shadow:0 32px 80px rgba(0,0,0,.6);
+    animation:slideUpQ .18s cubic-bezier(.22,1,.36,1) both;">
+    <div style="padding:1.4rem 1.5rem .8rem;">
+      <div style="font-size:2rem; margin-bottom:.7rem;">🗂</div>
+      <div style="font-weight:700; font-size:1.05rem; margin-bottom:.5rem;">Archivar completadas</div>
+      <div style="font-size:.85rem; color:var(--text-muted); line-height:1.65;">
+        Las tareas marcadas como <strong style="color:var(--accent)">completadas</strong>
+        se moverán al historial <code style="color:var(--accent)">tareas_archivo</code>
+        y desaparecerán de la vista principal.<br><br>
+        <strong>Esta acción no se puede deshacer fácilmente.</strong>
+      </div>
+    </div>
+    <div id="archivar-msg" style="display:none; margin:.2rem 1.5rem .8rem;
+         padding:.7rem 1rem; border-radius:8px; font-size:.84rem; font-family:var(--mono);"></div>
+    <div style="padding:.8rem 1.5rem 1.3rem; display:flex; gap:.6rem; justify-content:flex-end;">
+      <button id="btn-arc-cancel" onclick="cerrarModalArchivar()" class="btn btn-g-ghost">Cancelar</button>
+      <button id="btn-arc-ok" onclick="ejecutarArchivar()" class="btn btn-g-success"
+              style="background:rgba(35,134,54,.18); border-color:rgba(35,134,54,.45);">
+        Sí, archivar
+      </button>
+    </div>
+  </div>
+</div>
+
+
 <style>
-@keyframes slideUp {
-  from { opacity:0; transform:translateY(20px) scale(.97); }
-  to   { opacity:1; transform:translateY(0)    scale(1); }
-}
+@keyframes slideUp  { from{opacity:0;transform:translateY(18px) scale(.97)} to{opacity:1;transform:none} }
+@keyframes slideUpQ { from{opacity:0;transform:translateY(-14px) scale(.97)} to{opacity:1;transform:none} }
+
+.b-item { display:flex; align-items:flex-start; gap:.7rem; padding:.7rem 1.2rem;
+  border-bottom:1px solid var(--border-soft); cursor:pointer; transition:background .12s; color:inherit; }
+.b-item:last-child { border-bottom:none; }
+.b-item:hover, .b-item.active { background:var(--bg3); }
+.b-body { flex:1; min-width:0; }
+.b-desc { font-size:.86rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.b-meta { font-size:.7rem; color:var(--text-muted); font-family:var(--mono); margin-top:.2rem;
+  display:flex; flex-wrap:wrap; gap:.5rem; }
+.b-empty { padding:2.5rem; text-align:center; color:var(--text-muted); font-size:.88rem; }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+.priv-field{filter:blur(4px);transition:filter .2s;cursor:pointer;user-select:none;}
+.priv-field.revealed{filter:none;cursor:default;}
+</style>
 <script>
-  // ── Reveal privado ────────────────────────────────────────────────────────
-  const revealPriv = (ev, el) => {
-    ev.stopPropagation();
-    const real = el.dataset.real || el.textContent;
-    el.textContent = real;
-    el.style.color = 'var(--accent)';
-    el.style.cursor = 'default';
-    el.onclick = null;
-    setTimeout(() => {
-      el.textContent = real;
-      el.style.color = '';
-      el.style.cursor = 'pointer';
-      el.onclick = (e) => revealPriv(e, el);
-    }, 10000);
-  };
+// ── Reveal privado ────────────────────────────────────────────────────────
+window.revealPriv = function(e, el) {
+  e.stopPropagation();
+  if (el.classList.contains('revealed')) return;
+  const real = el.dataset.real || '';
+  if (real) el.textContent = real;
+  el.classList.add('revealed'); el.title = '';
+  setTimeout(() => { el.classList.remove('revealed'); if(real) el.textContent=real; el.title='Clic para revelar'; }, 10000);
+};
 
-  const cats  = {{ categorias | tojson }};
-  const cnts  = {{ cantidades | tojson }};
-  const todasTareas = {{ todas_tareas | tojson if todas_tareas is defined else '[]' }};
-  const tareasPorCat = {};
-  todasTareas.forEach(t => {
-    const cat = t.categoria || t[2] || 'Sin categoría';
-    if (!tareasPorCat[cat]) tareasPorCat[cat] = [];
-    tareasPorCat[cat].push({
-      id:          t.id          ?? t[0],
-      descripcion: t.descripcion ?? t[1],
-      prioridad:   t.prioridad   ?? t[3],
-      completada:  t.completada  ?? t[4],
-      codigo:      t.codigo      ?? t[5],
-      fecha:       t.fecha       ?? t[6] ?? t.fecha_vencimiento ?? '',
-      notas:       t.notas       ?? t[7] ?? ''
-    });
-  });
+// ── Datos gráfico ─────────────────────────────────────────────────────────
+const cats  = {{ categorias | tojson }};
+const cnts  = {{ cantidades | tojson }};
+const todasTareas = {{ todas_tareas | tojson if todas_tareas is defined else '[]' }};
+const tareasPorCat = {};
+todasTareas.forEach(t => {
+  const cat = t.categoria||t[2]||'Sin categoría';
+  if (!tareasPorCat[cat]) tareasPorCat[cat]=[];
+  tareasPorCat[cat].push({ id:t.id??t[0], descripcion:t.descripcion??t[1],
+    prioridad:t.prioridad??t[3], completada:t.completada??t[4],
+    codigo:t.codigo??t[5], fecha:t.fecha??t[6]??'', notas:t.notas??t[7]??'' });
+});
+const isLight=document.body.classList.contains('light');
+const gridColor=isLight?'rgba(0,0,0,.08)':'rgba(255,255,255,.06)';
+const textColor=isLight?'#636c76':'#7d8590';
+const barColors=cats.map((_,i)=>`hsl(${140+i*28},55%,${isLight?38:48}%)`);
 
-  const isLight   = document.body.classList.contains('light');
-  const gridColor = isLight ? 'rgba(0,0,0,.08)' : 'rgba(255,255,255,.06)';
-  const textColor = isLight ? '#636c76' : '#7d8590';
-  const barColors = cats.map((_,i) => `hsl(${140 + i*28},55%,${isLight?38:48}%)`);
-
-  const chart = new Chart(document.getElementById('chartCat'), {
-    type: 'bar',
-    data: {
-      labels: cats,
-      datasets: [{
-        label: 'Tareas',
-        data: cnts,
-        backgroundColor: barColors.map(c => c),
-        hoverBackgroundColor: barColors.map(c => c.replace('55%', '70%')),
-        borderRadius: 6,
-        borderSkipped: false,
-        cursor: 'pointer',
-      }]
-    },
-    options: {
-      responsive: true,
-      onClick(e, elements) {
-        if (!elements.length) return;
-        const idx = elements[0].index;
-        abrirModalCat(cats[idx], idx);
-      },
-      onHover(e, elements) {
-        e.native.target.style.cursor = elements.length ? 'pointer' : 'default';
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: '#161b22',
-          borderColor: '#30363d',
-          borderWidth: 1,
-          titleColor: '#e6edf3',
-          bodyColor: '#7d8590',
-          callbacks: {
-            footer: (items) => {
-              const i = items[0].dataIndex;
-              const ts = tareasPorCat[cats[i]] || [];
-              const ok = ts.filter(t => t.completada == 1).length;
-              return `✔ ${ok} completadas · ● ${ts.length - ok} pendientes`;
-            }
-          }
-        }
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { color: textColor, stepSize: 1 },
-          grid: { color: gridColor },
-        },
-        x: {
-          ticks: { color: textColor },
-          grid: { display: false },
-        }
-      }
+new Chart(document.getElementById('chartCat'),{
+  type:'bar',
+  data:{ labels:cats, datasets:[{ label:'Tareas', data:cnts,
+    backgroundColor:barColors, hoverBackgroundColor:barColors.map(c=>c.replace('55%','70%')),
+    borderRadius:6, borderSkipped:false }]},
+  options:{
+    responsive:true,
+    onClick(e,els){ if(els.length) abrirModalCat(cats[els[0].index],els[0].index); },
+    onHover(e,els){ e.native.target.style.cursor=els.length?'pointer':'default'; },
+    plugins:{
+      legend:{display:false},
+      tooltip:{ backgroundColor:'#161b22',borderColor:'#30363d',borderWidth:1,
+        titleColor:'#e6edf3',bodyColor:'#7d8590',
+        callbacks:{ footer:items=>{ const i=items[0].dataIndex,ts=tareasPorCat[cats[i]]||[];
+          const ok=ts.filter(t=>t.completada==1).length;
+          return `✔ ${ok} completadas · ● ${ts.length-ok} pendientes`; }}}},
+    scales:{
+      y:{beginAtZero:true,ticks:{color:textColor,stepSize:1},grid:{color:gridColor}},
+      x:{ticks:{color:textColor},grid:{display:false}}
     }
-  });
+  }
+});
 
-  // ── Modal ──────────────────────────────────────────────────────────────
-  const PRIORIDAD_LABEL = { 1:'🔴 Alta', 2:'🟡 Media', 3:'🟢 Baja', '1':'🔴 Alta', '2':'🟡 Media', '3':'🟢 Baja' };
+// ── Modal categoría ───────────────────────────────────────────────────────
+function abrirModalCat(cat,idx){
+  const tareas=tareasPorCat[cat]||[],totalG=cnts[idx]||0;
+  const total=tareas.length||totalG,hechas=tareas.filter(t=>t.completada==1).length;
+  const pct=tareas.length?Math.round(hechas/total*100):0,color=barColors[idx]||'var(--accent)';
+  const bar=document.getElementById('mcat-bar');
+  bar.style.cssText='height:100%;border-radius:99px;transition:width .6s ease;width:0%';
+  document.getElementById('mcat-emoji').textContent='📂';
+  document.getElementById('mcat-titulo').textContent=cat;
+  document.getElementById('mcat-sub').textContent=`${total} tarea${total!==1?'s':''} en esta categoría`;
+  document.getElementById('mcat-pct').textContent=tareas.length?`${pct}%`:`${total} tareas`;
+  requestAnimationFrame(()=>{ bar.style.width=tareas.length?`${pct}%`:'100%'; bar.style.background=color; });
+  document.getElementById('mcat-stats').innerHTML=tareas.length
+    ?`<span>✔ ${hechas} completadas</span><span>● ${total-hechas} pendientes</span>`
+    :`<span>📊 ${total} tareas en total</span>`;
+  const lista=document.getElementById('mcat-lista');
+  lista.innerHTML=tareas.length
+    ?tareas.map(t=>`<div style="padding:.75rem 1.4rem;border-bottom:1px solid var(--border-soft);transition:background .15s"
+       onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'">
+       <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.2rem">
+         ${t.codigo?`<span style="font-family:var(--mono);font-size:.72rem;font-weight:700;color:var(--accent);background:var(--bg3);padding:.1rem .45rem;border-radius:5px">${t.codigo}</span>`:''}
+         <span style="font-size:.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.descripcion}</span></div>
+       <div style="font-size:.75rem;color:var(--text-muted);line-height:1.4">
+         ${(t.notas||t.descripcion).slice(0,80)}${(t.notas||t.descripcion).length>80?'…':''}</div></div>`).join('')
+    :`<div style="padding:1.5rem 1.4rem;font-size:.78rem;color:var(--text-muted)">Sin detalle disponible.</div>`;
+  document.getElementById('modal-cat').style.display='flex';
+  document.body.style.overflow='hidden';
+}
+function cerrarModalCat(){
+  document.getElementById('modal-cat').style.display='none';
+  document.body.style.overflow='';
+}
 
-  function abrirModalCat(categoria, idx) {
-    const tareas    = tareasPorCat[categoria] || [];
-    const totalGraf = cnts[idx] || 0;
-    const total     = tareas.length || totalGraf;
-    const hechas    = tareas.length ? tareas.filter(t => t.completada == 1).length : 0;
-    const pct       = tareas.length ? Math.round(hechas / total * 100) : 0;
-    const color     = barColors[idx] || 'var(--accent)';
+// ══════════════════════════════════════════════════════════════════════════
+// ── BUSCADOR ─────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+let busTimer=null, resultados=[], idxActivo=-1;
+const HOY_D = new Date().toISOString().slice(0,10);
 
-    const bar = document.getElementById('mcat-bar');
-    bar.style.cssText = 'height:100%; border-radius:99px; transition:width .6s ease; width:0%;';
+function abrirBuscador(){
+  document.getElementById('modal-buscar').style.display='flex';
+  document.body.style.overflow='hidden';
+  setTimeout(()=>document.getElementById('buscar-input').focus(),50);
+  renderResultados([]);
+}
+function cerrarBuscador(){
+  document.getElementById('modal-buscar').style.display='none';
+  document.getElementById('buscar-input').value='';
+  document.body.style.overflow=''; idxActivo=-1; resultados=[];
+}
 
-    document.getElementById('mcat-emoji').textContent  = '📂';
-    document.getElementById('mcat-titulo').textContent = categoria;
-    document.getElementById('mcat-sub').textContent    = `${total} tarea${total!==1?'s':''} en esta categoría`;
-    document.getElementById('mcat-pct').textContent    = tareas.length ? `${pct}%` : `${total} tareas`;
+async function doBusqueda(q){
+  clearTimeout(busTimer);
+  if (q.trim().length < 2){ renderResultados([],''); return; }
+  busTimer=setTimeout(async()=>{
+    const res=await fetch(`/buscar?q=${encodeURIComponent(q)}`);
+    resultados=await res.json(); idxActivo=-1;
+    renderResultados(resultados, q);
+  }, 260);
+}
 
-    requestAnimationFrame(() => {
-      bar.style.width     = tareas.length ? `${pct}%` : '100%';
-      bar.style.background = color;
-    });
+function renderResultados(items, q=''){
+  const c=document.getElementById('buscar-resultados');
+  if (!items.length){
+    c.innerHTML=q.length>=2
+      ?`<div class="b-empty">Sin resultados para "<strong>${q}</strong>"</div>`
+      :`<div class="b-empty" style="opacity:.45">Escribe al menos 2 caracteres…</div>`;
+    return;
+  }
+  const PRIOR={1:'🔴',2:'🟡',3:'🟢'};
+  c.innerHTML=items.map((t,i)=>{
+    const done=t.completada==1, venc=!done&&t.fecha&&t.fecha<HOY_D;
+    const ico=done?'✔':venc?'⚠':'●';
+    const clr=done?'var(--accent)':venc?'#ff6a6a':'var(--amber)';
+    return `<div class="b-item" data-idx="${i}" onclick="irATarea(${t.id})">
+      <span style="font-size:1rem;color:${clr};flex-shrink:0;margin-top:.05rem">${ico}</span>
+      <div class="b-body">
+        <div class="b-desc">
+          ${t.codigo?`<span style="font-family:var(--mono);font-size:.67rem;color:var(--accent);
+            background:var(--bg3);padding:.1rem .3rem;border-radius:3px;margin-right:.35rem">${t.codigo}</span>`:''}
+          ${t.descripcion}
+        </div>
+        <div class="b-meta">
+          ${t.categoria?`<span>📂 ${t.categoria}</span>`:''}
+          ${t.fecha?`<span>📅 ${t.fecha}</span>`:''}
+          <span>${PRIOR[t.prioridad]||'🟡'}</span>
+          <span style="color:${clr}">${done?'Completada':venc?'Vencida':'Pendiente'}</span>
+          ${t.username?`<span>👤 ${t.username}</span>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
 
-    document.getElementById('mcat-stats').innerHTML = tareas.length ? `
-      <span>✔ ${hechas} completadas</span>
-      <span>● ${total - hechas} pendientes</span>
-    ` : `<span>📊 ${total} tareas en total</span>`;
+function irATarea(id){ cerrarBuscador(); window.location.href=`/?highlight=${id}`; }
 
-    const lista = document.getElementById('mcat-lista');
-    if (!tareas.length) {
-      const totalCat = cnts[idx] || 0;
-      lista.innerHTML = `
-        <div style="padding:1.5rem 1.4rem;">
-          <div style="
-            background:var(--bg3); border-radius:10px; padding:1rem 1.2rem;
-            display:flex; align-items:center; gap:1rem; margin-bottom:1rem;
-          ">
-            <span style="font-size:2rem;">📊</span>
-            <div>
-              <div style="font-weight:700; font-size:1.1rem; font-family:var(--mono);">${totalCat}</div>
-              <div style="font-size:.78rem; color:var(--text-muted);">tarea${totalCat!==1?'s':''} en esta categoría</div>
-            </div>
-          </div>
-          <div style="font-size:.75rem; color:var(--text-muted); line-height:1.6; background:var(--bg3);
-                      border-radius:8px; padding:.7rem .9rem; border-left:3px solid var(--accent);">
-            Para ver el detalle de cada tarea, añade <code style="color:var(--accent)">todas_tareas</code>
-            al <code>render_template</code> de Flask.
-          </div>
-        </div>`;
-    } else {
-      lista.innerHTML = tareas.map(t => {
-        const resumen = t.notas
-          ? t.notas.length > 80 ? t.notas.slice(0, 80) + '…' : t.notas
-          : t.descripcion.length > 80 ? t.descripcion.slice(0, 80) + '…' : t.descripcion;
-        return `
-          <div style="
-            padding:.75rem 1.4rem;
-            border-bottom:1px solid var(--border-soft);
-            transition:background .15s;
-          " onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'">
-            <div style="display:flex; align-items:center; gap:.6rem; margin-bottom:.2rem;">
-              ${t.codigo ? `<span style="font-family:var(--mono); font-size:.72rem; font-weight:700; color:var(--accent); background:var(--bg3); padding:.1rem .45rem; border-radius:5px;">${t.codigo}</span>` : ''}
-              <span style="font-size:.85rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${t.descripcion}">
-                ${t.descripcion}
-              </span>
-            </div>
-            <div style="font-size:.75rem; color:var(--text-muted); line-height:1.4;">
-              ${resumen}
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
+document.getElementById('buscar-input').addEventListener('keydown',e=>{
+  const items=document.querySelectorAll('#buscar-resultados .b-item');
+  if(e.key==='ArrowDown'){
+    e.preventDefault(); items[idxActivo]?.classList.remove('active');
+    idxActivo=Math.min(idxActivo+1,items.length-1);
+    items[idxActivo]?.classList.add('active'); items[idxActivo]?.scrollIntoView({block:'nearest'});
+  } else if(e.key==='ArrowUp'){
+    e.preventDefault(); items[idxActivo]?.classList.remove('active');
+    idxActivo=Math.max(idxActivo-1,0);
+    items[idxActivo]?.classList.add('active'); items[idxActivo]?.scrollIntoView({block:'nearest'});
+  } else if(e.key==='Enter'&&idxActivo>=0){
+    const t=resultados[idxActivo]; if(t) irATarea(t.id);
+  }
+});
 
-    const modal = document.getElementById('modal-cat');
-    modal.style.display = 'flex';
-    document.body.style.overflow = 'hidden';
+// ══════════════════════════════════════════════════════════════════════════
+// ── ARCHIVAR ─────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+function abrirModalArchivar(){
+  const msg=document.getElementById('archivar-msg');
+  msg.style.display='none'; msg.textContent='';
+  document.getElementById('btn-arc-ok').disabled=false;
+  document.getElementById('btn-arc-ok').textContent='Sí, archivar';
+  document.getElementById('btn-arc-ok').style.display='';
+  document.getElementById('btn-arc-cancel').textContent='Cancelar';
+  document.getElementById('modal-archivar').style.display='flex';
+  document.body.style.overflow='hidden';
+}
+function cerrarModalArchivar(){
+  document.getElementById('modal-archivar').style.display='none';
+  document.body.style.overflow='';
+}
+async function ejecutarArchivar(){
+  const btn=document.getElementById('btn-arc-ok');
+  btn.disabled=true; btn.textContent='Archivando…';
+  const res=await fetch('/archivar-completadas',{method:'POST'});
+  const data=await res.json();
+  const msg=document.getElementById('archivar-msg');
+  msg.style.display='block';
+  if(data.ok){
+    msg.style.cssText='display:block;margin:.2rem 1.5rem .8rem;padding:.7rem 1rem;border-radius:8px;font-size:.84rem;font-family:var(--mono);background:rgba(35,134,54,.12);border:1px solid rgba(35,134,54,.3);color:var(--accent)';
+    msg.textContent=`✔ ${data.archivadas} tarea${data.archivadas!==1?'s':''} archivada${data.archivadas!==1?'s':''}.`;
+    btn.style.display='none';
+    document.getElementById('btn-arc-cancel').textContent='Cerrar';
+    setTimeout(()=>location.reload(),1600);
+  } else {
+    msg.style.cssText='display:block;margin:.2rem 1.5rem .8rem;padding:.7rem 1rem;border-radius:8px;font-size:.84rem;font-family:var(--mono);background:rgba(200,60,40,.1);border:1px solid rgba(200,60,40,.3);color:#ff6a6a';
+    msg.textContent='Error al archivar. Inténtalo de nuevo.';
+    btn.disabled=false; btn.textContent='Reintentar';
+  }
+}
+
+// ── Ctrl+K global + Esc ───────────────────────────────────────────────────
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='k'){ e.preventDefault(); abrirBuscador(); }
+  if(e.key==='Escape'){ cerrarBuscador(); cerrarModalCat(); cerrarModalArchivar(); cerrarModalRestaurar(); }
+});
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<!-- ── Modal Restaurar Archivadas ─────────────────────────────────── -->
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<div id="modal-restaurar" onclick="if(event.target===this) cerrarModalRestaurar()" style="
+  display:none; position:fixed; inset:0; z-index:10001;
+  background:rgba(0,0,0,.72); backdrop-filter:blur(6px);
+  align-items:center; justify-content:center; padding:1rem;">
+  <div style="background:var(--bg2); border:1px solid var(--border-soft);
+    border-radius:14px; width:100%; max-width:640px; max-height:88vh;
+    display:flex; flex-direction:column; overflow:hidden;
+    box-shadow:0 32px 80px rgba(0,0,0,.6);
+    animation:slideUpQ .18s cubic-bezier(.22,1,.36,1) both;">
+
+    <!-- Cabecera -->
+    <div style="display:flex; align-items:center; gap:.7rem;
+                padding:1.1rem 1.4rem; border-bottom:1px solid var(--border-soft); flex-shrink:0;">
+      <span style="font-size:1.3rem;">↩</span>
+      <div>
+        <div style="font-weight:700; font-size:1rem;">Restaurar tareas archivadas</div>
+        <div id="rest-sub" style="font-size:.72rem; color:var(--text-muted); font-family:var(--mono);">Cargando…</div>
+      </div>
+      <button onclick="cerrarModalRestaurar()" style="margin-left:auto; background:none; border:none;
+        cursor:pointer; color:var(--text-muted); font-size:1.2rem; padding:.2rem .4rem;
+        border-radius:6px; transition:background .15s;"
+        onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'">✕</button>
+    </div>
+
+    <!-- Buscador + Seleccionar todo -->
+    <div style="padding:.7rem 1.2rem; border-bottom:1px solid var(--border-soft); flex-shrink:0;
+                display:flex; gap:.6rem; align-items:center;">
+      <span style="color:var(--text-muted);">🔍</span>
+      <input id="rest-buscar" type="text" autocomplete="off"
+             placeholder="Filtrar por descripción, categoría o código…"
+             oninput="filtrarArchivadas(this.value)"
+             style="flex:1; background:none; border:none; outline:none;
+                    color:var(--text); font-size:.88rem; font-family:inherit;">
+      <label style="display:flex; align-items:center; gap:.35rem; font-size:.78rem;
+                    color:var(--text-muted); cursor:pointer; user-select:none; flex-shrink:0;">
+        <input type="checkbox" id="rest-selall" onchange="toggleSelAll(this.checked)"
+               style="accent-color:var(--blue); width:14px; height:14px;">
+        Seleccionar todo
+      </label>
+    </div>
+
+    <!-- Lista -->
+    <div id="rest-lista" style="overflow-y:auto; flex:1; padding:.4rem 0;"></div>
+
+    <!-- Mensaje resultado -->
+    <div id="rest-msg" style="display:none; margin:.2rem 1.2rem .4rem;
+         padding:.65rem 1rem; border-radius:8px; font-size:.83rem; font-family:var(--mono);"></div>
+
+    <!-- Footer -->
+    <div style="padding:.9rem 1.4rem; border-top:1px solid var(--border-soft); flex-shrink:0;
+                display:flex; align-items:center; gap:.6rem; justify-content:flex-end;">
+      <span id="rest-conteo" style="font-size:.78rem; color:var(--text-muted); font-family:var(--mono); margin-right:auto;"></span>
+      <button onclick="cerrarModalRestaurar()" class="btn btn-g-ghost" id="btn-rest-cancel">Cancelar</button>
+      <button id="btn-rest-ok" onclick="ejecutarRestaurar()" class="btn btn-g-ghost"
+              disabled style="border-color:var(--blue); color:var(--blue);">
+        ↩ Restaurar seleccionadas
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+.rest-item:hover { background: var(--bg3); }
+.rest-sel        { background: rgba(31,111,235,.07) !important; }
+</style>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════
+// ── RESTAURAR ARCHIVADAS ──────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+let _archivadas = [];
+let _selIds     = new Set();
+
+async function abrirModalRestaurar() {
+  document.getElementById('modal-restaurar').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  _selIds.clear();
+
+  document.getElementById('rest-msg').style.display      = 'none';
+  document.getElementById('rest-buscar').value           = '';
+  document.getElementById('rest-selall').checked         = false;
+  document.getElementById('btn-rest-ok').disabled        = true;
+  document.getElementById('btn-rest-ok').textContent     = '↩ Restaurar seleccionadas';
+  document.getElementById('btn-rest-cancel').textContent = 'Cancelar';
+  document.getElementById('rest-sub').textContent        = 'Cargando…';
+  renderListaRest('<div style="padding:2rem;text-align:center;color:var(--text-muted);">⏳ Cargando…</div>');
+
+  let data;
+  try {
+    const res = await fetch('/util/tareas-archivadas');
+    const txt = await res.text();
+    try { data = JSON.parse(txt); }
+    catch(_) { throw new Error('Respuesta no válida del servidor: ' + txt.slice(0,200)); }
+    if (data && data.error) throw new Error(data.error);
+    _archivadas = Array.isArray(data) ? data : [];
+  } catch(e) {
+    document.getElementById('rest-sub').textContent = 'Error al cargar';
+    renderListaRest(
+      `<div style="padding:2rem;text-align:center;">
+        <div style="color:var(--red);font-weight:700;margin-bottom:.5rem;">❌ Error al cargar las tareas archivadas</div>
+        <div style="font-family:var(--mono);font-size:.75rem;color:var(--text-muted);word-break:break-all;">${e.message}</div>
+      </div>`
+    );
+    return;
   }
 
-  function cerrarModalCat() {
-    document.getElementById('modal-cat').style.display = 'none';
-    document.body.style.overflow = '';
+  actualizarSubtitulo();
+  filtrarArchivadas('');
+}
+
+function cerrarModalRestaurar() {
+  document.getElementById('modal-restaurar').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function actualizarSubtitulo() {
+  const n = _archivadas.length;
+  document.getElementById('rest-sub').textContent =
+    n ? `${n} tarea${n !== 1 ? 's' : ''} en el archivo` : 'El archivo está vacío';
+}
+
+function filtrarArchivadas(q) {
+  const ql       = q.toLowerCase().trim();
+  const visibles = ql
+    ? _archivadas.filter(t =>
+        (t.descripcion||'').toLowerCase().includes(ql) ||
+        (t.categoria||'').toLowerCase().includes(ql)   ||
+        (t.codigo||'').toLowerCase().includes(ql))
+    : _archivadas;
+
+  if (!visibles.length) {
+    renderListaRest(
+      `<div style="padding:2rem;text-align:center;color:var(--text-muted);">
+        <div style="font-size:1.4rem;margin-bottom:.4rem;">🔍</div>
+        ${_archivadas.length ? 'Ninguna tarea coincide.' : 'No hay tareas archivadas.'}
+      </div>`
+    );
+    actualizarConteo();
+    return;
   }
 
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') cerrarModalCat();
+  const PRIOR = {1:'🔴',2:'🟡',3:'🟢'};
+  const html = visibles.map(t => {
+    const sel  = _selIds.has(t.id);
+    const arch = t.fecha_archivado ? t.fecha_archivado.slice(0,10) : '—';
+    return `
+    <div class="rest-item${sel ? ' rest-sel' : ''}" data-id="${t.id}"
+         onclick="toggleRestItem(${t.id}, this)"
+         style="display:flex;align-items:flex-start;gap:.75rem;padding:.7rem 1.2rem;
+                border-bottom:1px solid var(--border-soft);cursor:pointer;transition:background .12s;">
+      <input type="checkbox" class="rest-chk" data-id="${t.id}" ${sel ? 'checked' : ''}
+             onclick="event.stopPropagation();toggleRestItem(${t.id},this.closest('.rest-item'))"
+             style="margin-top:.25rem;accent-color:var(--blue);width:14px;height:14px;flex-shrink:0;cursor:pointer;">
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.15rem;">
+          ${t.codigo ? `<span style="font-family:var(--mono);font-size:.67rem;color:var(--accent);
+            background:var(--bg3);padding:.1rem .35rem;border-radius:3px;">${t.codigo}</span>` : ''}
+          <span style="font-size:.86rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            ${t.descripcion}
+          </span>
+          <span style="margin-left:auto;flex-shrink:0;">${PRIOR[t.prioridad]||'🟡'}</span>
+        </div>
+        <div style="font-size:.7rem;color:var(--text-muted);font-family:var(--mono);
+                    display:flex;flex-wrap:wrap;gap:.5rem;">
+          ${t.categoria ? `<span>📂 ${t.categoria}</span>` : ''}
+          ${t.fecha     ? `<span>📅 ${t.fecha}</span>` : ''}
+          <span>🗂 archivada ${arch}</span>
+          ${t.usuario   ? `<span>👤 ${t.usuario}</span>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  renderListaRest(html);
+  actualizarConteo();
+}
+
+function renderListaRest(html) {
+  document.getElementById('rest-lista').innerHTML = html;
+}
+
+function toggleRestItem(id, row) {
+  const chk = row.querySelector('.rest-chk');
+  if (_selIds.has(id)) {
+    _selIds.delete(id);
+    row.classList.remove('rest-sel');
+    if (chk) chk.checked = false;
+  } else {
+    _selIds.add(id);
+    row.classList.add('rest-sel');
+    if (chk) chk.checked = true;
+  }
+  actualizarConteo();
+  const items = document.querySelectorAll('.rest-item');
+  document.getElementById('rest-selall').checked =
+    items.length > 0 && [...items].every(r => _selIds.has(+r.dataset.id));
+}
+
+function toggleSelAll(checked) {
+  document.querySelectorAll('.rest-item').forEach(row => {
+    const id  = +row.dataset.id;
+    const chk = row.querySelector('.rest-chk');
+    if (checked) { _selIds.add(id); row.classList.add('rest-sel'); }
+    else         { _selIds.delete(id); row.classList.remove('rest-sel'); }
+    if (chk) chk.checked = checked;
   });
+  actualizarConteo();
+}
+
+function actualizarConteo() {
+  const n   = _selIds.size;
+  const btn = document.getElementById('btn-rest-ok');
+  document.getElementById('rest-conteo').textContent =
+    n ? `${n} tarea${n !== 1 ? 's' : ''} seleccionada${n !== 1 ? 's' : ''}` : '';
+  btn.disabled    = n === 0;
+  btn.textContent = n ? `↩ Restaurar ${n} tarea${n !== 1 ? 's' : ''}` : '↩ Restaurar seleccionadas';
+}
+
+async function ejecutarRestaurar() {
+  if (!_selIds.size) return;
+  const btn = document.getElementById('btn-rest-ok');
+  btn.disabled    = true;
+  btn.textContent = 'Restaurando…';
+
+  let data;
+  try {
+    const res = await fetch('/util/restaurar-archivadas', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ ids: [..._selIds] }),
+    });
+    const txt = await res.text();
+    try { data = JSON.parse(txt); }
+    catch(_) { throw new Error('Respuesta inválida: ' + txt.slice(0,200)); }
+  } catch(e) {
+    data = { ok: false, error: e.message };
+  }
+
+  const msg = document.getElementById('rest-msg');
+  msg.style.display = 'block';
+
+  if (data.ok) {
+    msg.style.cssText = 'display:block;margin:.2rem 1.2rem .4rem;padding:.65rem 1rem;border-radius:8px;font-size:.83rem;font-family:var(--mono);background:rgba(31,111,235,.12);border:1px solid rgba(31,111,235,.35);color:var(--blue)';
+    msg.textContent   = `✔ ${data.restauradas} tarea${data.restauradas!==1?'s':''} restaurada${data.restauradas!==1?'s':''} correctamente.`;
+    document.getElementById('btn-rest-cancel').textContent = 'Cerrar';
+    _archivadas = _archivadas.filter(t => !_selIds.has(t.id));
+    _selIds.clear();
+    actualizarSubtitulo();
+    filtrarArchivadas(document.getElementById('rest-buscar').value);
+    setTimeout(() => location.reload(), 1800);
+  } else {
+    msg.style.cssText = 'display:block;margin:.2rem 1.2rem .4rem;padding:.65rem 1rem;border-radius:8px;font-size:.83rem;font-family:var(--mono);background:rgba(200,60,40,.1);border:1px solid rgba(200,60,40,.3);color:#ff6a6a';
+    msg.textContent   = '❌ ' + (data.error || 'Error al restaurar. Inténtalo de nuevo.');
+    btn.disabled      = false;
+    btn.textContent   = `↩ Restaurar ${_selIds.size} tarea${_selIds.size!==1?'s':''}`;
+  }
+}
 </script>
 {% endblock %}

@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}Vista Usuarios — Gestor{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+  <div>
+    <h4 style="font-weight:700; margin:0;">👥 Vista usuarios</h4>
+    <div style="font-family:var(--mono); font-size:.75rem; color:var(--text-muted); margin-top:.2rem;">
+      Resumen de actividad por usuario — {{ hoy }}
+    </div>
+  </div>
+  <a href="/dashboard" class="btn btn-g-ghost" style="font-size:.82rem;">← Dashboard</a>
+</div>
+
+<!-- ── KPIs globales ──────────────────────────────────────────────────────── -->
+{% set ns = namespace(tu=0, tt=0, tc=0, tp=0, tv=0) %}
+{% for u in usuarios %}
+  {% if u.total > 0 %}{% set ns.tu = ns.tu + 1 %}{% endif %}
+  {% set ns.tt = ns.tt + u.total %}
+  {% set ns.tc = ns.tc + u.comp %}
+  {% set ns.tp = ns.tp + u.pend %}
+  {% set ns.tv = ns.tv + u.vencidas %}
+{% endfor %}
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-sm-3">
+    <div class="stat-card blue">
+      <div class="stat-label">Usuarios activos</div>
+      <div class="stat-value">{{ ns.tu }}</div>
+      <div style="font-size:.8rem; color:var(--text-muted);">con tareas</div>
+    </div>
+  </div>
+  <div class="col-6 col-sm-3">
+    <div class="stat-card green">
+      <div class="stat-label">Completadas</div>
+      <div class="stat-value" style="color:var(--accent);">{{ ns.tc }}</div>
+      <div style="font-size:.8rem; color:var(--text-muted);">en total</div>
+    </div>
+  </div>
+  <div class="col-6 col-sm-3">
+    <div class="stat-card amber">
+      <div class="stat-label">Pendientes</div>
+      <div class="stat-value" style="color:var(--amber);">{{ ns.tp }}</div>
+      <div style="font-size:.8rem; color:var(--text-muted);">en total</div>
+    </div>
+  </div>
+  <div class="col-6 col-sm-3">
+    <div class="stat-card red">
+      <div class="stat-label">Vencidas</div>
+      <div class="stat-value" style="color:#ff6a6a;">{{ ns.tv }}</div>
+      <div style="font-size:.8rem; color:var(--text-muted);">sin completar</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Tabla ──────────────────────────────────────────────────────────────── -->
+<div class="gcard">
+  <div class="gcard-header">
+    <span style="color:var(--blue)">◉</span>
+    <span class="gcard-title">Detalle por usuario</span>
+    <span style="margin-left:auto;">
+      <input id="filtro-usuario" type="text" placeholder="Filtrar…"
+             oninput="filtrarTabla(this.value)"
+             style="background:var(--bg3); border:1px solid var(--border-soft);
+                    border-radius:7px; padding:.3rem .75rem; color:var(--text);
+                    font-size:.8rem; outline:none; font-family:var(--mono); width:160px;">
+    </span>
+  </div>
+  <div class="gcard-body p-0" style="overflow-x:auto;">
+    <table id="tabla-usuarios" style="width:100%; border-collapse:collapse; font-size:.85rem;">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border-soft);">
+          <th class="th-u" onclick="sortTabla(0)">Usuario <span class="sort-ico">↕</span></th>
+          <th class="th-u" onclick="sortTabla(1)">Email</th>
+          <th class="th-u th-num" onclick="sortTabla(2)">Total <span class="sort-ico">↕</span></th>
+          <th class="th-u th-num" onclick="sortTabla(3)">✔ Comp. <span class="sort-ico">↕</span></th>
+          <th class="th-u th-num" onclick="sortTabla(4)">● Pend. <span class="sort-ico">↕</span></th>
+          <th class="th-u th-num" onclick="sortTabla(5)">⚠ Venc. <span class="sort-ico">↕</span></th>
+          <th class="th-u th-num" onclick="sortTabla(6)">% <span class="sort-ico">↕</span></th>
+          <th class="th-u">Barra</th>
+          <th class="th-u">Últ. actividad</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in usuarios %}
+        <tr class="fila-u" data-user="{{ u.username | lower }}"
+            style="border-bottom:1px solid var(--border-soft); transition:background .14s;"
+            onmouseover="this.style.background='var(--bg3)'"
+            onmouseout="this.style.background=''">
+
+          <!-- Usuario -->
+          <td style="padding:.8rem 1rem; font-weight:700; white-space:nowrap;">
+            <span style="display:inline-flex; align-items:center; gap:.5rem;">
+              <span style="width:28px; height:28px; border-radius:50%; background:var(--bg3);
+                           border:1px solid var(--border-soft); display:inline-flex;
+                           align-items:center; justify-content:center; font-size:.75rem;
+                           font-family:var(--mono); font-weight:700; flex-shrink:0;
+                           color:{{ 'var(--accent)' if u.pct==100 else ('#ff6a6a' if u.vencidas > 0 else 'var(--text-muted)') }};">
+                {{ u.username[0] | upper }}
+              </span>
+              {{ u.username }}
+              {% if u.alta_pend > 0 %}
+                <span title="{{ u.alta_pend }} tareas de alta prioridad pendientes"
+                      style="font-size:.65rem; background:rgba(200,60,40,.15);
+                             color:#ff6a6a; padding:.1rem .35rem; border-radius:4px;
+                             font-family:var(--mono); font-weight:700;">
+                  🔴 {{ u.alta_pend }}
+                </span>
+              {% endif %}
+            </span>
+          </td>
+
+          <!-- Email -->
+          <td style="padding:.8rem 1rem; color:var(--text-muted); font-size:.8rem;
+                     font-family:var(--mono); white-space:nowrap;">{{ u.email }}</td>
+
+          <!-- Total -->
+          <td class="td-num" style="color:var(--text-muted);">{{ u.total }}</td>
+
+          <!-- Completadas -->
+          <td class="td-num" style="color:var(--accent);">{{ u.comp }}</td>
+
+          <!-- Pendientes -->
+          <td class="td-num" style="color:{{ 'var(--amber)' if u.pend > 0 else 'var(--text-muted)' }};">
+            {{ u.pend }}
+          </td>
+
+          <!-- Vencidas -->
+          <td class="td-num">
+            {% if u.vencidas > 0 %}
+              <span style="color:#ff6a6a; font-weight:700; animation:pulse-r 2s ease infinite;">
+                {{ u.vencidas }}
+              </span>
+            {% else %}
+              <span style="color:var(--text-muted);">—</span>
+            {% endif %}
+          </td>
+
+          <!-- % -->
+          <td class="td-num">
+            <span style="font-family:var(--mono); font-weight:700;
+                         color:{{ 'var(--accent)' if u.pct==100 else ('var(--amber)' if u.pct>=50 else '#ff6a6a') }};">
+              {{ u.pct }}%
+            </span>
+          </td>
+
+          <!-- Barra -->
+          <td style="padding:.8rem 1rem; min-width:100px;">
+            <div style="height:6px; background:var(--bg3); border-radius:99px; overflow:hidden; width:100px;">
+              <div style="height:100%; width:{{ u.pct }}%;
+                          background:{{ 'var(--accent)' if u.pct==100 else ('var(--blue)' if u.pct>=50 else 'var(--amber)') }};
+                          border-radius:99px; transition:width 1s ease;"></div>
+            </div>
+          </td>
+
+          <!-- Última actividad -->
+          <td style="padding:.8rem 1rem; font-size:.78rem; font-family:var(--mono);
+                     color:var(--text-muted); white-space:nowrap;">
+            {% if u.ultima %}
+              {{ u.ultima.strftime('%d/%m/%Y %H:%M') if u.ultima else '—' }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" style="padding:3rem; text-align:center; color:var(--text-muted); font-size:.88rem;">
+            No hay usuarios con tareas.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Leyenda ─────────────────────────────────────────────────────────────── -->
+<div style="margin-top:.75rem; display:flex; flex-wrap:wrap; gap:.5rem 1.5rem;
+            font-size:.72rem; font-family:var(--mono); color:var(--text-muted);">
+  <span>🔴 = tareas de alta prioridad pendientes</span>
+  <span>⚠ = tareas cuya fecha ya pasó sin completarse</span>
+  <span>% en verde = todo completado</span>
+</div>
+
+
+<style>
+.th-u {
+  padding:.75rem 1rem; text-align:left; font-family:var(--mono);
+  font-size:.7rem; font-weight:700; color:var(--text-muted);
+  letter-spacing:.05em; text-transform:uppercase; white-space:nowrap;
+  cursor:pointer; user-select:none;
+  transition:color .15s;
+}
+.th-u:hover { color:var(--accent); }
+.th-num { text-align:center; }
+.td-num { padding:.8rem 1rem; text-align:center; font-family:var(--mono); font-weight:700; }
+.sort-ico { font-size:.7rem; opacity:.5; }
+@keyframes pulse-r { 0%,100%{opacity:1} 50%{opacity:.55} }
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Filtrar por nombre ────────────────────────────────────────────────────
+function filtrarTabla(q) {
+  const filas = document.querySelectorAll('#tabla-usuarios .fila-u');
+  filas.forEach(f => {
+    f.style.display = f.dataset.user.includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+
+// ── Ordenar tabla ─────────────────────────────────────────────────────────
+let sortDir = {};
+function sortTabla(col) {
+  const tbody = document.querySelector('#tabla-usuarios tbody');
+  const filas = [...tbody.querySelectorAll('.fila-u')];
+  sortDir[col] = !sortDir[col];
+  filas.sort((a, b) => {
+    const va = a.querySelectorAll('td')[col]?.textContent.trim() || '';
+    const vb = b.querySelectorAll('td')[col]?.textContent.trim() || '';
+    const na = parseFloat(va.replace('%','').replace('—','0'));
+    const nb = parseFloat(vb.replace('%','').replace('—','0'));
+    if (!isNaN(na) && !isNaN(nb)) return sortDir[col] ? na-nb : nb-na;
+    return sortDir[col] ? va.localeCompare(vb) : vb.localeCompare(va);
+  });
+  filas.forEach(f => tbody.appendChild(f));
+}
+</script>
+{% endblock %}

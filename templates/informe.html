@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+{% block title %}Informe — Gestor{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+  <div>
+    <h4 style="font-weight:700; margin:0;">📊 Informe de productividad</h4>
+    <div style="font-family:var(--mono); font-size:.75rem; color:var(--text-muted); margin-top:.2rem;">
+      {{ mes_nombre }} {{ anio }}
+    </div>
+  </div>
+  <a href="/dashboard" class="btn btn-g-ghost" style="font-size:.82rem;">← Dashboard</a>
+</div>
+
+
+<!-- ── KPIs principales ───────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+
+  <div class="col-6 col-md-3">
+    <div class="stat-card blue">
+      <div class="stat-label">Tareas este mes</div>
+      <div class="stat-value">{{ total_mes }}</div>
+      {% set delta_t = total_mes - total_ant %}
+      <div style="font-size:.78rem; color:{{ 'var(--accent)' if delta_t >= 0 else '#ff6a6a' }};">
+        {{ '+' if delta_t >= 0 else '' }}{{ delta_t }} vs {{ mes_ant_n }}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="stat-card green">
+      <div class="stat-label">Completadas</div>
+      <div class="stat-value" style="color:var(--accent);">{{ comp_mes }}</div>
+      {% set delta_c = comp_mes - comp_ant %}
+      <div style="font-size:.78rem; color:{{ 'var(--accent)' if delta_c >= 0 else '#ff6a6a' }};">
+        {{ '+' if delta_c >= 0 else '' }}{{ delta_c }} vs {{ mes_ant_n }}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="stat-card amber">
+      <div class="stat-label">% Completado</div>
+      <div class="stat-value" style="color:var(--blue); font-size:1.8rem;">{{ pct_mes }}%</div>
+      {% set delta_p = pct_mes - pct_ant %}
+      <div style="font-size:.78rem; color:{{ 'var(--accent)' if delta_p >= 0 else '#ff6a6a' }};">
+        {{ '+' if delta_p >= 0 else '' }}{{ delta_p }}pp vs {{ mes_ant_n }}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="stat-card" style="{{ 'border-color:rgba(35,134,54,.4)' if racha >= 3 else '' }}">
+      <div class="stat-label">Racha</div>
+      <div class="stat-value" style="color:{{ 'var(--accent)' if racha >= 3 else ('var(--amber)' if racha >= 1 else 'var(--text-muted)') }};">
+        {{ racha }}
+        <span style="font-size:1rem;">{{ '🔥' if racha >= 3 else '📅' }}</span>
+      </div>
+      <div style="font-size:.78rem; color:var(--text-muted);">día{{ 's' if racha != 1 else '' }} consecutivo{{ 's' if racha != 1 else '' }}</div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ── Barra de progreso del mes ──────────────────────────────────────────── -->
+<div class="gcard mb-4">
+  <div class="gcard-header">
+    <span style="color:var(--accent)">▰</span>
+    <span class="gcard-title">Progreso — {{ mes_nombre }}</span>
+    <div style="margin-left:auto; display:flex; gap:1.2rem; font-family:var(--mono); font-size:.74rem; color:var(--text-muted);">
+      <span>✔ {{ comp_mes }} completadas</span>
+      <span>● {{ pend_mes }} pendientes</span>
+      {% if venc_mes > 0 %}<span style="color:#ff6a6a;">⚠ {{ venc_mes }} vencidas</span>{% endif %}
+    </div>
+  </div>
+  <div class="gcard-body">
+    <div style="height:12px; background:var(--bg3); border-radius:99px; overflow:hidden; position:relative;">
+      {% if total_mes > 0 %}
+      <!-- Vencidas (base, rojo) -->
+      <div style="position:absolute; left:0; top:0; height:100%;
+                  width:{{ (venc_mes / total_mes * 100) | round | int }}%;
+                  background:#ff6a6a; border-radius:99px; transition:width 1s ease;"></div>
+      <!-- Completadas (encima, verde) -->
+      <div style="position:absolute; left:0; top:0; height:100%;
+                  width:{{ pct_mes }}%;
+                  background:linear-gradient(90deg,var(--accent),#4dc663);
+                  border-radius:99px; transition:width 1s ease;"></div>
+      {% endif %}
+    </div>
+    <div class="d-flex justify-content-between mt-2"
+         style="font-family:var(--mono); font-size:.72rem; color:var(--text-muted);">
+      <span>0%</span><span>{{ pct_mes }}% completado</span><span>100%</span>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── Gráficos ───────────────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+
+  <!-- Actividad diaria (área) -->
+  <div class="col-lg-7">
+    <div class="gcard h-100">
+      <div class="gcard-header">
+        <span style="color:var(--blue)">◉</span>
+        <span class="gcard-title">Actividad diaria — {{ mes_nombre }}</span>
+      </div>
+      <div class="gcard-body">
+        <canvas id="chartDia" style="max-height:230px;"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Por categoría (donut) -->
+  <div class="col-lg-5">
+    <div class="gcard h-100">
+      <div class="gcard-header">
+        <span style="color:var(--text-muted)">◑</span>
+        <span class="gcard-title">Por categoría</span>
+      </div>
+      <div class="gcard-body" style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap;">
+        <canvas id="chartCat" style="max-height:180px; max-width:180px;"></canvas>
+        <div id="legend-cat" style="flex:1; min-width:120px; font-size:.78rem;
+             font-family:var(--mono); display:flex; flex-direction:column; gap:.4rem;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── Próximas tareas (7 días) ───────────────────────────────────────────── -->
+{% if proximas %}
+<div class="gcard mb-4">
+  <div class="gcard-header">
+    <span style="color:var(--accent)">⏭</span>
+    <span class="gcard-title">Próximas 7 días</span>
+    <span style="margin-left:auto; font-family:var(--mono); font-size:.72rem; color:var(--text-muted);">
+      {{ proximas | length }} tarea{{ 's' if proximas | length != 1 else '' }}
+    </span>
+  </div>
+  <div class="gcard-body p-0">
+    {% for t in proximas %}
+    {% set dias = ((t.fecha | string) | replace('-','')) | int - (hoy | replace('-','')) | int %}
+    <div style="display:flex; align-items:center; gap:.85rem;
+                padding:.75rem 1.25rem; border-bottom:1px solid var(--border-soft);
+                transition:background .14s;"
+         onmouseover="this.style.background='var(--bg3)'"
+         onmouseout="this.style.background=''">
+      <span style="font-family:var(--mono); font-size:.75rem; font-weight:700; flex-shrink:0;
+                   min-width:52px; color:{{ '#f0833a' if t.fecha == hoy else 'var(--text-muted)' }};">
+        {{ '📍 HOY' if t.fecha == hoy else t.fecha[-5:] }}
+      </span>
+      {% if t.prioridad == 1 %}<span title="Alta prioridad">🔴</span>
+      {% elif t.prioridad == 3 %}<span title="Baja prioridad">🟢</span>
+      {% else %}<span title="Media prioridad">🟡</span>{% endif %}
+      <span style="flex:1; font-size:.86rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+        {% if t.codigo %}<span style="font-family:var(--mono); font-size:.68rem; color:var(--accent);
+          background:var(--bg3); padding:.1rem .35rem; border-radius:4px; margin-right:.4rem;">{{ t.codigo }}</span>{% endif %}
+        {{ t.descripcion }}
+      </span>
+      <span style="font-size:.72rem; font-family:var(--mono); color:var(--text-muted); flex-shrink:0;
+                   background:var(--bg3); padding:.15rem .5rem; border-radius:5px;">
+        {{ t.categoria or 'General' }}
+      </span>
+      {% if t.username %}<span style="font-size:.72rem; color:var(--text-muted); flex-shrink:0;">👤 {{ t.username }}</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ── Tareas vencidas ────────────────────────────────────────────────────── -->
+{% if vencidas %}
+<div class="gcard mb-4" style="border-color:rgba(200,60,40,.3);">
+  <div class="gcard-header" style="border-bottom-color:rgba(200,60,40,.2);">
+    <span style="color:#ff6a6a;">⚠</span>
+    <span class="gcard-title" style="color:#ff6a6a;">Vencidas sin completar</span>
+    <span style="margin-left:auto; font-family:var(--mono); font-size:.72rem; color:#ff6a6a;">
+      {{ vencidas | length }} tarea{{ 's' if vencidas | length != 1 else '' }}
+    </span>
+  </div>
+  <div class="gcard-body p-0">
+    {% for t in vencidas %}
+    <div style="display:flex; align-items:center; gap:.85rem;
+                padding:.75rem 1.25rem; border-bottom:1px solid rgba(200,60,40,.12);
+                transition:background .14s; background:rgba(200,60,40,.03);"
+         onmouseover="this.style.background='rgba(200,60,40,.06)'"
+         onmouseout="this.style.background='rgba(200,60,40,.03)'">
+      <span style="font-family:var(--mono); font-size:.75rem; color:#ff6a6a; flex-shrink:0; min-width:72px;">
+        {{ t.fecha }}
+      </span>
+      {% if t.prioridad == 1 %}<span>🔴</span>{% elif t.prioridad == 3 %}<span>🟢</span>{% else %}<span>🟡</span>{% endif %}
+      <span style="flex:1; font-size:.86rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text);">
+        {% if t.codigo %}<span style="font-family:var(--mono); font-size:.68rem; color:var(--accent);
+          background:var(--bg3); padding:.1rem .35rem; border-radius:4px; margin-right:.4rem;">{{ t.codigo }}</span>{% endif %}
+        {{ t.descripcion }}
+      </span>
+      <span style="font-size:.72rem; font-family:var(--mono); color:var(--text-muted); flex-shrink:0;
+                   background:var(--bg3); padding:.15rem .5rem; border-radius:5px;">
+        {{ t.categoria or 'General' }}
+      </span>
+      {% if t.username %}<span style="font-size:.72rem; color:var(--text-muted); flex-shrink:0;">👤 {{ t.username }}</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ── Tabla comparativa de categorías ────────────────────────────────────── -->
+{% if cats %}
+<div class="gcard">
+  <div class="gcard-header">
+    <span style="color:var(--text-muted)">📂</span>
+    <span class="gcard-title">Por categoría — {{ mes_nombre }}</span>
+  </div>
+  <div class="gcard-body p-0" style="overflow-x:auto;">
+    <table style="width:100%; border-collapse:collapse; font-size:.84rem;">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border-soft);">
+          <th class="th-inf">Categoría</th>
+          <th class="th-inf th-c">Total</th>
+          <th class="th-inf th-c">✔ Comp.</th>
+          <th class="th-inf th-c">● Pend.</th>
+          <th class="th-inf th-c">%</th>
+          <th class="th-inf">Progreso</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in cats %}
+        {% set pct_c = (c.comp / c.total * 100) | round | int if c.total > 0 else 0 %}
+        <tr style="border-bottom:1px solid var(--border-soft); transition:background .14s;"
+            onmouseover="this.style.background='var(--bg3)'"
+            onmouseout="this.style.background=''">
+          <td style="padding:.75rem 1.25rem; font-weight:600;">{{ c.cat }}</td>
+          <td class="td-c" style="color:var(--text-muted);">{{ c.total }}</td>
+          <td class="td-c" style="color:var(--accent);">{{ c.comp }}</td>
+          <td class="td-c" style="color:{{ 'var(--amber)' if (c.total - c.comp) > 0 else 'var(--text-muted)' }};">
+            {{ c.total - c.comp }}
+          </td>
+          <td class="td-c">
+            <span style="font-family:var(--mono); font-weight:700;
+                         color:{{ 'var(--accent)' if pct_c==100 else ('var(--blue)' if pct_c>=50 else 'var(--amber)') }};">
+              {{ pct_c }}%
+            </span>
+          </td>
+          <td style="padding:.75rem 1.25rem; min-width:120px;">
+            <div style="height:5px; background:var(--bg3); border-radius:99px; overflow:hidden; width:120px;">
+              <div style="height:100%; width:{{ pct_c }}%;
+                          background:{{ 'var(--accent)' if pct_c==100 else ('var(--blue)' if pct_c>=50 else 'var(--amber)') }};
+                          border-radius:99px; transition:width 1s ease;"></div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+
+<style>
+.th-inf {
+  padding:.7rem 1.25rem; font-family:var(--mono); font-size:.7rem;
+  font-weight:700; color:var(--text-muted); text-transform:uppercase;
+  letter-spacing:.05em; text-align:left;
+}
+.th-c, .td-c { text-align:center; }
+.td-c { padding:.75rem 1.25rem; font-family:var(--mono); font-weight:700; }
+</style>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const isLight   = document.body.classList.contains('light');
+const gridColor = isLight ? 'rgba(0,0,0,.07)' : 'rgba(255,255,255,.06)';
+const textColor = isLight ? '#636c76' : '#7d8590';
+
+// ── Gráfico diario (área) ─────────────────────────────────────────────────
+const POR_DIA = {{ por_dia | tojson }};
+const labels  = Object.keys(POR_DIA).map(d => d.slice(5));   // "MM-DD"
+const dataTot = Object.values(POR_DIA).map(v => v.total);
+const dataComp= Object.values(POR_DIA).map(v => v.comp);
+
+new Chart(document.getElementById('chartDia'), {
+  type: 'line',
+  data: {
+    labels,
+    datasets: [
+      {
+        label: 'Completadas',
+        data: dataComp,
+        fill: true,
+        backgroundColor: 'rgba(35,134,54,.15)',
+        borderColor: 'rgba(35,134,54,.8)',
+        borderWidth: 2,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        tension: .35,
+      },
+      {
+        label: 'Total',
+        data: dataTot,
+        fill: false,
+        borderColor: 'rgba(31,111,235,.5)',
+        borderWidth: 1.5,
+        borderDash: [4,3],
+        pointRadius: 2,
+        tension: .35,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { labels: { color: textColor, font:{size:11} } },
+      tooltip: {
+        backgroundColor:'#161b22', borderColor:'#30363d', borderWidth:1,
+        titleColor:'#e6edf3', bodyColor:'#7d8590',
+      }
+    },
+    scales: {
+      x: { ticks:{color:textColor,maxTicksLimit:10}, grid:{color:gridColor} },
+      y: { beginAtZero:true, ticks:{color:textColor,stepSize:1}, grid:{color:gridColor} }
+    }
+  }
+});
+
+// ── Gráfico categorías (donut) ────────────────────────────────────────────
+const CATS = {{ cats | tojson }};
+if (CATS.length) {
+  const catLabels = CATS.map(c => c.cat);
+  const catTotals = CATS.map(c => c.total);
+  const catColors = CATS.map((_,i) => `hsl(${140+i*30},50%,${isLight?42:50}%)`);
+
+  new Chart(document.getElementById('chartCat'), {
+    type: 'doughnut',
+    data: {
+      labels: catLabels,
+      datasets: [{ data:catTotals, backgroundColor:catColors, borderWidth:2,
+                   borderColor:'var(--bg2)', hoverOffset:6 }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:true, cutout:'68%',
+      plugins:{ legend:{display:false},
+        tooltip:{ backgroundColor:'#161b22',borderColor:'#30363d',borderWidth:1,
+          titleColor:'#e6edf3',bodyColor:'#7d8590' }}
+    }
+  });
+
+  // Leyenda manual
+  const leg = document.getElementById('legend-cat');
+  CATS.forEach((c, i) => {
+    const pct = c.total > 0 ? Math.round(c.comp/c.total*100) : 0;
+    const div = document.createElement('div');
+    div.style.cssText='display:flex;align-items:center;gap:.45rem;';
+    div.innerHTML=`
+      <span style="width:9px;height:9px;border-radius:50%;background:${catColors[i]};flex-shrink:0;"></span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${c.cat}">${c.cat}</span>
+      <span style="color:var(--text-muted);flex-shrink:0;">${c.total}</span>
+      <span style="color:${pct===100?'var(--accent)':'var(--text-muted)'};flex-shrink:0;">${pct}%</span>`;
+    leg.appendChild(div);
+  });
+}
+</script>
+{% endblock %}

@@ -17,6 +17,7 @@ from formacion import formacion_bp, inicializar_formacion
 from cursos import cursos_bp
 from historial_alumno_bp import historial_alumno_bp
 from calendario_bp import calendario_bp
+from utilidades_bp import utilidades_bp
 
 from auth import (
     auth_bp,
@@ -69,6 +70,8 @@ app.register_blueprint(calendario_bp)
 app.register_blueprint(cursos_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(historial_alumno_bp)
+app.register_blueprint(utilidades_bp, url_prefix="/util")
+
 init_oauth(app)
 
 # ── Cabeceras de seguridad HTTP ────────────────────────────────────────────────
