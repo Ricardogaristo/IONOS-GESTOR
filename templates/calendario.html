@@ -1,0 +1,700 @@
+{% extends "base.html" %}
+{% block title %}Calendario — Gestor{% endblock %}
+
+{% block content %}
+
+{# ── Estilos exclusivos del calendario ──────────────────────────────────── #}
+<style>
+/* ── Cabecera y navegación ── */
+.cal-nav { display:flex; align-items:center; gap:.6rem; }
+.cal-nav a {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:34px; height:34px; border-radius:8px;
+  border:1px solid var(--border-soft); background:var(--bg2);
+  color:var(--text-muted); text-decoration:none; font-size:.95rem;
+  transition:background .15s, color .15s;
+}
+.cal-nav a:hover { background:var(--bg3); color:var(--accent); }
+
+/* ── Grid del calendario ── */
+.cal-grid {
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:4px;
+  margin-top:.75rem;
+}
+.cal-dow {
+  text-align:center; font-family:var(--mono); font-size:.68rem;
+  font-weight:700; color:var(--text-muted); padding:.45rem 0;
+  letter-spacing:.06em; text-transform:uppercase;
+}
+.cal-dow.weekend { color:var(--blue); opacity:.7; }
+
+/* ── Celdas de día ── */
+.cal-day {
+  min-height:88px; border-radius:10px;
+  border:1px solid var(--border-soft);
+  background:var(--bg2);
+  padding:.45rem .5rem .4rem;
+  cursor:default;
+  position:relative;
+  transition:border-color .15s, box-shadow .15s, background .15s;
+  overflow:hidden;
+}
+.cal-day.has-tasks { cursor:pointer; }
+.cal-day.has-tasks:hover {
+  border-color:var(--accent);
+  box-shadow:0 0 0 1px var(--accent), 0 6px 20px rgba(0,0,0,.25);
+  z-index:1;
+}
+.cal-day.empty { background:transparent; border-color:transparent; }
+.cal-day.today {
+  border-color:var(--accent) !important;
+  box-shadow:0 0 0 1px var(--accent) !important;
+}
+
+/* ── Número del día ── */
+.cal-day-num {
+  font-family:var(--mono); font-weight:700; font-size:.82rem;
+  line-height:1; margin-bottom:.35rem;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.cal-day-num .num-badge {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:22px; height:22px; border-radius:6px;
+}
+.cal-day.today .num-badge {
+  background:var(--accent); color:#000; border-radius:50%;
+  font-size:.78rem;
+}
+.cal-day.past .cal-day-num .num-badge { color:var(--text-muted); }
+
+/* ── Pastillas de tareas dentro de la celda ── */
+.cal-pill {
+  display:flex; align-items:center; gap:.28rem;
+  font-size:.67rem; border-radius:5px; padding:.15rem .35rem;
+  margin-bottom:.18rem; overflow:hidden; white-space:nowrap;
+  text-overflow:ellipsis; max-width:100%;
+  border:1px solid transparent;
+  transition:opacity .15s;
+  font-family:var(--mono);
+}
+.cal-pill.done {
+  background:rgba(35,134,54,.18); color:#3fb950;
+  border-color:rgba(35,134,54,.25);
+}
+.cal-pill.pending {
+  background:rgba(210,153,34,.18); color:#e3b341;
+  border-color:rgba(210,153,34,.25);
+}
+/* Urgencia progresiva: mañana */
+.cal-pill.urgent-1 {
+  background:rgba(210,100,0,.18); color:#f0833a;
+  border-color:rgba(210,100,0,.3);
+}
+/* Urgencia: hoy/vence hoy */
+.cal-pill.urgent-today {
+  background:rgba(200,60,40,.22); color:#ff7b72;
+  border-color:rgba(200,60,40,.35);
+}
+/* Urgencia: vencida */
+.cal-pill.overdue {
+  background:rgba(180,30,30,.28); color:#ff6a6a;
+  border-color:rgba(180,30,30,.4);
+  animation:pulse-overdue 2.2s ease-in-out infinite;
+}
+@keyframes pulse-overdue {
+  0%,100% { opacity:1; }
+  50%      { opacity:.6; }
+}
+
+/* Fondo del día según urgencia máxima */
+.cal-day.bg-overdue   { background:rgba(180,30,30,.07) !important; }
+.cal-day.bg-today     { background:rgba(200,60,40,.05) !important; }
+.cal-day.bg-urgent-1  { background:rgba(210,100,0,.05) !important; }
+.cal-day.bg-this-week { background:rgba(210,153,34,.04) !important; }
+
+/* Contador de desbordamiento */
+.cal-more {
+  font-size:.65rem; color:var(--text-muted); font-family:var(--mono);
+  margin-top:.1rem; padding-left:.1rem;
+}
+
+/* ── Fondo urgente del número ── */
+.urgency-dot {
+  width:6px; height:6px; border-radius:50%; flex-shrink:0;
+}
+.urgency-dot.overdue  { background:#ff6a6a; }
+.urgency-dot.today    { background:var(--accent); }
+.urgency-dot.urgent-1 { background:#f0833a; }
+.urgency-dot.week     { background:#e3b341; }
+
+/* ── Modal de día ── */
+#modal-dia {
+  display:none; position:fixed; inset:0; z-index:9999;
+  background:rgba(0,0,0,.65); backdrop-filter:blur(5px);
+  align-items:center; justify-content:center; padding:1rem;
+}
+.modal-dia-box {
+  background:var(--bg2); border:1px solid var(--border-soft);
+  border-radius:16px; width:100%; max-width:520px;
+  max-height:82vh; display:flex; flex-direction:column;
+  box-shadow:0 24px 60px rgba(0,0,0,.55);
+  animation:slideUpCal .22s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes slideUpCal {
+  from { opacity:0; transform:translateY(24px) scale(.96); }
+  to   { opacity:1; transform:translateY(0)    scale(1); }
+}
+.modal-dia-header {
+  display:flex; align-items:center; gap:.7rem;
+  padding:1.1rem 1.4rem; border-bottom:1px solid var(--border-soft);
+  flex-shrink:0;
+}
+.modal-dia-body { overflow-y:auto; flex:1; }
+.modal-dia-footer {
+  padding:.85rem 1.4rem; border-top:1px solid var(--border-soft);
+  flex-shrink:0;
+}
+
+/* ── Ítem de tarea dentro del modal ── */
+.task-item {
+  display:flex; align-items:flex-start; gap:.75rem;
+  padding:.8rem 1.4rem; border-bottom:1px solid var(--border-soft);
+  transition:background .14s;
+}
+.task-item:last-child { border-bottom:none; }
+.task-item:hover { background:var(--bg3); }
+.task-chk {
+  width:18px; height:18px; border-radius:5px; flex-shrink:0;
+  border:2px solid var(--border-soft); cursor:pointer; margin-top:.1rem;
+  display:flex; align-items:center; justify-content:center;
+  transition:background .15s, border-color .15s;
+}
+.task-chk.done-chk { background:var(--accent); border-color:var(--accent); color:#000; font-size:.75rem; }
+.task-chk:hover { border-color:var(--accent); }
+.task-del {
+  margin-left:auto; background:none; border:none; cursor:pointer;
+  color:var(--text-muted); font-size:.85rem; padding:.2rem .35rem;
+  border-radius:5px; transition:background .14s, color .14s; flex-shrink:0;
+}
+.task-del:hover { background:rgba(200,60,40,.15); color:#ff6a6a; }
+
+/* ── Modal agregar tarea ── */
+#modal-add {
+  display:none; position:fixed; inset:0; z-index:10000;
+  background:rgba(0,0,0,.7); backdrop-filter:blur(6px);
+  align-items:center; justify-content:center; padding:1rem;
+}
+.modal-add-box {
+  background:var(--bg2); border:1px solid var(--border-soft);
+  border-radius:16px; width:100%; max-width:480px;
+  box-shadow:0 24px 60px rgba(0,0,0,.6);
+  animation:slideUpCal .2s cubic-bezier(.22,1,.36,1) both;
+}
+.modal-add-header {
+  display:flex; align-items:center; gap:.65rem;
+  padding:1.1rem 1.4rem; border-bottom:1px solid var(--border-soft);
+}
+.modal-add-body { padding:1.2rem 1.4rem; display:flex; flex-direction:column; gap:.9rem; }
+.modal-add-footer {
+  padding:.9rem 1.4rem; border-top:1px solid var(--border-soft);
+  display:flex; justify-content:flex-end; gap:.6rem;
+}
+.field-label {
+  font-family:var(--mono); font-size:.72rem; font-weight:700;
+  color:var(--text-muted); letter-spacing:.05em; text-transform:uppercase;
+  margin-bottom:.35rem;
+}
+.field-input {
+  width:100%; background:var(--bg3); border:1px solid var(--border-soft);
+  border-radius:8px; padding:.55rem .8rem; color:var(--text);
+  font-size:.88rem; font-family:inherit; outline:none;
+  transition:border-color .15s;
+}
+.field-input:focus { border-color:var(--accent); }
+select.field-input { cursor:pointer; }
+
+/* ── Leyenda ── */
+.cal-legend {
+  display:flex; flex-wrap:wrap; gap:.5rem 1.2rem;
+  font-size:.72rem; font-family:var(--mono); color:var(--text-muted);
+  margin-top:.6rem;
+}
+.leg-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:.35rem; }
+
+/* ── Resumen mensual ── */
+.cal-summary {
+  display:flex; gap:.5rem; flex-wrap:wrap;
+  font-family:var(--mono); font-size:.76rem;
+}
+.sum-chip {
+  padding:.25rem .7rem; border-radius:20px;
+  border:1px solid var(--border-soft);
+  background:var(--bg3);
+}
+</style>
+
+{# ── Encabezado de página ──────────────────────────────────────────────────── #}
+<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+  <div>
+    <h4 style="font-weight:700; margin:0;">◈ Calendario</h4>
+    <div style="font-family:var(--mono); font-size:.75rem; color:var(--text-muted); margin-top:.2rem;">
+      {{ mes_nombre }} {{ anio }}
+    </div>
+  </div>
+  <div class="d-flex gap-2 align-items-center">
+    <a href="/dashboard" class="btn btn-g-ghost" style="font-size:.82rem;">← Dashboard</a>
+    <button class="btn btn-g-success" onclick="abrirModalAdd()"
+            style="font-size:.84rem; display:flex; align-items:center; gap:.4rem;">
+      <span style="font-size:1.05rem; line-height:1;">＋</span> Nueva tarea
+    </button>
+  </div>
+</div>
+
+{# ── Resumen del mes ───────────────────────────────────────────────────────── #}
+{% set ns = namespace(total=0, comp=0, pend=0, vencidas=0) %}
+{% for fecha, tareas in tareas_por_dia.items() %}
+  {% for t in tareas %}
+    {% set ns.total = ns.total + 1 %}
+    {% if t.completada == 1 %}
+      {% set ns.comp = ns.comp + 1 %}
+    {% else %}
+      {% set ns.pend = ns.pend + 1 %}
+      {% if fecha < hoy %}
+        {% set ns.vencidas = ns.vencidas + 1 %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+{% endfor %}
+
+<div class="gcard mb-3">
+  <div class="gcard-body" style="padding:.85rem 1.25rem;">
+    <div class="cal-summary">
+      <span class="sum-chip">📋 {{ ns.total }} tareas este mes</span>
+      <span class="sum-chip" style="color:var(--accent); border-color:rgba(35,134,54,.3);">✔ {{ ns.comp }} completadas</span>
+      <span class="sum-chip" style="color:var(--amber); border-color:rgba(210,153,34,.3);">● {{ ns.pend }} pendientes</span>
+      {% if ns.vencidas > 0 %}
+      <span class="sum-chip" style="color:#ff6a6a; border-color:rgba(200,60,40,.35);">⚠ {{ ns.vencidas }} vencidas</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# ── Navegación de mes ─────────────────────────────────────────────────────── #}
+<div class="gcard mb-3">
+  <div class="gcard-body" style="padding:.85rem 1.25rem;">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div class="cal-nav">
+        <a href="/calendario?anio={{ anio_ant }}&mes={{ mes_ant }}" title="Mes anterior">‹</a>
+        <span style="font-weight:700; font-size:1rem; font-family:var(--mono); min-width:160px; text-align:center;">
+          {{ mes_nombre }} {{ anio }}
+        </span>
+        <a href="/calendario?anio={{ anio_sig }}&mes={{ mes_sig }}" title="Mes siguiente">›</a>
+        <a href="/calendario" title="Hoy" style="font-size:.72rem; width:auto; padding:0 .65rem; font-family:var(--mono);">hoy</a>
+      </div>
+
+      {# Leyenda #}
+      <div class="cal-legend">
+        <span><span class="leg-dot" style="background:#3fb950;"></span>Completada</span>
+        <span><span class="leg-dot" style="background:#e3b341;"></span>Pendiente</span>
+        <span><span class="leg-dot" style="background:#f0833a;"></span>Mañana</span>
+        <span><span class="leg-dot" style="background:#ff6a6a;"></span>Vencida</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Grid principal ────────────────────────────────────────────────────────── #}
+<div class="gcard">
+  <div class="gcard-body" style="padding:.75rem;">
+
+    {# Nombres de columnas #}
+    <div class="cal-grid">
+      {% for dia, es_fin in [("Lun",false),("Mar",false),("Mié",false),("Jue",false),("Vie",false),("Sáb",true),("Dom",true)] %}
+      <div class="cal-dow{% if es_fin %} weekend{% endif %}">{{ dia }}</div>
+      {% endfor %}
+    </div>
+
+    {# Semanas #}
+    {% for semana in semanas %}
+    <div class="cal-grid" style="margin-top:4px;">
+      {% for dia in semana %}
+        {% if dia is none %}
+          <div class="cal-day empty"></div>
+        {% else %}
+          {% set fecha_str = dia.strftime('%Y-%m-%d') %}
+          {% set tareas    = tareas_por_dia.get(fecha_str, []) %}
+          {% set es_hoy    = fecha_str == hoy %}
+          {% set es_pasado = fecha_str < hoy %}
+
+          {# Calcular urgencia máxima de tareas pendientes #}
+          {% set urgencia = namespace(max=0) %}
+          {% for t in tareas %}
+            {% if t.completada != 1 %}
+              {% if fecha_str < hoy and urgencia.max < 4 %}
+                {% set urgencia.max = 4 %}
+              {% elif fecha_str == hoy and urgencia.max < 3 %}
+                {% set urgencia.max = 3 %}
+              {% elif (hoy | replace('-','') | int) + 1 == (fecha_str | replace('-','') | int) and urgencia.max < 2 %}
+                {% set urgencia.max = 2 %}
+              {% elif urgencia.max < 1 %}
+                {% set urgencia.max = 1 %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+
+          <div class="cal-day
+            {% if tareas %} has-tasks{% endif %}
+            {% if es_hoy %} today{% elif es_pasado %} past{% endif %}
+            {% if urgencia.max == 4 %} bg-overdue
+            {% elif urgencia.max == 3 %} bg-today
+            {% elif urgencia.max == 2 %} bg-urgent-1
+            {% elif urgencia.max == 1 %} bg-this-week
+            {% endif %}"
+            {% if tareas %}onclick="abrirDia('{{ fecha_str }}')"{% endif %}
+            data-fecha="{{ fecha_str }}">
+
+            <div class="cal-day-num">
+              <span class="num-badge">{{ dia.day }}</span>
+              {# Punto de urgencia #}
+              {% if urgencia.max == 4 and tareas %}
+                <span class="urgency-dot overdue"></span>
+              {% elif urgencia.max == 3 and tareas %}
+                <span class="urgency-dot today"></span>
+              {% elif urgencia.max == 2 and tareas %}
+                <span class="urgency-dot urgent-1"></span>
+              {% elif urgencia.max == 1 and tareas %}
+                <span class="urgency-dot week"></span>
+              {% endif %}
+            </div>
+
+            {# Mostrar hasta 3 pastillas #}
+            {% for t in tareas[:3] %}
+              {% if t.completada == 1 %}
+                {% set pill_cls = "done" %}
+              {% elif fecha_str < hoy %}
+                {% set pill_cls = "overdue" %}
+              {% elif fecha_str == hoy %}
+                {% set pill_cls = "urgent-today" %}
+              {% else %}
+                {# calcular días al vencimiento #}
+                {% set pill_cls = "pending" %}
+              {% endif %}
+              <div class="cal-pill {{ pill_cls }}">
+                {% if t.completada == 1 %}✔{% elif fecha_str < hoy %}⚠{% else %}●{% endif %}
+                {{ t.descripcion[:22] }}{% if t.descripcion|length > 22 %}…{% endif %}
+              </div>
+            {% endfor %}
+
+            {% if tareas|length > 3 %}
+              <div class="cal-more">+{{ tareas|length - 3 }} más</div>
+            {% endif %}
+
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
+
+  </div>
+</div>
+
+
+{# ── Modal: detalle del día ────────────────────────────────────────────────── #}
+<div id="modal-dia" onclick="if(event.target===this)cerrarDia()">
+  <div class="modal-dia-box">
+    <div class="modal-dia-header">
+      <span id="mdia-icono" style="font-size:1.3rem;"></span>
+      <div>
+        <div id="mdia-titulo" style="font-weight:700; font-size:1rem;"></div>
+        <div id="mdia-sub"    style="font-size:.72rem; color:var(--text-muted); font-family:var(--mono);"></div>
+      </div>
+      <button onclick="cerrarDia()" style="
+        margin-left:auto; background:none; border:none; cursor:pointer;
+        color:var(--text-muted); font-size:1.1rem; padding:.2rem .4rem;
+        border-radius:6px; transition:background .15s;
+      " onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'">✕</button>
+    </div>
+    <div class="modal-dia-body" id="mdia-lista"></div>
+    <div class="modal-dia-footer">
+      <button class="btn btn-g-success" style="width:100%; font-size:.85rem;"
+              onclick="abrirModalAdd(diaActual)">
+        ＋ Agregar tarea a este día
+      </button>
+    </div>
+  </div>
+</div>
+
+{# ── Modal: agregar tarea ──────────────────────────────────────────────────── #}
+<div id="modal-add" onclick="if(event.target===this)cerrarModalAdd()">
+  <div class="modal-add-box">
+    <div class="modal-add-header">
+      <span style="font-size:1.25rem;">＋</span>
+      <div style="font-weight:700; font-size:1rem;">Nueva tarea</div>
+      <button onclick="cerrarModalAdd()" style="
+        margin-left:auto; background:none; border:none; cursor:pointer;
+        color:var(--text-muted); font-size:1.1rem; padding:.2rem .4rem; border-radius:6px;
+        transition:background .15s;
+      " onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'">✕</button>
+    </div>
+
+    <form action="/calendario/agregar" method="POST">
+      <div class="modal-add-body">
+
+        <div>
+          <div class="field-label">Descripción *</div>
+          <input type="text" name="descripcion" class="field-input"
+                 placeholder="¿Qué hay que hacer?" required autocomplete="off">
+        </div>
+
+        <div>
+          <div class="field-label">Fecha *</div>
+          <input type="date" name="fecha" id="add-fecha" class="field-input" required>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:.75rem;">
+          <div>
+            <div class="field-label">Categoría</div>
+            <select name="categoria" class="field-input">
+              <option value="General">General</option>
+              {% for cat in categorias %}
+              <option value="{{ cat }}">{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <div class="field-label">Prioridad</div>
+            <select name="prioridad" class="field-input">
+              <option value="1">🔴 Alta</option>
+              <option value="2" selected>🟡 Media</option>
+              <option value="3">🟢 Baja</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <div class="field-label">Notas</div>
+          <textarea name="notas" class="field-input" rows="2"
+                    style="resize:vertical; min-height:60px;"
+                    placeholder="Detalles opcionales…"></textarea>
+        </div>
+
+      </div>
+      <div class="modal-add-footer">
+        <button type="button" class="btn btn-g-ghost" onclick="cerrarModalAdd()">Cancelar</button>
+        <button type="submit" class="btn btn-g-success">Guardar tarea</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+{# ── JavaScript ────────────────────────────────────────────────────────────── #}
+<script>
+// Datos de tareas desde Flask (agrupadas por fecha)
+const TAREAS_DIA = {{ tareas_por_dia | tojson }};
+const HOY        = "{{ hoy }}";
+
+let diaActual = null;
+
+// ── Abrir modal de día ──────────────────────────────────────────────────────
+function abrirDia(fecha) {
+  diaActual = fecha;
+  const tareas   = TAREAS_DIA[fecha] || [];
+  const [anio, mes, dia] = fecha.split('-');
+  const fechaDate = new Date(fecha + 'T00:00:00');
+  const opciones  = { weekday:'long', year:'numeric', month:'long', day:'numeric' };
+  const tituloFecha = fechaDate.toLocaleDateString('es-ES', opciones);
+
+  // Calcular estado del día
+  let estadoDia = '';
+  if (fecha < HOY) estadoDia = '⚠ Fecha pasada';
+  else if (fecha === HOY) estadoDia = '📍 Hoy';
+
+  const comp  = tareas.filter(t => t.completada == 1).length;
+  const pend  = tareas.length - comp;
+
+  document.getElementById('mdia-icono').textContent  = fecha < HOY ? '⚠' : (fecha === HOY ? '📍' : '📅');
+  document.getElementById('mdia-titulo').textContent = tituloFecha.charAt(0).toUpperCase() + tituloFecha.slice(1);
+  document.getElementById('mdia-sub').textContent    = `${tareas.length} tarea${tareas.length!==1?'s':''} · ✔ ${comp} completadas · ● ${pend} pendientes`;
+
+  renderListaDia(tareas, fecha);
+
+  const modal = document.getElementById('modal-dia');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function renderListaDia(tareas, fecha) {
+  const lista = document.getElementById('mdia-lista');
+  if (!tareas.length) {
+    lista.innerHTML = `
+      <div style="padding:2.5rem; text-align:center; color:var(--text-muted); font-size:.88rem;">
+        Sin tareas para este día.
+      </div>`;
+    return;
+  }
+
+  const PRIOR = { 1:'🔴', 2:'🟡', 3:'🟢' };
+
+  lista.innerHTML = tareas.map(t => {
+    const done    = t.completada == 1;
+    const vencida = !done && fecha < HOY;
+    const hoyDia  = !done && fecha === HOY;
+
+    let urgClr = done    ? '#3fb950'
+               : vencida ? '#ff6a6a'
+               : hoyDia  ? '#ff7b72'
+               : '#e3b341';
+
+    return `
+      <div class="task-item" id="task-item-${t.id}">
+        <div class="task-chk ${done ? 'done-chk' : ''}"
+             onclick="toggleTarea(${t.id}, '${fecha}')"
+             title="${done ? 'Marcar pendiente' : 'Marcar completada'}">
+          ${done ? '✔' : ''}
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="
+            font-size:.87rem; font-weight:600;
+            text-decoration:${done ? 'line-through' : 'none'};
+            color:${done ? 'var(--text-muted)' : 'var(--text)'};
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+          ">
+            ${t.codigo ? `<span style="font-family:var(--mono); font-size:.68rem; color:var(--accent);
+              background:var(--bg3); padding:.1rem .35rem; border-radius:4px; margin-right:.4rem;">${t.codigo}</span>` : ''}
+            ${t.descripcion}
+          </div>
+          <div style="font-size:.72rem; color:var(--text-muted); font-family:var(--mono); margin-top:.2rem;
+                      display:flex; gap:.75rem; flex-wrap:wrap;">
+            <span>${PRIOR[t.prioridad] || '🟡'} ${t.prioridad==1?'Alta':t.prioridad==3?'Baja':'Media'}</span>
+            <span style="color:${urgClr}; font-weight:700;">
+              ${done ? '✔ Completada' : vencida ? '⚠ Vencida' : hoyDia ? '⏰ Hoy' : '● Pendiente'}
+            </span>
+            ${t.categoria ? `<span>📂 ${t.categoria}</span>` : ''}
+          </div>
+          ${t.notas ? `<div style="font-size:.75rem; color:var(--text-muted); margin-top:.3rem;
+            background:var(--bg3); border-radius:6px; padding:.3rem .55rem; line-height:1.5;">
+            ${t.notas}
+          </div>` : ''}
+        </div>
+        <button class="task-del" onclick="eliminarTarea(${t.id}, '${fecha}')" title="Eliminar tarea">🗑</button>
+      </div>`;
+  }).join('');
+}
+
+function cerrarDia() {
+  document.getElementById('modal-dia').style.display = 'none';
+  document.body.style.overflow = '';
+  diaActual = null;
+}
+
+// ── Toggle completada ────────────────────────────────────────────────────────
+async function toggleTarea(id, fecha) {
+  const res  = await fetch(`/calendario/toggle/${id}`, { method:'POST' });
+  const data = await res.json();
+  if (!data.ok) return;
+
+  // Actualizar estado local
+  const tareas = TAREAS_DIA[fecha] || [];
+  const tarea  = tareas.find(t => t.id == id);
+  if (tarea) tarea.completada = data.completada;
+
+  // Re-renderizar modal
+  renderListaDia(tareas, fecha);
+  // Actualizar subtítulo
+  const comp = tareas.filter(t => t.completada == 1).length;
+  const pend = tareas.length - comp;
+  document.getElementById('mdia-sub').textContent =
+    `${tareas.length} tarea${tareas.length!==1?'s':''} · ✔ ${comp} completadas · ● ${pend} pendientes`;
+
+  // Actualizar pastilla en el grid
+  actualizarCelda(fecha);
+}
+
+// ── Eliminar tarea ───────────────────────────────────────────────────────────
+async function eliminarTarea(id, fecha) {
+  if (!confirm('¿Eliminar esta tarea?')) return;
+  const res  = await fetch(`/calendario/eliminar/${id}`, { method:'POST' });
+  const data = await res.json();
+  if (!data.ok) return;
+
+  // Quitar de datos locales
+  const idx = (TAREAS_DIA[fecha] || []).findIndex(t => t.id == id);
+  if (idx !== -1) TAREAS_DIA[fecha].splice(idx, 1);
+  if (TAREAS_DIA[fecha].length === 0) delete TAREAS_DIA[fecha];
+
+  // Si no quedan tareas, cerrar modal y actualizar celda
+  const tareas = TAREAS_DIA[fecha] || [];
+  if (tareas.length === 0) {
+    cerrarDia();
+  } else {
+    renderListaDia(tareas, fecha);
+    const comp = tareas.filter(t => t.completada == 1).length;
+    document.getElementById('mdia-sub').textContent =
+      `${tareas.length} tarea${tareas.length!==1?'s':''} · ✔ ${comp} completadas · ● ${tareas.length-comp} pendientes`;
+  }
+  actualizarCelda(fecha);
+}
+
+// ── Actualizar celda del grid sin recargar ───────────────────────────────────
+function actualizarCelda(fecha) {
+  const celda  = document.querySelector(`.cal-day[data-fecha="${fecha}"]`);
+  if (!celda) return;
+  const tareas = TAREAS_DIA[fecha] || [];
+
+  // Pastillas
+  const pillsHTML = tareas.slice(0, 3).map(t => {
+    let cls = t.completada==1 ? 'done'
+            : fecha < HOY    ? 'overdue'
+            : fecha === HOY  ? 'urgent-today'
+            : 'pending';
+    const ico = t.completada==1 ? '✔' : fecha < HOY ? '⚠' : '●';
+    const txt = t.descripcion.length > 22 ? t.descripcion.slice(0,22)+'…' : t.descripcion;
+    return `<div class="cal-pill ${cls}">${ico} ${txt}</div>`;
+  }).join('');
+
+  const moreHTML = tareas.length > 3 ? `<div class="cal-more">+${tareas.length-3} más</div>` : '';
+
+  // Sustituir pills (todo excepto el número)
+  const numDiv = celda.querySelector('.cal-day-num');
+  celda.innerHTML = numDiv.outerHTML + pillsHTML + moreHTML;
+
+  // Actualizar clases
+  celda.classList.toggle('has-tasks', tareas.length > 0);
+  if (tareas.length > 0) {
+    celda.setAttribute('onclick', `abrirDia('${fecha}')`);
+  } else {
+    celda.removeAttribute('onclick');
+  }
+}
+
+// ── Modal agregar tarea ──────────────────────────────────────────────────────
+function abrirModalAdd(fechaPreseleccionada) {
+  // Precarga la fecha
+  const fechaInput = document.getElementById('add-fecha');
+  if (fechaPreseleccionada) {
+    fechaInput.value = fechaPreseleccionada;
+  } else {
+    fechaInput.value = HOY;
+  }
+  document.getElementById('modal-add').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalAdd() {
+  document.getElementById('modal-add').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+// ── Teclado ──────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    cerrarDia();
+    cerrarModalAdd();
+  }
+});
+</script>
+
+{% endblock %}
