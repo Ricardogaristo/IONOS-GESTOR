@@ -22,7 +22,8 @@ def _get_conn():
 
 
 def _tareas_rango(user_id: int, es_admin: bool, fecha_ini: str, fecha_fin: str):
-    """Devuelve tareas cuya fecha de vencimiento esté entre fecha_ini y fecha_fin."""
+    """Devuelve tareas entre fecha_ini y fecha_fin.
+    Admin: solo usuarios con tipo='A'. Usuario normal: solo las suyas."""
     conn = _get_conn()
     try:
         if es_admin:
@@ -31,8 +32,9 @@ def _tareas_rango(user_id: int, es_admin: bool, fecha_ini: str, fecha_fin: str):
                 SELECT t.id, t.descripcion, t.categoria, t.fecha, t.completada,
                        t.codigo, t.prioridad, t.notas, u.username
                 FROM tareas t
-                LEFT JOIN usuarios u ON t.usuario_id = u.id
-                WHERE t.fecha BETWEEN %s AND %s
+                INNER JOIN usuarios u ON t.usuario_id = u.id
+                WHERE COALESCE(u.tipo, 'A') = 'A'
+                  AND t.fecha BETWEEN %s AND %s
                 ORDER BY t.fecha, t.prioridad, t.id
                 """,
                 (fecha_ini, fecha_fin)
@@ -55,12 +57,15 @@ def _tareas_rango(user_id: int, es_admin: bool, fecha_ini: str, fecha_fin: str):
 
 
 def _categorias(user_id: int, es_admin: bool):
-    """Lista de categorías disponibles para el usuario."""
+    """Lista de categorías disponibles. Admin: usuarios tipo='A'. Normal: las suyas."""
     conn = _get_conn()
     try:
         if es_admin:
             rows = conn.execute(
-                "SELECT DISTINCT categoria FROM tareas WHERE categoria IS NOT NULL ORDER BY categoria"
+                """SELECT DISTINCT t.categoria FROM tareas t
+                   INNER JOIN usuarios u ON t.usuario_id = u.id
+                   WHERE COALESCE(u.tipo,'A') = 'A' AND t.categoria IS NOT NULL
+                   ORDER BY t.categoria"""
             ).fetchall()
         else:
             rows = conn.execute(
@@ -243,7 +248,10 @@ def toggle_tarea(tarea_id: int):
     try:
         if es_admin:
             row = conn.execute(
-                "SELECT id, completada FROM tareas WHERE id=%s", (tarea_id,)
+                """SELECT t.id, t.completada FROM tareas t
+                   INNER JOIN usuarios u ON t.usuario_id = u.id
+                   WHERE t.id=%s AND COALESCE(u.tipo,'A')='A'""",
+                (tarea_id,)
             ).fetchone()
         else:
             row = conn.execute(
@@ -277,7 +285,12 @@ def eliminar_tarea_cal(tarea_id: int):
     conn = _get_conn()
     try:
         if es_admin:
-            conn.execute("DELETE FROM tareas WHERE id=%s", (tarea_id,))
+            conn.execute(
+                """DELETE t FROM tareas t
+                   INNER JOIN usuarios u ON t.usuario_id = u.id
+                   WHERE t.id=%s AND COALESCE(u.tipo,'A')='A'""",
+                (tarea_id,)
+            )
         else:
             conn.execute(
                 "DELETE FROM tareas WHERE id=%s AND usuario_id=%s",

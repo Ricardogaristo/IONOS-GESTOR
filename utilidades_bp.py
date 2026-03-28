@@ -120,7 +120,11 @@ def vista_usuarios():
                 "vencidas":  r["vencidas"] or 0,
                 "alta_pend": r["alta_pend"] or 0,
                 "pct":       round(comp / total * 100) if total else 0,
-                "ultima":    r["ultima_act"],
+                "ultima":    (
+                    r["ultima_act"].strftime("%d/%m/%Y %H:%M")
+                    if hasattr(r["ultima_act"], "strftime")
+                    else (str(r["ultima_act"])[:16] if r["ultima_act"] else None)
+                ),
             }
         )
 

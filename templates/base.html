@@ -74,6 +74,14 @@
         </li>
         {% endif %}
 
+        {% if session.get('puede_tareas') %}
+        <li class="nav-item">
+          <a class="nav-link{{ ' active' if path == '/util/informe' else '' }}" href="/util/informe">
+            📊 Informe
+          </a>
+        </li>
+        {% endif %}
+
         {% if session.get('puede_formacion') %}
         <li class="nav-item">
           <a class="nav-link{{ ' active' if path.startswith('/formacion') else '' }}" href="/formacion">

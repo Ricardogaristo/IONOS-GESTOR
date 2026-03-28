@@ -157,11 +157,7 @@
           <!-- Última actividad -->
           <td style="padding:.8rem 1rem; font-size:.78rem; font-family:var(--mono);
                      color:var(--text-muted); white-space:nowrap;">
-            {% if u.ultima %}
-              {{ u.ultima.strftime('%d/%m/%Y %H:%M') if u.ultima else '—' }}
-            {% else %}
-              —
-            {% endif %}
+            {{ u.ultima or '—' }}
           </td>
         </tr>
         {% else %}

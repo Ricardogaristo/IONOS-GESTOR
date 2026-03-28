@@ -150,7 +150,7 @@
       </button>
 
       <!-- Informe de productividad -->
-      <a href="/informe" class="btn btn-g-ghost"
+      <a href="/util/informe" class="btn btn-g-ghost"
          style="border-color:#e3b341; color:#e3b341;"
          onmouseover="this.style.background='rgba(227,179,65,.1)'"
          onmouseout="this.style.background=''">
@@ -176,7 +176,7 @@
 
       <!-- Vista usuarios (admin) -->
       {% if session.get('es_admin', 0) >= 1 %}
-      <a href="/usuarios/vista" class="btn btn-g-warning">👥 Vista usuarios</a>
+      <a href="/util/usuarios/vista" class="btn btn-g-warning">👥 Vista usuarios</a>
       {% endif %}
 
       {% if session.get('es_admin')==1 %}
@@ -419,7 +419,7 @@ async function doBusqueda(q){
   clearTimeout(busTimer);
   if (q.trim().length < 2){ renderResultados([],''); return; }
   busTimer=setTimeout(async()=>{
-    const res=await fetch(`/buscar?q=${encodeURIComponent(q)}`);
+    const res=await fetch(`/util/buscar?q=${encodeURIComponent(q)}`);
     resultados=await res.json(); idxActivo=-1;
     renderResultados(resultados, q);
   }, 260);
@@ -495,7 +495,7 @@ function cerrarModalArchivar(){
 async function ejecutarArchivar(){
   const btn=document.getElementById('btn-arc-ok');
   btn.disabled=true; btn.textContent='Archivando…';
-  const res=await fetch('/archivar-completadas',{method:'POST'});
+  const res=await fetch('/util/archivar-completadas',{method:'POST'});
   const data=await res.json();
   const msg=document.getElementById('archivar-msg');
   msg.style.display='block';
@@ -532,7 +532,6 @@ document.addEventListener('keydown',e=>{
     box-shadow:0 32px 80px rgba(0,0,0,.6);
     animation:slideUpQ .18s cubic-bezier(.22,1,.36,1) both;">
 
-    <!-- Cabecera -->
     <div style="display:flex; align-items:center; gap:.7rem;
                 padding:1.1rem 1.4rem; border-bottom:1px solid var(--border-soft); flex-shrink:0;">
       <span style="font-size:1.3rem;">↩</span>
@@ -546,7 +545,6 @@ document.addEventListener('keydown',e=>{
         onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'">✕</button>
     </div>
 
-    <!-- Buscador + Seleccionar todo -->
     <div style="padding:.7rem 1.2rem; border-bottom:1px solid var(--border-soft); flex-shrink:0;
                 display:flex; gap:.6rem; align-items:center;">
       <span style="color:var(--text-muted);">🔍</span>
@@ -563,14 +561,11 @@ document.addEventListener('keydown',e=>{
       </label>
     </div>
 
-    <!-- Lista -->
     <div id="rest-lista" style="overflow-y:auto; flex:1; padding:.4rem 0;"></div>
 
-    <!-- Mensaje resultado -->
     <div id="rest-msg" style="display:none; margin:.2rem 1.2rem .4rem;
          padding:.65rem 1rem; border-radius:8px; font-size:.83rem; font-family:var(--mono);"></div>
 
-    <!-- Footer -->
     <div style="padding:.9rem 1.4rem; border-top:1px solid var(--border-soft); flex-shrink:0;
                 display:flex; align-items:center; gap:.6rem; justify-content:flex-end;">
       <span id="rest-conteo" style="font-size:.78rem; color:var(--text-muted); font-family:var(--mono); margin-right:auto;"></span>
@@ -589,9 +584,6 @@ document.addEventListener('keydown',e=>{
 </style>
 
 <script>
-// ══════════════════════════════════════════════════════════════════════════
-// ── RESTAURAR ARCHIVADAS ──────────────────────────────────────────────────
-// ══════════════════════════════════════════════════════════════════════════
 let _archivadas = [];
 let _selIds     = new Set();
 
@@ -599,7 +591,6 @@ async function abrirModalRestaurar() {
   document.getElementById('modal-restaurar').style.display = 'flex';
   document.body.style.overflow = 'hidden';
   _selIds.clear();
-
   document.getElementById('rest-msg').style.display      = 'none';
   document.getElementById('rest-buscar').value           = '';
   document.getElementById('rest-selall').checked         = false;
@@ -609,25 +600,22 @@ async function abrirModalRestaurar() {
   document.getElementById('rest-sub').textContent        = 'Cargando…';
   renderListaRest('<div style="padding:2rem;text-align:center;color:var(--text-muted);">⏳ Cargando…</div>');
 
-  let data;
   try {
     const res = await fetch('/util/tareas-archivadas');
     const txt = await res.text();
-    try { data = JSON.parse(txt); }
-    catch(_) { throw new Error('Respuesta no válida del servidor: ' + txt.slice(0,200)); }
+    let data;
+    try { data = JSON.parse(txt); } catch(_) { throw new Error('Respuesta no válida: ' + txt.slice(0,200)); }
     if (data && data.error) throw new Error(data.error);
     _archivadas = Array.isArray(data) ? data : [];
   } catch(e) {
     document.getElementById('rest-sub').textContent = 'Error al cargar';
     renderListaRest(
       `<div style="padding:2rem;text-align:center;">
-        <div style="color:var(--red);font-weight:700;margin-bottom:.5rem;">❌ Error al cargar las tareas archivadas</div>
+        <div style="color:var(--red);font-weight:700;margin-bottom:.5rem;">❌ Error al cargar</div>
         <div style="font-family:var(--mono);font-size:.75rem;color:var(--text-muted);word-break:break-all;">${e.message}</div>
-      </div>`
-    );
+      </div>`);
     return;
   }
-
   actualizarSubtitulo();
   filtrarArchivadas('');
 }
@@ -640,143 +628,102 @@ function cerrarModalRestaurar() {
 function actualizarSubtitulo() {
   const n = _archivadas.length;
   document.getElementById('rest-sub').textContent =
-    n ? `${n} tarea${n !== 1 ? 's' : ''} en el archivo` : 'El archivo está vacío';
+    n ? `${n} tarea${n!==1?'s':''} en el archivo` : 'El archivo está vacío';
 }
 
 function filtrarArchivadas(q) {
-  const ql       = q.toLowerCase().trim();
-  const visibles = ql
-    ? _archivadas.filter(t =>
-        (t.descripcion||'').toLowerCase().includes(ql) ||
-        (t.categoria||'').toLowerCase().includes(ql)   ||
-        (t.codigo||'').toLowerCase().includes(ql))
-    : _archivadas;
+  const ql = q.toLowerCase().trim();
+  const vis = ql ? _archivadas.filter(t =>
+    (t.descripcion||'').toLowerCase().includes(ql) ||
+    (t.categoria||'').toLowerCase().includes(ql)   ||
+    (t.codigo||'').toLowerCase().includes(ql)) : _archivadas;
 
-  if (!visibles.length) {
-    renderListaRest(
-      `<div style="padding:2rem;text-align:center;color:var(--text-muted);">
-        <div style="font-size:1.4rem;margin-bottom:.4rem;">🔍</div>
-        ${_archivadas.length ? 'Ninguna tarea coincide.' : 'No hay tareas archivadas.'}
-      </div>`
-    );
-    actualizarConteo();
-    return;
+  if (!vis.length) {
+    renderListaRest(`<div style="padding:2rem;text-align:center;color:var(--text-muted);">
+      <div style="font-size:1.4rem;margin-bottom:.4rem;">🔍</div>
+      ${_archivadas.length ? 'Ninguna tarea coincide.' : 'No hay tareas archivadas.'}</div>`);
+    actualizarConteo(); return;
   }
 
-  const PRIOR = {1:'🔴',2:'🟡',3:'🟢'};
-  const html = visibles.map(t => {
-    const sel  = _selIds.has(t.id);
-    const arch = t.fecha_archivado ? t.fecha_archivado.slice(0,10) : '—';
-    return `
-    <div class="rest-item${sel ? ' rest-sel' : ''}" data-id="${t.id}"
-         onclick="toggleRestItem(${t.id}, this)"
-         style="display:flex;align-items:flex-start;gap:.75rem;padding:.7rem 1.2rem;
-                border-bottom:1px solid var(--border-soft);cursor:pointer;transition:background .12s;">
-      <input type="checkbox" class="rest-chk" data-id="${t.id}" ${sel ? 'checked' : ''}
+  const PRIOR={1:'🔴',2:'🟡',3:'🟢'};
+  renderListaRest(vis.map(t => {
+    const sel=_selIds.has(t.id), arch=t.fecha_archivado?t.fecha_archivado.slice(0,10):'—';
+    return `<div class="rest-item${sel?' rest-sel':''}" data-id="${t.id}" onclick="toggleRestItem(${t.id},this)"
+      style="display:flex;align-items:flex-start;gap:.75rem;padding:.7rem 1.2rem;
+             border-bottom:1px solid var(--border-soft);cursor:pointer;transition:background .12s;">
+      <input type="checkbox" class="rest-chk" ${sel?'checked':''} data-id="${t.id}"
              onclick="event.stopPropagation();toggleRestItem(${t.id},this.closest('.rest-item'))"
              style="margin-top:.25rem;accent-color:var(--blue);width:14px;height:14px;flex-shrink:0;cursor:pointer;">
       <div style="flex:1;min-width:0;">
         <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.15rem;">
-          ${t.codigo ? `<span style="font-family:var(--mono);font-size:.67rem;color:var(--accent);
-            background:var(--bg3);padding:.1rem .35rem;border-radius:3px;">${t.codigo}</span>` : ''}
-          <span style="font-size:.86rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-            ${t.descripcion}
-          </span>
+          ${t.codigo?`<span style="font-family:var(--mono);font-size:.67rem;color:var(--accent);background:var(--bg3);padding:.1rem .35rem;border-radius:3px;">${t.codigo}</span>`:''}
+          <span style="font-size:.86rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.descripcion}</span>
           <span style="margin-left:auto;flex-shrink:0;">${PRIOR[t.prioridad]||'🟡'}</span>
         </div>
-        <div style="font-size:.7rem;color:var(--text-muted);font-family:var(--mono);
-                    display:flex;flex-wrap:wrap;gap:.5rem;">
-          ${t.categoria ? `<span>📂 ${t.categoria}</span>` : ''}
-          ${t.fecha     ? `<span>📅 ${t.fecha}</span>` : ''}
+        <div style="font-size:.7rem;color:var(--text-muted);font-family:var(--mono);display:flex;flex-wrap:wrap;gap:.5rem;">
+          ${t.categoria?`<span>📂 ${t.categoria}</span>`:''}
+          ${t.fecha?`<span>📅 ${t.fecha}</span>`:''}
           <span>🗂 archivada ${arch}</span>
-          ${t.usuario   ? `<span>👤 ${t.usuario}</span>` : ''}
+          ${t.usuario?`<span>👤 ${t.usuario}</span>`:''}
         </div>
-      </div>
-    </div>`;
-  }).join('');
-
-  renderListaRest(html);
+      </div></div>`;
+  }).join(''));
   actualizarConteo();
 }
 
-function renderListaRest(html) {
-  document.getElementById('rest-lista').innerHTML = html;
-}
+function renderListaRest(html){ document.getElementById('rest-lista').innerHTML=html; }
 
-function toggleRestItem(id, row) {
-  const chk = row.querySelector('.rest-chk');
-  if (_selIds.has(id)) {
-    _selIds.delete(id);
-    row.classList.remove('rest-sel');
-    if (chk) chk.checked = false;
-  } else {
-    _selIds.add(id);
-    row.classList.add('rest-sel');
-    if (chk) chk.checked = true;
-  }
+function toggleRestItem(id,row){
+  const chk=row.querySelector('.rest-chk');
+  if(_selIds.has(id)){ _selIds.delete(id); row.classList.remove('rest-sel'); if(chk) chk.checked=false; }
+  else               { _selIds.add(id);    row.classList.add('rest-sel');    if(chk) chk.checked=true;  }
   actualizarConteo();
-  const items = document.querySelectorAll('.rest-item');
-  document.getElementById('rest-selall').checked =
-    items.length > 0 && [...items].every(r => _selIds.has(+r.dataset.id));
+  const items=document.querySelectorAll('.rest-item');
+  document.getElementById('rest-selall').checked=items.length>0&&[...items].every(r=>_selIds.has(+r.dataset.id));
 }
 
-function toggleSelAll(checked) {
-  document.querySelectorAll('.rest-item').forEach(row => {
-    const id  = +row.dataset.id;
-    const chk = row.querySelector('.rest-chk');
-    if (checked) { _selIds.add(id); row.classList.add('rest-sel'); }
-    else         { _selIds.delete(id); row.classList.remove('rest-sel'); }
-    if (chk) chk.checked = checked;
+function toggleSelAll(checked){
+  document.querySelectorAll('.rest-item').forEach(row=>{
+    const id=+row.dataset.id, chk=row.querySelector('.rest-chk');
+    if(checked){ _selIds.add(id); row.classList.add('rest-sel'); }
+    else       { _selIds.delete(id); row.classList.remove('rest-sel'); }
+    if(chk) chk.checked=checked;
   });
   actualizarConteo();
 }
 
-function actualizarConteo() {
-  const n   = _selIds.size;
-  const btn = document.getElementById('btn-rest-ok');
-  document.getElementById('rest-conteo').textContent =
-    n ? `${n} tarea${n !== 1 ? 's' : ''} seleccionada${n !== 1 ? 's' : ''}` : '';
-  btn.disabled    = n === 0;
-  btn.textContent = n ? `↩ Restaurar ${n} tarea${n !== 1 ? 's' : ''}` : '↩ Restaurar seleccionadas';
+function actualizarConteo(){
+  const n=_selIds.size, btn=document.getElementById('btn-rest-ok');
+  document.getElementById('rest-conteo').textContent=n?`${n} tarea${n!==1?'s':''} seleccionada${n!==1?'s':''}` :'';
+  btn.disabled=n===0;
+  btn.textContent=n?`↩ Restaurar ${n} tarea${n!==1?'s':''}`:'↩ Restaurar seleccionadas';
 }
 
-async function ejecutarRestaurar() {
-  if (!_selIds.size) return;
-  const btn = document.getElementById('btn-rest-ok');
-  btn.disabled    = true;
-  btn.textContent = 'Restaurando…';
-
+async function ejecutarRestaurar(){
+  if(!_selIds.size) return;
+  const btn=document.getElementById('btn-rest-ok');
+  btn.disabled=true; btn.textContent='Restaurando…';
   let data;
   try {
-    const res = await fetch('/util/restaurar-archivadas', {
-      method:  'POST',
-      headers: {'Content-Type': 'application/json'},
-      body:    JSON.stringify({ ids: [..._selIds] }),
-    });
-    const txt = await res.text();
-    try { data = JSON.parse(txt); }
-    catch(_) { throw new Error('Respuesta inválida: ' + txt.slice(0,200)); }
-  } catch(e) {
-    data = { ok: false, error: e.message };
-  }
+    const res=await fetch('/util/restaurar-archivadas',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[..._selIds]})});
+    const txt=await res.text();
+    try{ data=JSON.parse(txt); }catch(_){ throw new Error('Respuesta inválida: '+txt.slice(0,200)); }
+  } catch(e){ data={ok:false,error:e.message}; }
 
-  const msg = document.getElementById('rest-msg');
-  msg.style.display = 'block';
-
-  if (data.ok) {
-    msg.style.cssText = 'display:block;margin:.2rem 1.2rem .4rem;padding:.65rem 1rem;border-radius:8px;font-size:.83rem;font-family:var(--mono);background:rgba(31,111,235,.12);border:1px solid rgba(31,111,235,.35);color:var(--blue)';
-    msg.textContent   = `✔ ${data.restauradas} tarea${data.restauradas!==1?'s':''} restaurada${data.restauradas!==1?'s':''} correctamente.`;
-    document.getElementById('btn-rest-cancel').textContent = 'Cerrar';
-    _archivadas = _archivadas.filter(t => !_selIds.has(t.id));
-    _selIds.clear();
-    actualizarSubtitulo();
-    filtrarArchivadas(document.getElementById('rest-buscar').value);
-    setTimeout(() => location.reload(), 1800);
+  const msg=document.getElementById('rest-msg');
+  msg.style.display='block';
+  if(data.ok){
+    msg.style.cssText='display:block;margin:.2rem 1.2rem .4rem;padding:.65rem 1rem;border-radius:8px;font-size:.83rem;font-family:var(--mono);background:rgba(31,111,235,.12);border:1px solid rgba(31,111,235,.35);color:var(--blue)';
+    msg.textContent=`✔ ${data.restauradas} tarea${data.restauradas!==1?'s':''} restaurada${data.restauradas!==1?'s':''} correctamente.`;
+    document.getElementById('btn-rest-cancel').textContent='Cerrar';
+    _archivadas=_archivadas.filter(t=>!_selIds.has(t.id)); _selIds.clear();
+    actualizarSubtitulo(); filtrarArchivadas(document.getElementById('rest-buscar').value);
+    setTimeout(()=>location.reload(),1800);
   } else {
-    msg.style.cssText = 'display:block;margin:.2rem 1.2rem .4rem;padding:.65rem 1rem;border-radius:8px;font-size:.83rem;font-family:var(--mono);background:rgba(200,60,40,.1);border:1px solid rgba(200,60,40,.3);color:#ff6a6a';
-    msg.textContent   = '❌ ' + (data.error || 'Error al restaurar. Inténtalo de nuevo.');
-    btn.disabled      = false;
-    btn.textContent   = `↩ Restaurar ${_selIds.size} tarea${_selIds.size!==1?'s':''}`;
+    msg.style.cssText='display:block;margin:.2rem 1.2rem .4rem;padding:.65rem 1rem;border-radius:8px;font-size:.83rem;font-family:var(--mono);background:rgba(200,60,40,.1);border:1px solid rgba(200,60,40,.3);color:#ff6a6a';
+    msg.textContent='❌ '+(data.error||'Error al restaurar. Inténtalo de nuevo.');
+    btn.disabled=false; btn.textContent=`↩ Restaurar ${_selIds.size} tarea${_selIds.size!==1?'s':''}`;
   }
 }
 </script>
