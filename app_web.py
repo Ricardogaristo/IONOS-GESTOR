@@ -1093,10 +1093,10 @@ def exportar():
     es_admin = session.get("es_admin", 0) >= 2  # Solo SuperAdmin exporta todo
     username = session.get("user", "sistema")
     conn     = get_connection()
-    base_q   = "SELECT t.id,t.descripcion,t.categoria,t.fecha,t.completada,t.codigo,t.usuario_id,u.username FROM tareas t LEFT JOIN usuarios u ON t.usuario_id=u.id "
+    base_q   = "SELECT t.id,t.descripcion,t.categoria,t.fecha,t.completada,t.codigo,t.usuario_id,u.username FROM tareas t INNER JOIN usuarios u ON t.usuario_id=u.id "
     if es_admin:
-        todas      = conn.execute(base_q+"ORDER BY t.categoria,t.id").fetchall()
-        tareas_hoy = conn.execute(base_q+"WHERE t.fecha=%s ORDER BY t.id",(hoy,)).fetchall()
+        todas      = conn.execute(base_q+"WHERE COALESCE(u.tipo,'A')='A' ORDER BY t.categoria,t.id").fetchall()
+        tareas_hoy = conn.execute(base_q+"WHERE COALESCE(u.tipo,'A')='A' AND t.fecha=%s ORDER BY t.id",(hoy,)).fetchall()
     else:
         todas      = conn.execute(base_q+"WHERE t.usuario_id=%s ORDER BY t.categoria,t.id",(user_id,)).fetchall()
         tareas_hoy = conn.execute(base_q+"WHERE t.usuario_id=%s AND t.fecha=%s ORDER BY t.id",(user_id,hoy)).fetchall()
