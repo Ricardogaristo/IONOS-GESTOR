@@ -20,13 +20,15 @@
       --ink:          #f0f4ff;
       --ink2:         #b0bbd8;
       --ink3:         #6e7a99;
-      --accent:       #c8290a;   /* rojo de marca — fijo en ambos temas */
+      --accent:       #c8290a;
       --accent-lt:    rgba(200,41,10,.12);
       --accent-md:    rgba(200,41,10,.22);
       --blue:         #7dd3fc;
       --blue-lt:      rgba(125,211,252,.1);
       --green:        #4ade80;
       --green-lt:     rgba(74,222,128,.1);
+      --gold:         #fbbf24;
+      --gold-lt:      rgba(251,191,36,.10);
     }
 
     body.light {
@@ -38,13 +40,15 @@
       --ink:          #1a1510;
       --ink2:         #3d3328;
       --ink3:         #6b5f52;
-      --accent:       #c8290a;   /* rojo de marca — fijo */
+      --accent:       #c8290a;
       --accent-lt:    rgba(200,41,10,.08);
       --accent-md:    rgba(200,41,10,.16);
       --blue:         #1e40af;
       --blue-lt:      rgba(30,64,175,.08);
       --green:        #166534;
       --green-lt:     rgba(22,101,52,.08);
+      --gold:         #92400e;
+      --gold-lt:      rgba(146,64,14,.08);
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -149,7 +153,51 @@
 
     .divider { height: 1px; background: var(--border); margin-bottom: 1.8rem; }
 
-    /* Alertas */
+    /* ── BANNER DE TRIAL ── */
+    .trial-promo {
+      display: flex;
+      align-items: flex-start;
+      gap: .9rem;
+      background: linear-gradient(135deg, var(--gold-lt) 0%, rgba(251,191,36,.04) 100%);
+      border: 1.5px solid rgba(251,191,36,.28);
+      border-radius: 14px;
+      padding: 1.1rem 1.3rem;
+      margin-bottom: 1.5rem;
+      animation: rise .4s .1s cubic-bezier(.22,1,.36,1) both;
+      position: relative;
+      overflow: hidden;
+    }
+    .trial-promo::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(251,191,36,.6), transparent);
+    }
+    .trial-promo__icon  { font-size: 1.6rem; line-height: 1; flex-shrink: 0; margin-top: .05rem; }
+    .trial-promo__body  { flex: 1; }
+    .trial-promo__title {
+      font-size: .82rem; font-weight: 600; color: var(--gold);
+      margin-bottom: .3rem; display: flex; align-items: center; gap: .4rem;
+    }
+    .trial-promo__text  {
+      font-size: .76rem; color: var(--ink2); font-weight: 300; line-height: 1.55;
+    }
+    .trial-promo__text strong { color: var(--ink); font-weight: 600; }
+
+    /* Chips de features */
+    .trial-chips {
+      display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .65rem;
+    }
+    .trial-chip {
+      font-size: .65rem; font-weight: 500;
+      padding: .18rem .55rem; border-radius: 20px;
+      background: var(--gold-lt); color: var(--gold);
+      border: 1px solid rgba(251,191,36,.2);
+      white-space: nowrap;
+    }
+    body.light .trial-promo__title { color: var(--gold); }
+    body.light .trial-chip         { color: var(--gold); }
+
+    /* Alertas normales */
     .alert {
       border-radius: 9px; font-size: .8rem;
       padding: .65rem .9rem; margin-bottom: 1.4rem;
@@ -207,28 +255,28 @@
     .perfil-option { position: relative; }
     .perfil-option input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
     .perfil-option label {
-      display: flex; flex-direction: column; gap: .22rem;
-      padding: .85rem .9rem;
-      border: 1.5px solid var(--border); border-radius: 12px;
-      background: var(--surface2); cursor: pointer;
+      display: flex; flex-direction: column; gap: .3rem;
+      padding: .75rem .85rem .7rem;
+      background: var(--surface2); border: 1.5px solid var(--border);
+      border-radius: 12px; cursor: pointer;
       transition: border-color .15s, background .15s, box-shadow .15s;
-      user-select: none; position: relative;
-    }
-    .perfil-option label:hover { border-color: rgba(200,41,10,.35); background: var(--surface); }
-    .perfil-option input[type="radio"]:checked + label {
-      border-color: var(--accent);
-      background: var(--accent-lt);
-      box-shadow: 0 0 0 2px rgba(200,41,10,.1);
+      position: relative;
     }
     .perfil-option label::after {
-      content: '';
-      position: absolute; top: .65rem; right: .65rem;
-      width: 13px; height: 13px; border-radius: 50%;
-      border: 1.5px solid var(--border2); background: var(--surface);
-      transition: background .15s, border-color .15s;
+      content: ''; position: absolute; top: .6rem; right: .6rem;
+      width: 14px; height: 14px; border-radius: 50%;
+      border: 1.5px solid var(--border); background: var(--surface);
+      transition: border-color .15s, background .15s;
     }
-    .perfil-option input[type="radio"]:checked + label::after {
-      background: var(--accent); border-color: var(--accent);
+    .perfil-option input:checked + label {
+      border-color: var(--accent); background: var(--accent-lt);
+      box-shadow: 0 0 0 3px var(--accent-md);
+    }
+    .perfil-option input:checked + label::after {
+      border-color: var(--accent); background: var(--accent);
+    }
+    .perfil-option label:hover:not(.perfil-option.wip label) {
+      border-color: var(--border2); background: var(--surface);
     }
     .perfil-option.wip input[type="radio"] { pointer-events: none; }
     .perfil-option.wip label { cursor: not-allowed; opacity: .45; border-style: dashed; }
@@ -286,6 +334,7 @@
       h1 { font-size: 2rem; }
       .form-row { grid-template-columns: 1fr; }
       .field-btn { grid-column: auto; }
+      .trial-chips { display: none; }
     }
   </style>
 </head>
@@ -313,6 +362,29 @@
   </div>
 
   <div class="divider"></div>
+
+  <!-- ── BANNER DE TRIAL 60 DÍAS ── -->
+  <div class="trial-promo">
+    <div class="trial-promo__icon">🎁</div>
+    <div class="trial-promo__body">
+      <div class="trial-promo__title">
+        15 días gratis con acceso completo
+      </div>
+      <div class="trial-promo__text">
+        Al registrarte, disfrutas de <strong>15 días de prueba gratuita</strong> con todas las utilidades
+        desbloqueadas. Pasado ese período, el acceso se limita a las funciones básicas a no ser que
+        actives tu cuenta por un <strong>pago único de 25 €</strong> vía Bizum a Ricardo Garisto.
+      </div>
+      <div class="trial-chips">
+        <span class="trial-chip">✅ Tareas completas</span>
+        <span class="trial-chip">✅ Dashboard avanzado</span>
+        <span class="trial-chip">✅ Informes Excel</span>
+        <span class="trial-chip">✅ Formación</span>
+        <span class="trial-chip">✅ Accesos rápidos</span>
+        <span class="trial-chip">✅ Sin tarjeta</span>
+      </div>
+    </div>
+  </div>
 
   <div class="alert alert-notice">
     Para los perfiles <strong>Admin</strong> o <strong>SuperAdmin</strong> contacta con el administrador del sistema.
@@ -385,7 +457,7 @@
 
   </form>
 
-  <div class="foot">© 2026 Ricardo Garisto</div>
+  <div class="foot">© 2026 Ricardo Garisto · 60 días gratis, luego 15 € pago único</div>
 </div>
 
 <script>

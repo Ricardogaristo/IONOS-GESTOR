@@ -34,6 +34,7 @@ Dependencias:
 """
 
 import os
+import datetime
 from functools import wraps
 
 from flask import (Blueprint, render_template, request, redirect,
@@ -161,6 +162,37 @@ def es_superadmin(perfil: int) -> bool:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# TRIAL
+# ══════════════════════════════════════════════════════════════════════════════
+
+TRIAL_DIAS = 15  # días de acceso completo gratuito tras el registro
+
+
+def dias_trial_restantes(user: dict) -> int:
+    """Devuelve días enteros que le quedan de trial (mínimo 0)."""
+    fecha = user.get("fecha_registro")
+    if not fecha:
+        return TRIAL_DIAS  # usuario antiguo sin fecha → gracia completa
+    if isinstance(fecha, str):
+        fecha = datetime.datetime.fromisoformat(fecha)
+    # Eliminar zona horaria si la tiene, para comparar con datetime.now() (naive)
+    if hasattr(fecha, "tzinfo") and fecha.tzinfo is not None:
+        fecha = fecha.replace(tzinfo=None)
+    transcurridos = (datetime.datetime.now() - fecha).days
+    return max(0, TRIAL_DIAS - transcurridos)
+
+
+def trial_activo(user: dict) -> bool:
+    """True mientras el trial no haya expirado."""
+    return dias_trial_restantes(user) > 0
+
+
+def acceso_completo(user: dict) -> bool:
+    """True si el usuario tiene acceso completo (trial vigente O suscrito)."""
+    return trial_activo(user) or bool(user.get("suscrito", 0))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # GOOGLE OAUTH (opcional)
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -239,8 +271,8 @@ def _create_user(username: str, email: str, password_plain: str | None = None,
     conn    = _conn()
     cursor  = conn.cursor()
     cursor.execute(
-        """INSERT INTO usuarios (username, email, password, perfil, google_id, pw_format)
-           VALUES (%s, %s, %s, %s, %s, %s)""",
+        """INSERT INTO usuarios (username, email, password, perfil, google_id, pw_format, fecha_registro)
+           VALUES (%s, %s, %s, %s, %s, %s, NOW())""",
         (username, email, pw_hash, perfil, google_id, pw_fmt)
     )
     new_id = cursor.lastrowid
@@ -268,6 +300,20 @@ def _set_session(user: dict) -> None:
     session["puede_tareas"]    = puede_ver_tareas(perfil)
     session["es_coordinador"]  = es_coordinador_o_superior(perfil)
 
+    # ── Trial / suscripción ────────────────────────────────────────────────────
+    # Admin y SuperAdmin nunca están limitados por el trial
+    if perfil >= PERFIL_ADMIN:
+        session["trial_dias"]      = 999
+        session["trial_activo"]    = True
+        session["acceso_completo"] = True
+        session["suscrito"]        = True
+    else:
+        dias = dias_trial_restantes(user)
+        session["trial_dias"]      = dias
+        session["trial_activo"]    = dias > 0
+        session["suscrito"]        = bool(user.get("suscrito", 0))
+        session["acceso_completo"] = dias > 0 or bool(user.get("suscrito", 0))
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # DECORADORES DE ACCESO
@@ -278,6 +324,15 @@ def login_required(f):
     def decorated(*args, **kwargs):
         if "user_id" not in session:
             return redirect(url_for("auth.login"))
+        # ── Recalcular trial en cada request para usuarios no-admin ──────────
+        # Evita que una sesión larga mantenga acceso_completo=True tras expirar.
+        if session.get("perfil", 0) < PERFIL_ADMIN:
+            user = _user_by_id(session["user_id"])
+            if user:
+                dias = dias_trial_restantes(user)
+                session["trial_dias"]      = dias
+                session["trial_activo"]    = dias > 0
+                session["acceso_completo"] = dias > 0 or bool(user.get("suscrito", 0))
         return f(*args, **kwargs)
     return decorated
 
@@ -343,6 +398,22 @@ def superadmin_required(f):
         if not es_superadmin(session.get("perfil", 0)):
             flash("Necesitas permisos de SuperAdmin.", "danger")
             return redirect("/")
+        return f(*args, **kwargs)
+    return decorated
+
+
+def trial_required(f):
+    """
+    Permite el acceso solo si el usuario tiene trial activo O está suscrito.
+    Los admins/superadmins siempre pasan.
+    """
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("auth.login"))
+        if not session.get("acceso_completo", False):
+            flash("Tu período de prueba ha finalizado. Activa tu cuenta por 15 € con Ricardo Garisto.", "warning")
+            return redirect("/suscripcion")
         return f(*args, **kwargs)
     return decorated
 

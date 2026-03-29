@@ -4,6 +4,8 @@
 {% block content %}
 
 <!-- ── Header ──────────────────────────────────────────────────────────── -->
+{% set n_sol_pendientes = 0 %}
+{# Contar solicitudes pendientes se haría en la ruta; usamos variable pasada #}
 <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
   <div>
     <h4 style="font-weight:700; margin:0;">👥 Gestión de Usuarios</h4>
@@ -11,6 +13,20 @@
       {{ usuarios | length }} usuario{{ 's' if usuarios|length != 1 else '' }} registrado{{ 's' if usuarios|length != 1 else '' }}
     </div>
   </div>
+  <a href="/usuarios/solicitudes" class="btn btn-g-warning" style="position:relative;">
+    📬 Solicitudes de activación
+    {% if sol_pendientes > 0 %}
+    <span style="
+      position:absolute; top:-7px; right:-8px;
+      background:var(--red); color:#fff;
+      font-size:.62rem; font-weight:800;
+      min-width:18px; height:18px;
+      border-radius:99px; display:flex; align-items:center; justify-content:center;
+      padding:0 4px; font-family:var(--mono);
+      box-shadow:0 0 0 2px var(--bg);
+      pointer-events:none;">{{ sol_pendientes }}</span>
+    {% endif %}
+  </a>
 </div>
 
 <!-- ── KPI strip ───────────────────────────────────────────────────────── -->
@@ -52,6 +68,93 @@
   </div>
 </div>
 
+<!-- ── Panel de planes ──────────────────────────────────────────────────── -->
+{% set n_supercompleto = usuarios | selectattr('perfil', 'ge', 10) | list | length %}
+{% set n_completo      = usuarios | selectattr('suscrito', 'equalto', true) | rejectattr('perfil', 'ge', 10) | list | length %}
+{% set n_gratuito      = usuarios | selectattr('trial_activo', 'defined') | list | length %}
+{# Calculamos manualmente con un namespace #}
+{% set ns = namespace(gratuito=0, expirado=0) %}
+{% for u in usuarios %}
+  {% if u.perfil < 10 and not u.suscrito %}
+    {% if (u.dias_trial | default(0)) > 0 %}{% set ns.gratuito = ns.gratuito + 1 %}
+    {% else %}{% set ns.expirado = ns.expirado + 1 %}{% endif %}
+  {% endif %}
+{% endfor %}
+
+<div class="gcard mb-4">
+  <div class="gcard-header">
+    <span style="color:#a371f7">◈</span>
+    <span class="gcard-title">Planes de usuarios</span>
+    <span style="margin-left:auto; font-family:var(--mono); font-size:.72rem; color:var(--text-muted);">
+      {{ total_u }} usuario{{ 's' if total_u != 1 else '' }} en total
+    </span>
+  </div>
+  <div class="gcard-body">
+    <div class="d-flex flex-wrap gap-3">
+
+      <!-- SuperCompleto -->
+      <div class="plan-card plan-super">
+        <div class="plan-icon">👑</div>
+        <div class="plan-nombre">SuperCompleto</div>
+        <div class="plan-count">{{ n_supercompleto }}</div>
+        <div class="plan-desc">Admin / SuperAdmin<br>Acceso total sin límites</div>
+      </div>
+
+      <!-- Completo -->
+      <div class="plan-card plan-full">
+        <div class="plan-icon">✦</div>
+        <div class="plan-nombre">Completo</div>
+        <div class="plan-count">{{ n_completo }}</div>
+        <div class="plan-desc">Cuenta activada<br>Acceso completo (15 €)</div>
+      </div>
+
+      <!-- Gratuito -->
+      <div class="plan-card plan-trial">
+        <div class="plan-icon">⏳</div>
+        <div class="plan-nombre">Gratuito</div>
+        <div class="plan-count">{{ ns.gratuito }}</div>
+        <div class="plan-desc">Trial activo<br>15 días desde registro</div>
+      </div>
+
+      <!-- Expirado -->
+      <div class="plan-card plan-expired">
+        <div class="plan-icon">🔒</div>
+        <div class="plan-nombre">Expirado</div>
+        <div class="plan-count">{{ ns.expirado }}</div>
+        <div class="plan-desc">Trial terminado<br>Sin suscripción activa</div>
+      </div>
+
+    </div>
+
+    <!-- Mini-barra de distribución -->
+    {% if total_u > 0 %}
+    <div style="margin-top:1.2rem;">
+      <div style="font-family:var(--mono); font-size:.68rem; color:var(--text-muted); margin-bottom:.4rem; text-transform:uppercase; letter-spacing:.06em;">Distribución</div>
+      <div style="height:8px; border-radius:99px; overflow:hidden; display:flex; gap:2px;">
+        {% if n_supercompleto > 0 %}
+        <div style="flex:{{ n_supercompleto }}; background:#a371f7; border-radius:99px 0 0 99px;" title="SuperCompleto: {{ n_supercompleto }}"></div>
+        {% endif %}
+        {% if n_completo > 0 %}
+        <div style="flex:{{ n_completo }}; background:var(--accent);" title="Completo: {{ n_completo }}"></div>
+        {% endif %}
+        {% if ns.gratuito > 0 %}
+        <div style="flex:{{ ns.gratuito }}; background:var(--amber);" title="Gratuito: {{ ns.gratuito }}"></div>
+        {% endif %}
+        {% if ns.expirado > 0 %}
+        <div style="flex:{{ ns.expirado }}; background:var(--red); border-radius:0 99px 99px 0;" title="Expirado: {{ ns.expirado }}"></div>
+        {% endif %}
+      </div>
+      <div style="display:flex; gap:1.4rem; margin-top:.55rem; flex-wrap:wrap;">
+        <span style="font-size:.72rem; font-family:var(--mono); color:#a371f7;">● SuperCompleto {{ n_supercompleto }}</span>
+        <span style="font-size:.72rem; font-family:var(--mono); color:var(--accent);">● Completo {{ n_completo }}</span>
+        <span style="font-size:.72rem; font-family:var(--mono); color:var(--amber);">● Gratuito {{ ns.gratuito }}</span>
+        <span style="font-size:.72rem; font-family:var(--mono); color:var(--red);">● Expirado {{ ns.expirado }}</span>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
 <!-- ── Tabla de usuarios ────────────────────────────────────────────────── -->
 <div class="gcard mb-4">
   <div class="gcard-header">
@@ -67,16 +170,17 @@
              placeholder="Buscar usuario…" autocomplete="off">
     </div>
 
-    <div class="table-responsive">
-      <table class="gtable">
+    <div class="table-responsive usuarios-table-wrap">
+      <table class="gtable usuarios-table">
         <thead>
           <tr>
             <th>Usuario</th>
-            <th>Email</th>
+            <th class="col-email">Email</th>
             <th>Perfil</th>
-            <th>Tipo</th>
-            <th>Tareas</th>
-            <th>Progreso</th>
+            <th>Plan</th>
+            <th class="col-tipo">Tipo</th>
+            <th class="col-tareas">Tareas</th>
+            <th class="col-progreso">Progreso</th>
             <th>Acciones</th>
           </tr>
         </thead>
@@ -84,9 +188,13 @@
           {% for u in usuarios %}
           {% set pct_u = ((u.completadas / u.total_tareas) * 100) | round(1) if u.total_tareas > 0 else 0 %}
           {% set p = u.perfil if u.perfil is defined else 2 %}
+          {# ── Permisos: se calculan aquí para usarlos en cualquier columna ── #}
+          {% set es_superadmin_actual = (perfil_actual >= 20) %}
+          {% set objetivo_es_admin    = (p >= 10) %}
+          {% set puede_editar         = es_superadmin_actual or not objetivo_es_admin %}
           <tr data-search="{{ u.username }} {{ u.email or '' }}">
 
-            <td style="font-weight:700;">
+            <td data-label="Usuario" style="font-weight:700;">
               <div style="display:flex; align-items:center; gap:.55rem;">
                 <span class="user-avatar" style="background:{{ loop.cycle('var(--blue-dim)','var(--accent-dim)','var(--amber-dim)','var(--red-dim)') }}; color:{{ loop.cycle('var(--blue)','var(--accent)','var(--amber)','var(--red)') }};">
                   {{ u.username[0] | upper }}
@@ -98,12 +206,12 @@
               </div>
             </td>
 
-            <td style="font-family:var(--mono); font-size:.78rem; color:var(--text-muted);">
+            <td data-label="Email" class="col-email" style="font-family:var(--mono); font-size:.78rem; color:var(--text-muted);">
               {{ u.email or '—' }}
             </td>
 
             <!-- ── Columna Perfil ── -->
-            <td>
+            <td data-label="Perfil">
               {% if p == 20 %}
                 <span class="badge-perfil badge-superadmin">👑 SuperAdmin</span>
               {% elif p == 10 %}
@@ -119,9 +227,52 @@
               {% endif %}
             </td>
 
+            <!-- ── Columna Plan ── -->
+            {% set suscrito_u = u.suscrito if u.suscrito is defined else false %}
+            {% set dias_u     = u.dias_trial if u.dias_trial is defined else 15 %}
+            <td data-label="Plan">
+              <div style="display:flex; flex-direction:column; gap:.3rem; align-items:flex-start;">
+              {% if p >= 10 %}
+                <span class="badge-plan badge-plan-super" title="Administrador — acceso total sin límites">
+                  👑 SuperCompleto
+                </span>
+              {% elif suscrito_u %}
+                <span class="badge-plan badge-plan-full" title="Cuenta activa — acceso completo">
+                  ✦ Completo
+                </span>
+              {% elif dias_u > 0 %}
+                <span class="badge-plan badge-plan-trial"
+                      title="{{ dias_u }} día{{ 's' if dias_u != 1 else '' }} restante{{ 's' if dias_u != 1 else '' }} de prueba">
+                  ⏳ Gratuito
+                  <span style="font-family:var(--mono); font-size:.62rem; opacity:.85; margin-left:.2rem;">
+                    {{ dias_u }}d
+                  </span>
+                </span>
+                {% if puede_editar %}
+                <button type="button" class="btn-renovar"
+                        onclick="abrirRenovar({{ u.id }}, '{{ u.username }}')"
+                        title="Renovar/ampliar días de trial para {{ u.username }}">
+                  🔄 Renovar
+                </button>
+                {% endif %}
+              {% else %}
+                <span class="badge-plan badge-plan-expired" title="Trial expirado — sin suscripción">
+                  🔒 Expirado
+                </span>
+                {% if puede_editar %}
+                <button type="button" class="btn-renovar"
+                        onclick="abrirRenovar({{ u.id }}, '{{ u.username }}')"
+                        title="Renovar días de trial para {{ u.username }}">
+                  🔄 Renovar
+                </button>
+                {% endif %}
+              {% endif %}
+              </div>
+            </td>
+
             <!-- ── Columna Tipo A/B ── -->
             {% set tipo_u = u.tipo if u.tipo is defined else 'A' %}
-            <td>
+            <td data-label="Tipo" class="col-tipo">
               <button type="button"
                       id="tipo-btn-{{ u.id }}"
                       class="btn btn-tipo btn-tipo-{{ tipo_u | lower }} btn-sm"
@@ -133,14 +284,14 @@
               </button>
             </td>
 
-            <td>
+            <td data-label="Tareas" class="col-tareas">
               <div style="display:flex; gap:.4rem; flex-wrap:wrap; align-items:center;">
                 <span class="badge-g badge-pending" style="font-size:.65rem;">{{ u.pendientes }} pend.</span>
                 <span class="badge-g badge-done"    style="font-size:.65rem;">{{ u.completadas }} hech.</span>
               </div>
             </td>
 
-            <td style="min-width:130px;">
+            <td data-label="Progreso" class="col-progreso" style="min-width:130px;">
               <div style="display:flex; align-items:center; gap:.5rem;">
                 <div style="flex:1; height:6px; background:var(--bg3); border-radius:99px; overflow:hidden;">
                   <div style="height:100%; width:{{ pct_u }}%;
@@ -151,54 +302,51 @@
               </div>
             </td>
 
-            <td style="white-space:nowrap;">
-              {% set es_superadmin_actual = (perfil_actual >= 20) %}
-              {% set objetivo_es_admin    = (p >= 10) %}
-              {% set puede_editar         = es_superadmin_actual or not objetivo_es_admin %}
+            <td data-label="Acciones">
+              <div class="acciones-wrap">
 
-              <!-- Asignar tarea: todos los admins pueden -->
-              <button type="button" class="btn btn-g-primary btn-sm"
-                      onclick="abrirAsignar({{ u.id }}, '{{ u.username }}')"
-                      title="Asignar tarea a {{ u.username }}">
-                ＋ Tarea
-              </button>
-
-              <!-- Cambiar contraseña: cualquier admin puede cambiar la suya propia -->
-              <button type="button" class="btn btn-g-ghost btn-sm"
-                      onclick="abrirCambiarPassword({{ u.id }}, '{{ u.username }}')"
-                      title="Cambiar contraseña de {{ u.username }}">
-                🔑
-              </button>
-
-              {% if u.id != session.get('user_id') %}
-
-                {% if puede_editar %}
-                <!-- Cambiar perfil -->
-                <button type="button" class="btn btn-g-warning btn-sm"
-                        onclick="abrirCambiarPerfil({{ u.id }}, '{{ u.username }}', {{ p }})"
-                        title="Cambiar perfil de {{ u.username }}">
-                  ✎ Perfil
+                <!-- Asignar tarea: todos los admins pueden -->
+                <button type="button" class="btn btn-g-primary btn-sm"
+                        onclick="abrirAsignar({{ u.id }}, '{{ u.username }}')"
+                        title="Asignar tarea a {{ u.username }}">
+                  ＋ Tarea
                 </button>
 
-                <!-- Eliminar -->
-                <form method="POST" action="/usuarios/eliminar/{{ u.id }}"
-                      style="display:inline;"
-                      onsubmit="return confirm('¿Eliminar a {{ u.username }}? Se borrarán también todas sus tareas.')">
-                  <button type="submit" class="btn btn-g-danger btn-sm" title="Eliminar usuario">🗑</button>
-                </form>
-                {% else %}
-                <!-- Admin viendo a otro Admin/SuperAdmin: solo lectura -->
-                <span style="font-size:.7rem; color:var(--text-muted); font-style:italic;">
-                  🔒 Solo SuperAdmin
-                </span>
+                <!-- Cambiar contraseña -->
+                <button type="button" class="btn btn-g-ghost btn-sm"
+                        onclick="abrirCambiarPassword({{ u.id }}, '{{ u.username }}')"
+                        title="Cambiar contraseña de {{ u.username }}">
+                  🔑
+                </button>
+
+                {% if u.id != session.get('user_id') %}
+                  {% if puede_editar %}
+                  <!-- Cambiar perfil -->
+                  <button type="button" class="btn btn-g-warning btn-sm"
+                          onclick="abrirCambiarPerfil({{ u.id }}, '{{ u.username }}', {{ p }})"
+                          title="Cambiar perfil de {{ u.username }}">
+                    ✎ Perfil
+                  </button>
+
+                  <!-- Eliminar -->
+                  <form method="POST" action="/usuarios/eliminar/{{ u.id }}"
+                        style="display:contents;"
+                        onsubmit="return confirm('¿Eliminar a {{ u.username }}? Se borrarán también todas sus tareas.')">
+                    <button type="submit" class="btn btn-g-danger btn-sm" title="Eliminar usuario">🗑</button>
+                  </form>
+                  {% else %}
+                  <span style="font-size:.7rem; color:var(--text-muted); font-style:italic;">
+                    🔒 Solo SuperAdmin
+                  </span>
+                  {% endif %}
                 {% endif %}
 
-              {% endif %}
+              </div>
             </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="7" style="text-align:center; padding:3rem; color:var(--text-muted);">
+            <td colspan="8" style="text-align:center; padding:3rem; color:var(--text-muted);">
               <div style="font-size:2rem; margin-bottom:.5rem;">👥</div>
               No hay usuarios registrados aún.
             </td>
@@ -321,6 +469,42 @@
 
 <!-- ── Estilos badges perfil + modal ──────────────────────────────────── -->
 <style>
+/* ── Badges Plan ────────────────────────────────────────────── */
+.badge-plan {
+  display: inline-flex; align-items: center; gap: .2rem;
+  font-size: .68rem; font-weight: 700;
+  padding: .22rem .6rem; border-radius: 7px;
+  border: 1px solid transparent; white-space: nowrap;
+  letter-spacing: .01em;
+}
+.badge-plan-super   { background:rgba(168,85,247,.15); border-color:rgba(168,85,247,.45); color:#c084fc; }
+.badge-plan-full    { background:rgba(35,134,54,.13);  border-color:rgba(35,134,54,.4);   color:var(--accent); }
+.badge-plan-trial   { background:rgba(227,179,65,.13); border-color:rgba(227,179,65,.4);  color:#e3b341; }
+.badge-plan-expired { background:rgba(200,60,40,.1);   border-color:rgba(200,60,40,.35);  color:#ff6a6a; }
+
+/* ── Panel de Planes ─────────────────────────────────────────── */
+.plan-card {
+  display: flex; flex-direction: column; align-items: center;
+  gap: .3rem; padding: 1rem 1.4rem; border-radius: 12px;
+  border: 1px solid var(--border); flex: 1; min-width: 140px;
+  text-align: center; transition: border-color .18s, transform .15s;
+}
+.plan-card:hover { transform: translateY(-2px); }
+.plan-icon  { font-size: 1.6rem; }
+.plan-nombre { font-size: .72rem; font-weight: 700; text-transform: uppercase;
+               letter-spacing: .08em; color: var(--text-muted); }
+.plan-count  { font-size: 2rem; font-weight: 800; line-height: 1; }
+.plan-desc   { font-size: .7rem; color: var(--text-muted); font-family: var(--mono); line-height: 1.5; }
+
+.plan-super  { border-color: rgba(168,85,247,.3);  background: rgba(168,85,247,.06); }
+.plan-super  .plan-count { color: #c084fc; }
+.plan-full   { border-color: rgba(35,134,54,.3);   background: rgba(35,134,54,.06); }
+.plan-full   .plan-count { color: var(--accent); }
+.plan-trial  { border-color: rgba(227,179,65,.3);  background: rgba(227,179,65,.06); }
+.plan-trial  .plan-count { color: #e3b341; }
+.plan-expired{ border-color: rgba(200,60,40,.25);  background: rgba(200,60,40,.05); }
+.plan-expired .plan-count { color: #ff6a6a; }
+
 .badge-perfil {
   display: inline-flex; align-items: center; gap: .25rem;
   font-size: .68rem; font-weight: 600;
@@ -368,6 +552,63 @@
 .p-desc   { font-size:.72rem; color:var(--text-muted); }
 .p-check  { font-size:.9rem; color:var(--accent); opacity:0; transition:opacity .15s; min-width:1rem; }
 .perfil-radio-row.selected .p-check { opacity:1; }
+
+/* ── Columna Acciones ────────────────────────────────────── */
+.acciones-wrap {
+  display: flex; flex-wrap: wrap; gap: .35rem; align-items: center;
+}
+
+/* ── Botón Renovar Trial ─────────────────────────────────── */
+.btn-renovar {
+  display: inline-flex; align-items: center; gap: .25rem;
+  font-size: .65rem; font-weight: 700; letter-spacing: .02em;
+  padding: .18rem .5rem; border-radius: 6px; cursor: pointer;
+  background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.4);
+  color: #4ade80; transition: all .18s; margin-top: .3rem;
+  white-space: nowrap;
+}
+.btn-renovar:hover { background: rgba(34,197,94,.22); border-color: rgba(34,197,94,.7); }
+
+/* ── Tabla responsive ────────────────────────────────────── */
+.usuarios-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 767px) {
+  .usuarios-table thead { display: none; }
+  .usuarios-table,
+  .usuarios-table tbody,
+  .usuarios-table tr,
+  .usuarios-table td { display: block; width: 100%; box-sizing: border-box; }
+  .usuarios-table tr {
+    border: 1px solid var(--border); border-radius: 10px;
+    margin-bottom: .85rem; padding: .6rem .75rem;
+    background: var(--bg2, var(--surface));
+  }
+  .usuarios-table td {
+    display: flex; align-items: flex-start; gap: .6rem;
+    padding: .35rem 0; border: none;
+    border-bottom: 1px solid var(--border);
+    font-size: .82rem; min-width: 0;
+  }
+  .usuarios-table td:last-child  { border-bottom: none; padding-bottom: 0; }
+  .usuarios-table td:first-child { padding-top: 0; }
+  .usuarios-table td::before {
+    content: attr(data-label);
+    font-size: .65rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--text-muted);
+    min-width: 74px; padding-top: .15rem; flex-shrink: 0;
+  }
+  .usuarios-table td.col-email,
+  .usuarios-table td.col-tipo,
+  .usuarios-table td.col-tareas,
+  .usuarios-table td.col-progreso { display: flex !important; }
+  .usuarios-table td[data-label="Acciones"] { flex-wrap: wrap; }
+  .usuarios-table td[data-label="Progreso"] { min-width: 0 !important; }
+}
+
+@media (min-width: 768px) and (max-width: 1100px) {
+  .usuarios-table td.col-email,  .usuarios-table th.col-email,
+  .usuarios-table td.col-tipo,   .usuarios-table th.col-tipo  { display: none; }
+}
 </style>
 
 <!-- ══════════════════════════════════════════════════════════════════════
@@ -406,6 +647,54 @@
       <button type="button" class="btn btn-g-primary w-100"
               onclick="guardarPassword()" style="justify-content:center;">
         💾 Guardar contraseña
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     MODAL — Renovar trial de usuario
+══════════════════════════════════════════════════════════════════════ -->
+<div id="modal-renovar" class="modal-overlay" style="display:none;"
+     onclick="if(event.target.id==='modal-renovar') cerrarModalRenovar()">
+  <div class="modal-box" style="max-width:360px;">
+    <div class="modal-header">
+      <span>🔄 Renovar trial —</span>
+      <span id="renovar-username" style="color:var(--accent); font-weight:700;"></span>
+      <button type="button" class="modal-close" onclick="cerrarModalRenovar()">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:.8rem; color:var(--text-muted); margin-bottom:1rem;">
+        Días de acceso gratuito que se concederán al usuario <strong>desde hoy</strong>.
+      </p>
+
+      <label style="font-size:.67rem; font-weight:500; letter-spacing:.08em; text-transform:uppercase;
+                    color:var(--text-muted); display:block; margin-bottom:.35rem;">
+        Días de trial
+      </label>
+      <input id="renovar-dias" type="number" class="form-control"
+             value="15" min="1" max="365" style="margin-bottom:.9rem;">
+
+      <!-- Accesos rápidos -->
+      <div style="display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.9rem;">
+        {% for d in [7, 15, 30, 60, 90] %}
+        <button type="button" onclick="document.getElementById('renovar-dias').value={{ d }}"
+                style="font-size:.68rem; padding:.18rem .55rem; border-radius:6px; cursor:pointer;
+                       background:var(--bg3); border:1px solid var(--border); color:var(--text-muted);
+                       transition:all .15s;">
+          {{ d }}d
+        </button>
+        {% endfor %}
+      </div>
+
+      <div id="renovar-error" style="display:none; font-size:.78rem; color:var(--red); margin-bottom:.75rem;"></div>
+      <div id="renovar-ok"    style="display:none; font-size:.78rem; color:var(--accent); margin-bottom:.75rem;">
+        ✔ Trial renovado correctamente.
+      </div>
+
+      <button type="button" class="btn btn-g-primary w-100"
+              onclick="guardarRenovar()" style="justify-content:center;">
+        🔄 Renovar acceso
       </button>
     </div>
   </div>
@@ -536,8 +825,59 @@ document.addEventListener('keydown', e => {
     cerrarModalBtn();
     cerrarModalPerfilBtn();
     cerrarModalPassword();
+    cerrarModalRenovar();
   }
 });
+
+// ── Modal renovar trial ────────────────────────────────────────────────────
+let _renovarUid = null;
+
+function abrirRenovar(uid, username) {
+  _renovarUid = uid;
+  document.getElementById('renovar-username').textContent = username;
+  document.getElementById('renovar-dias').value = 15;
+  document.getElementById('renovar-error').style.display = 'none';
+  document.getElementById('renovar-ok').style.display    = 'none';
+  document.getElementById('modal-renovar').style.display = 'flex';
+  setTimeout(() => document.getElementById('renovar-dias').focus(), 80);
+}
+
+function cerrarModalRenovar() {
+  document.getElementById('modal-renovar').style.display = 'none';
+  _renovarUid = null;
+}
+
+async function guardarRenovar() {
+  const dias  = parseInt(document.getElementById('renovar-dias').value);
+  const errEl = document.getElementById('renovar-error');
+  const okEl  = document.getElementById('renovar-ok');
+  errEl.style.display = 'none';
+  okEl.style.display  = 'none';
+
+  if (!dias || dias < 1 || dias > 365) {
+    errEl.textContent   = 'Introduce un número de días entre 1 y 365.';
+    errEl.style.display = 'block';
+    return;
+  }
+  try {
+    const res  = await fetch(`/usuarios/renovar_trial/${_renovarUid}`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ dias })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      okEl.style.display = 'block';
+      setTimeout(() => { cerrarModalRenovar(); location.reload(); }, 1200);
+    } else {
+      errEl.textContent   = data.error || 'No se pudo renovar el trial.';
+      errEl.style.display = 'block';
+    }
+  } catch {
+    errEl.textContent   = 'Error de conexión.';
+    errEl.style.display = 'block';
+  }
+}
 
 // ── Modal cambiar contraseña ───────────────────────────────────────────────
 let _pwUid = null;

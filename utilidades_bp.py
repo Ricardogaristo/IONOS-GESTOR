@@ -89,6 +89,9 @@ def vista_usuarios():
     try:
         rows = db.execute(
             """SELECT u.id, u.username, u.email,
+                      COALESCE(u.suscrito, 0)    AS suscrito,
+                      u.fecha_registro,
+                      u.perfil,
                       COUNT(t.id)                                          AS total,
                       SUM(t.completada = 1)                                AS completadas,
                       SUM(t.completada = 0)                                AS pendientes,
@@ -98,17 +101,44 @@ def vista_usuarios():
                       SUM(t.prioridad = 1 AND t.completada = 0)           AS alta_pend
                FROM usuarios u
                LEFT JOIN tareas t ON t.usuario_id = u.id
-               GROUP BY u.id, u.username, u.email
+               GROUP BY u.id, u.username, u.email, u.suscrito, u.fecha_registro, u.perfil
                ORDER BY vencidas DESC, pendientes DESC, total DESC""",
             (hoy,),
         ).fetchall()
     finally:
         db.close()
 
+    TRIAL_DIAS = 15
     usuarios = []
     for r in rows:
         total = r["total"] or 0
         comp  = r["completadas"] or 0
+        perfil = r["perfil"] or 2
+        suscrito = bool(r["suscrito"])
+
+        # Calcular días trial restantes
+        fecha_reg = r["fecha_registro"]
+        if fecha_reg:
+            if isinstance(fecha_reg, str):
+                fecha_reg = datetime.fromisoformat(fecha_reg)
+            if hasattr(fecha_reg, "tzinfo") and fecha_reg.tzinfo is not None:
+                fecha_reg = fecha_reg.replace(tzinfo=None)
+            dias_rest = max(0, TRIAL_DIAS - (datetime.now() - fecha_reg).days)
+        else:
+            dias_rest = TRIAL_DIAS  # usuario antiguo sin fecha → gracia completa
+
+        trial_ok = dias_rest > 0
+
+        # Determinar plan
+        if perfil >= 10:
+            plan = "supercompleto"
+        elif suscrito:
+            plan = "completo"
+        elif trial_ok:
+            plan = "gratuito"
+        else:
+            plan = "expirado"
+
         usuarios.append(
             {
                 "id":        r["id"],
@@ -125,6 +155,10 @@ def vista_usuarios():
                     if hasattr(r["ultima_act"], "strftime")
                     else (str(r["ultima_act"])[:16] if r["ultima_act"] else None)
                 ),
+                "plan":       plan,
+                "dias_trial": dias_rest,
+                "suscrito":   suscrito,
+                "perfil":     perfil,
             }
         )
 

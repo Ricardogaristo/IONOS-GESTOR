@@ -14,7 +14,6 @@
   <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
   <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" sizes="32x32">
 
-
   <!-- Estilos especificos de vistas (cacheados) -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}?v=1">
 
@@ -24,6 +23,110 @@
       if(localStorage.getItem('theme')!=='dark') document.documentElement.classList.add('light-init');
     })();
   </script>
+
+  <style>
+    /* ── BANNER TRIAL ─────────────────────────────────────────────────────────── */
+    .trial-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: .6rem 1.1rem;
+      border-radius: 10px;
+      font-size: .82rem;
+      font-weight: 400;
+      line-height: 1.4;
+      margin-bottom: .75rem;
+      animation: trialSlide .4s cubic-bezier(.22,1,.36,1) both;
+      position: relative;
+      overflow: hidden;
+    }
+    @keyframes trialSlide {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    /* Shimmer decorativo en el fondo */
+    .trial-banner::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.04) 50%, transparent 100%);
+      background-size: 200% 100%;
+      animation: shimmer 3s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes shimmer {
+      0%   { background-position: -200% 0; }
+      100% { background-position:  200% 0; }
+    }
+
+    /* Variantes de color */
+    .trial-banner--info {
+      background: rgba(59,130,246,.10);
+      border: 1px solid rgba(59,130,246,.25);
+      color: #93c5fd;
+    }
+    .trial-banner--warning {
+      background: rgba(234,179,8,.10);
+      border: 1px solid rgba(234,179,8,.28);
+      color: #fde047;
+    }
+    .trial-banner--danger {
+      background: rgba(200,41,10,.10);
+      border: 1px solid rgba(200,41,10,.30);
+      color: #fca5a5;
+    }
+    body.light .trial-banner--info    { background: rgba(59,130,246,.08);  border-color: rgba(59,130,246,.2);  color: #1d4ed8; }
+    body.light .trial-banner--warning { background: rgba(161,98,7,.08);    border-color: rgba(161,98,7,.22);   color: #92400e; }
+    body.light .trial-banner--danger  { background: rgba(200,41,10,.07);   border-color: rgba(200,41,10,.22);  color: #9b1c1c; }
+
+    .trial-banner strong { font-weight: 600; }
+
+    .trial-banner__left  { display: flex; align-items: center; gap: .55rem; flex: 1; min-width: 0; }
+    .trial-banner__icon  { font-size: 1rem; flex-shrink: 0; }
+    .trial-banner__text  { flex: 1; }
+
+    .trial-banner__btn {
+      flex-shrink: 0;
+      display: inline-flex; align-items: center; gap: .3rem;
+      padding: .3rem .85rem;
+      border-radius: 7px;
+      font-size: .75rem; font-weight: 600;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: filter .15s, transform .12s;
+    }
+    .trial-banner__btn:hover { filter: brightness(1.12); transform: translateY(-1px); }
+    .trial-banner--info    .trial-banner__btn { background: #3b82f6; color: #fff; }
+    .trial-banner--warning .trial-banner__btn { background: #ca8a04; color: #fff; }
+    .trial-banner--danger  .trial-banner__btn { background: #c8290a; color: #fff; }
+
+    /* Barra de progreso de días */
+    .trial-progress {
+      height: 3px;
+      border-radius: 2px;
+      background: rgba(255,255,255,.1);
+      margin-top: .35rem;
+      overflow: hidden;
+    }
+    .trial-progress__bar {
+      height: 100%;
+      border-radius: 2px;
+      transition: width .6s ease;
+    }
+    .trial-banner--info    .trial-progress__bar { background: #3b82f6; }
+    .trial-banner--warning .trial-progress__bar { background: #ca8a04; }
+    .trial-banner--danger  .trial-progress__bar { background: #c8290a; }
+    body.light .trial-progress { background: rgba(0,0,0,.08); }
+
+    /* Botón cerrar */
+    .trial-banner__close {
+      background: none; border: none; cursor: pointer;
+      opacity: .45; font-size: .85rem; padding: .1rem .2rem;
+      color: inherit; line-height: 1; transition: opacity .15s;
+      flex-shrink: 0;
+    }
+    .trial-banner__close:hover { opacity: 1; }
+  </style>
 
 </head>
 <body>
@@ -74,7 +177,7 @@
         </li>
         {% endif %}
 
-        {% if session.get('puede_tareas') %}
+        {% if session.get('es_admin', 0) >= 2 %}
         <li class="nav-item">
           <a class="nav-link{{ ' active' if path == '/util/informe' else '' }}" href="/util/informe">
             📊 Informe global
@@ -127,12 +230,65 @@
       </div>
     {% endfor %}
   {% endwith %}
+
+  {# ── BANNER DE TRIAL ───────────────────────────────────────────────────────
+     Solo se muestra a usuarios no-admin que no han cerrado el banner
+     ni son superadmin. Admins/SuperAdmins nunca lo ven.
+  ─────────────────────────────────────────────────────────────────────────── #}
+  {% if session.get('user_id') and session.get('es_admin', 0) == 0 and not session.get('suscrito') %}
+    {% set dias = session.get('trial_dias', 0) %}
+    {% set pct  = [((dias / 15) * 100) | int, 100] | min %}
+
+    {% if dias > 10 %}
+      {# ── Trial saludable: azul informativo ── #}
+      <div class="trial-banner trial-banner--info" id="trial-banner" role="alert">
+        <div class="trial-banner__left">
+          <span class="trial-banner__icon">🎁</span>
+          <div class="trial-banner__text">
+            Tienes <strong>{{ dias }} día{{ 's' if dias != 1 }}</strong> de acceso completo gratuito.
+            Pasado ese período, las funciones se limitarán salvo que actives tu cuenta.
+            <div class="trial-progress"><div class="trial-progress__bar" style="width:{{ pct }}%"></div></div>
+          </div>
+        </div>
+        <a href="/suscripcion" class="trial-banner__btn">Ver plan →</a>
+        <button class="trial-banner__close" onclick="cerrarBanner()" title="Cerrar">✕</button>
+      </div>
+
+    {% elif dias > 0 %}
+      {# ── Últimos días: naranja de alerta ── #}
+      <div class="trial-banner trial-banner--warning" id="trial-banner" role="alert">
+        <div class="trial-banner__left">
+          <span class="trial-banner__icon">⏳</span>
+          <div class="trial-banner__text">
+            ¡Solo quedan <strong>{{ dias }} día{{ 's' if dias != 1 }}</strong> de prueba gratuita!
+            Activa tu cuenta por <strong>15 €</strong> únicos para mantener el acceso completo.
+            <div class="trial-progress"><div class="trial-progress__bar" style="width:{{ pct }}%"></div></div>
+          </div>
+        </div>
+        <a href="/suscripcion" class="trial-banner__btn">Activar ahora →</a>
+        <button class="trial-banner__close" onclick="cerrarBanner()" title="Cerrar">✕</button>
+      </div>
+
+    {% else %}
+      {# ── Trial expirado: rojo, sin botón de cierre ── #}
+      <div class="trial-banner trial-banner--danger" id="trial-banner" role="alert">
+        <div class="trial-banner__left">
+          <span class="trial-banner__icon">🔒</span>
+          <div class="trial-banner__text">
+            Tu período de prueba gratuita ha <strong>finalizado</strong>.
+            Algunas funciones están limitadas. Activa tu cuenta por <strong>15 €</strong> para recuperar el acceso completo.
+          </div>
+        </div>
+        <a href="/suscripcion" class="trial-banner__btn">Activar cuenta →</a>
+      </div>
+    {% endif %}
+  {% endif %}
+
 </div>
 
 <!-- MAIN CONTENT -->
 <div class="page-wrapper">
   {% block content %}{% endblock %}
-
 </div>
 
 <!-- Bootstrap JS -->
@@ -150,6 +306,29 @@
     document.body.classList.toggle('light');
     localStorage.setItem('theme', document.body.classList.contains('light')?'light':'dark');
   }
+
+  // ── Cerrar banner de trial (recuerda por sesión de navegador) ──
+  function cerrarBanner() {
+    const b = document.getElementById('trial-banner');
+    if (!b) return;
+    b.style.transition = 'opacity .25s ease, transform .25s ease, max-height .3s ease, margin .3s ease, padding .3s ease';
+    b.style.opacity    = '0';
+    b.style.transform  = 'translateY(-6px)';
+    b.style.maxHeight  = '0';
+    b.style.marginBottom = '0';
+    b.style.paddingTop   = '0';
+    b.style.paddingBottom= '0';
+    b.style.overflow  = 'hidden';
+    setTimeout(() => b.remove(), 320);
+    sessionStorage.setItem('trial_banner_closed', '1');
+  }
+  // Si lo cerró antes en esta sesión del navegador, ocultarlo directamente
+  (function(){
+    if (sessionStorage.getItem('trial_banner_closed') === '1') {
+      const b = document.getElementById('trial-banner');
+      if (b) b.style.display = 'none';
+    }
+  })();
 
   // ── Generic live search (works on any page with id="buscador") ──
   const buscador = document.getElementById('buscador');

@@ -3,7 +3,29 @@
 
 {% block content %}
 
+<!-- ── Banner de trial ──────────────────────────────────────────────────── -->
+{% if not session.get('es_admin', 0) >= 1 %}
+  {% if not plan_activo %}
+  <div class="trial-banner trial-expired">
+    <span class="trial-icon">🔒</span>
+    <div>
+      <strong>Tu periodo de prueba ha expirado.</strong>
+      Contacta con el administrador para renovar tu acceso.
+    </div>
+  </div>
+  {% elif dias_restantes <= 5 %}
+  <div class="trial-banner trial-warning">
+    <span class="trial-icon">⏳</span>
+    <div>
+      <strong>{{ dias_restantes }} día{{ 's' if dias_restantes != 1 else '' }} restante{{ 's' if dias_restantes != 1 else '' }} de prueba.</strong>
+      Contacta con el administrador para ampliar tu acceso.
+    </div>
+  </div>
+  {% endif %}
+{% endif %}
+
 <!-- ── Nueva tarea ──────────────────────────────────────────────────── -->
+{% if plan_activo %}
 <div class="gcard mb-4">
   <div class="gcard-header">
     <span style="color:var(--accent)">＋</span>
@@ -44,6 +66,7 @@
     </form>
   </div>
 </div>
+{% endif %}
 
 <!-- ── Lista de tareas ───────────────────────────────────────────────── -->
 <div class="gcard">
@@ -267,15 +290,19 @@
             <!-- COLUMNA: Acciones -->
             <td data-label="Acciones" class="td-acciones">
               <div class="acciones-group">
-                {% if tcomp==0 %}
-                  <a href="/completar/{{ tid }}" class="btn btn-g-success btn-sm" title="Completar">✔</a>
+                {% if plan_activo %}
+                  {% if tcomp==0 %}
+                    <a href="/completar/{{ tid }}" class="btn btn-g-success btn-sm" title="Completar">✔</a>
+                  {% else %}
+                    <span class="btn btn-g-ghost btn-sm" style="cursor:default;opacity:.35;">✔</span>
+                  {% endif %}
+                  <a href="/editar/{{ tid }}"   class="btn btn-g-warning btn-sm" title="Editar">✏</a>
+                  <a href="/duplicar/{{ tid }}" class="btn btn-g-ghost   btn-sm" title="Duplicar tarea">⧉</a>
+                  <a href="/eliminar/{{ tid }}" class="btn btn-g-danger  btn-sm"
+                     onclick="return confirm('¿Eliminar esta tarea?')" title="Eliminar">🗑</a>
                 {% else %}
-                  <span class="btn btn-g-ghost btn-sm" style="cursor:default;opacity:.35;">✔</span>
+                  <span class="btn-locked" title="Acceso expirado">🔒</span>
                 {% endif %}
-                <a href="/editar/{{ tid }}"   class="btn btn-g-warning btn-sm" title="Editar">✏</a>
-                <a href="/duplicar/{{ tid }}" class="btn btn-g-ghost   btn-sm" title="Duplicar tarea">⧉</a>
-                <a href="/eliminar/{{ tid }}" class="btn btn-g-danger  btn-sm"
-                   onclick="return confirm('¿Eliminar esta tarea?')" title="Eliminar">🗑</a>
               </div>
             </td>
           </tr>
@@ -318,13 +345,36 @@
   </div>
 </div>
   <!-- Export button (footer) -->
+  {% if plan_activo %}
   <div class="text-end mt-4">
     <a href="/exportar" class="btn btn-g-export">⬇ Exportar Excel</a>
   </div>
+  {% endif %}
 {% endblock %}
 
 {% block scripts %}
 <style>
+/* ── Banner de trial ────────────────────────────────────────────────── */
+.trial-banner {
+  display: flex; align-items: center; gap: .85rem;
+  padding: .85rem 1.1rem; border-radius: 10px; margin-bottom: 1.1rem;
+  font-size: .88rem; border: 1px solid transparent;
+}
+.trial-banner .trial-icon { font-size: 1.4rem; flex-shrink: 0; }
+.trial-warning {
+  background: rgba(227,179,65,.13); border-color: rgba(227,179,65,.45); color: #e3b341;
+}
+.trial-expired {
+  background: rgba(200,60,40,.1); border-color: rgba(200,60,40,.4); color: #ff6a6a;
+}
+.trial-expired strong, .trial-warning strong { font-weight: 700; display: block; margin-bottom: .15rem; }
+
+/* ── Botón bloqueado ─────────────────────────────────────────────────── */
+.btn-locked {
+  font-size: .85rem; opacity: .5; cursor: default;
+  padding: .2rem .35rem;
+}
+
 /* ── Descripción siempre visible ────────────────────────────────────── */
 .task-toggle, .desc-text {
   filter: none !important;

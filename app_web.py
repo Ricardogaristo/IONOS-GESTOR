@@ -121,13 +121,17 @@ def inicializar_todo():
         )
     """)
     for col, ddl in [
-        ("email",     "VARCHAR(150)"),
-        ("es_admin",  "INT DEFAULT 0"),
-        ("perfil",    "INT DEFAULT 2"),
-        ("google_id", "VARCHAR(128)"),
-        ("avatar",    "VARCHAR(512)"),
-        ("pw_format", "INT DEFAULT 0"),
-        ("tipo",      "VARCHAR(1) DEFAULT 'A'"),
+        ("email",          "VARCHAR(150)"),
+        ("es_admin",       "INT DEFAULT 0"),
+        ("perfil",         "INT DEFAULT 2"),
+        ("google_id",      "VARCHAR(128)"),
+        ("avatar",         "VARCHAR(512)"),
+        ("pw_format",      "INT DEFAULT 0"),
+        ("tipo",           "VARCHAR(1) DEFAULT 'A'"),
+        # ── Trial ──────────────────────────────────────────────────────────────
+        ("fecha_registro", "DATETIME DEFAULT CURRENT_TIMESTAMP"),
+        ("suscrito",       "TINYINT(1) DEFAULT 0"),
+        ("dias_trial",     "INT DEFAULT 15"),
     ]:
         if not column_exists(cursor, 'usuarios', col):
             cursor.execute(f"ALTER TABLE usuarios ADD COLUMN {col} {ddl}")
@@ -164,6 +168,19 @@ def inicializar_todo():
             texto    TEXT NOT NULL,
             hecha    INT DEFAULT 0,
             FOREIGN KEY (tarea_id) REFERENCES tareas(id) ON DELETE CASCADE
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS solicitudes_activacion (
+            id            INT AUTO_INCREMENT PRIMARY KEY,
+            usuario_id    INT NOT NULL,
+            mensaje       TEXT,
+            estado        ENUM('pendiente','aprobada','rechazada') DEFAULT 'pendiente',
+            fecha_envio   DATETIME DEFAULT CURRENT_TIMESTAMP,
+            fecha_gestion DATETIME DEFAULT NULL,
+            admin_nota    TEXT,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
         )
     """)
 
@@ -240,8 +257,38 @@ def accesos_rapidos():
 @app.route("/")
 @login_required
 def index():
+    from datetime import datetime
     user_id  = session.get("user_id")
     es_admin = session.get("es_admin", 0)
+
+    # ── Calcular días de trial restantes del usuario logueado ──────────────
+    _conn = get_connection()
+    _urow = _conn.execute(
+        "SELECT dias_trial, fecha_registro, suscrito, perfil FROM usuarios WHERE id=%s",
+        (user_id,)
+    ).fetchone()
+    _conn.close()
+
+    if _urow:
+        _perfil      = _urow["perfil"] or 2
+        _suscrito    = int(_urow["suscrito"] or 0)
+        _dias_trial  = int(_urow["dias_trial"] or 15)
+        _fecha_reg   = _urow["fecha_registro"]
+        if _fecha_reg:
+            if isinstance(_fecha_reg, str):
+                try:    _fecha_dt = datetime.strptime(_fecha_reg, "%Y-%m-%d %H:%M:%S")
+                except: _fecha_dt = datetime.strptime(_fecha_reg[:10], "%Y-%m-%d")
+            else:
+                _fecha_dt = _fecha_reg
+            _dias_transcurridos = max((datetime.now() - _fecha_dt).days, 0)
+            dias_restantes = max(_dias_trial - _dias_transcurridos, 0)
+        else:
+            dias_restantes = _dias_trial
+        # plan activo = SuperAdmin/Admin, suscrito, o trial no expirado
+        plan_activo = (_perfil >= 10) or bool(_suscrito) or (dias_restantes > 0)
+    else:
+        dias_restantes = 15
+        plan_activo    = True
 
     filtro_estado = request.args.get("estado", "all").strip()
     filtro_cat    = request.args.get("cat",    "").strip()
@@ -318,7 +365,8 @@ def index():
                            filtro_estado=filtro_estado, filtro_cat=filtro_cat, filtro_q=filtro_q,
                            filtro_prio=filtro_prio, filtro_fav=filtro_fav, filtro_user=filtro_user,
                            categorias_lista=categorias_lista, subtareas_map=subtareas_map,
-                           usuarios_lista=usuarios_lista)
+                           usuarios_lista=usuarios_lista,
+                           dias_restantes=dias_restantes, plan_activo=plan_activo)
 
 
 @app.route("/agregar", methods=["POST"])
@@ -576,11 +624,14 @@ def usuarios():
         SELECT u.id, u.username, u.email, u.es_admin, u.perfil,
                COALESCE(u.pw_format, 0)                          AS pw_format,
                COALESCE(u.tipo, 'A')                             AS tipo,
+               COALESCE(u.suscrito, 0)                           AS suscrito,
+               COALESCE(u.dias_trial, 15)                        AS dias_trial,
+               u.fecha_registro,
                COUNT(t.id)                                        AS total_tareas,
                SUM(CASE WHEN t.completada=1 THEN 1 ELSE 0 END)   AS completadas,
                SUM(CASE WHEN t.completada=0 THEN 1 ELSE 0 END)   AS pendientes
         FROM usuarios u LEFT JOIN tareas t ON t.usuario_id = u.id
-        GROUP BY u.id, u.username, u.email, u.es_admin, u.perfil, u.pw_format, u.tipo
+        GROUP BY u.id, u.username, u.email, u.es_admin, u.perfil, u.pw_format, u.tipo, u.suscrito, u.dias_trial, u.fecha_registro
         ORDER BY u.perfil DESC, u.username
     """).fetchall()
     cats = conn.execute("""
@@ -600,6 +651,12 @@ def usuarios():
     else:
         perfiles_disponibles = [p for p in PERFILES_TODOS if p[0] <= PERFIL_ADMIN]
 
+    conn3 = get_connection()
+    sol_pendientes = conn3.execute(
+        "SELECT COUNT(*) AS cnt FROM solicitudes_activacion WHERE estado='pendiente'"
+    ).fetchone()["cnt"] or 0
+    conn3.close()
+
     return render_template(
         "usuarios.html",
         usuarios=usuarios_lista,
@@ -608,6 +665,7 @@ def usuarios():
         perfil_labels=PERFIL_LABELS,
         necesitan_reset=necesitan_reset,
         perfil_actual=perfil_actual,            # perfil del admin logueado → controla botones
+        sol_pendientes=sol_pendientes,          # badge solicitudes pendientes
     )
 
 
@@ -707,6 +765,31 @@ def usuario_cambiar_tipo(uid):
     conn.commit()
     conn.close()
     return jsonify({"ok": True, "tipo": nuevo_tipo})
+
+
+@app.route("/usuarios/renovar_trial/<int:uid>", methods=["POST"])
+@admin_required
+def usuario_renovar_trial(uid):
+    """Renueva los días de trial de un usuario. Acepta {'dias': N} (por defecto 15)."""
+    from flask import jsonify
+    data       = request.get_json(force=True) or {}
+    dias_nuevo = int(data.get("dias", 15))
+    if not (1 <= dias_nuevo <= 365):
+        return jsonify({"ok": False, "error": "Días no válidos (1–365)."}), 400
+
+    conn = get_connection()
+    row  = conn.execute("SELECT id FROM usuarios WHERE id=%s", (uid,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"ok": False, "error": "Usuario no encontrado."}), 404
+
+    conn.execute(
+        "UPDATE usuarios SET dias_trial=%s, fecha_registro=CURRENT_TIMESTAMP WHERE id=%s",
+        (dias_nuevo, uid)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "dias": dias_nuevo})
 
 
 # ── OPERACIONES TAREAS ─────────────────────────────────────────────────────────
@@ -1155,6 +1238,133 @@ def debug_login():
         lines.append(f"<tr><td>{u['id']}</td><td>{u['username']}</td><td>{u['pw']}</td><td>{u['es_admin']}</td></tr>")
     lines.append("</table><br><a href='/fix_passwords'>👉 Hashear contraseñas</a>")
     return "".join(lines)
+
+
+# ── SUSCRIPCIÓN / SOLICITUDES DE ACTIVACIÓN ────────────────────────────────────
+
+def _parse_fecha(val):
+    """Convierte string ISO o datetime a datetime. Devuelve None si falla."""
+    if val is None:
+        return None
+    if hasattr(val, 'strftime'):
+        return val
+    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(str(val)[:19], fmt)
+        except ValueError:
+            continue
+    return None
+
+
+@app.route("/suscripcion")
+@login_required
+def suscripcion():
+    user_id = session.get("user_id")
+    conn    = get_connection()
+    ultima_raw = conn.execute(
+        "SELECT * FROM solicitudes_activacion WHERE usuario_id=%s ORDER BY fecha_envio DESC LIMIT 1",
+        (user_id,)
+    ).fetchone()
+    conn.close()
+
+    ultima = None
+    if ultima_raw:
+        ultima = dict(ultima_raw)
+        ultima['fecha_envio']   = _parse_fecha(ultima.get('fecha_envio'))
+        ultima['fecha_gestion'] = _parse_fecha(ultima.get('fecha_gestion'))
+
+    return render_template("suscripcion.html", ultima_solicitud=ultima)
+
+
+@app.route("/suscripcion/solicitar", methods=["POST"])
+@login_required
+def solicitar_activacion():
+    user_id = session.get("user_id")
+    mensaje = (request.form.get("mensaje") or "").strip()[:1000]
+    conn    = get_connection()
+
+    pendiente = conn.execute(
+        "SELECT id FROM solicitudes_activacion WHERE usuario_id=%s AND estado='pendiente'",
+        (user_id,)
+    ).fetchone()
+    if pendiente:
+        conn.close()
+        from flask import flash
+        flash("Ya tienes una solicitud pendiente. El administrador la revisará pronto.", "warning")
+        return redirect("/suscripcion")
+
+    conn.execute(
+        "INSERT INTO solicitudes_activacion (usuario_id, mensaje) VALUES (%s, %s)",
+        (user_id, mensaje)
+    )
+    conn.commit()
+    conn.close()
+    from flask import flash
+    flash("Tu solicitud fue enviada. El administrador la revisará y activará tu cuenta.", "success")
+    return redirect("/suscripcion")
+
+
+@app.route("/usuarios/solicitudes")
+@admin_required
+def ver_solicitudes_activacion():
+    conn = get_connection()
+    rows = conn.execute("""
+        SELECT s.id, s.mensaje, s.estado, s.fecha_envio, s.fecha_gestion, s.admin_nota,
+               u.id AS uid, u.username, u.email, u.perfil,
+               COALESCE(u.suscrito, 0) AS suscrito,
+               COALESCE(u.dias_trial, 15) AS dias_trial,
+               u.fecha_registro
+        FROM solicitudes_activacion s
+        JOIN usuarios u ON s.usuario_id = u.id
+        ORDER BY
+            CASE s.estado WHEN 'pendiente' THEN 0 WHEN 'aprobada' THEN 1 ELSE 2 END,
+            s.fecha_envio DESC
+    """).fetchall()
+    conn.close()
+
+    solicitudes = []
+    for r in rows:
+        d = dict(r)
+        d['fecha_envio']   = _parse_fecha(d.get('fecha_envio'))
+        d['fecha_gestion'] = _parse_fecha(d.get('fecha_gestion'))
+        solicitudes.append(d)
+
+    return render_template("solicitudes_activacion.html", solicitudes=solicitudes)
+
+
+@app.route("/usuarios/solicitudes/<int:sid>/gestionar", methods=["POST"])
+@admin_required
+def gestionar_solicitud(sid):
+    data   = request.get_json(force=True) or {}
+    accion = data.get("accion")
+    nota   = (data.get("nota") or "").strip()[:500]
+
+    if accion not in ("aprobar", "rechazar"):
+        return jsonify({"ok": False, "error": "Accion no valida."}), 400
+
+    conn = get_connection()
+    sol  = conn.execute(
+        "SELECT usuario_id FROM solicitudes_activacion WHERE id=%s", (sid,)
+    ).fetchone()
+    if not sol:
+        conn.close()
+        return jsonify({"ok": False, "error": "Solicitud no encontrada."}), 404
+
+    nuevo_estado = "aprobada" if accion == "aprobar" else "rechazada"
+    conn.execute(
+        "UPDATE solicitudes_activacion SET estado=%s, fecha_gestion=NOW(), admin_nota=%s WHERE id=%s",
+        (nuevo_estado, nota, sid)
+    )
+
+    if accion == "aprobar":
+        conn.execute(
+            "UPDATE usuarios SET suscrito=1, dias_trial=30, fecha_registro=NOW() WHERE id=%s",
+            (sol["usuario_id"],)
+        )
+
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "estado": nuevo_estado})
 
 
 # ── ARRANCAR ───────────────────────────────────────────────────────────────────

@@ -137,7 +137,7 @@
          onmouseout="this.style.background=''">
         📅 Calendario
       </a>
-
+      {% if session.get('acceso_completo', False) %}
       <!-- Buscador rápido (Ctrl+K) -->
       <button onclick="abrirBuscador()" class="btn btn-g-ghost"
               style="border-color:#a371f7; color:#a371f7;"
@@ -148,6 +148,7 @@
                      color:var(--text-muted); background:var(--bg3);
                      padding:.05rem .35rem; border-radius:4px; border:1px solid var(--border-soft);">Ctrl K</span>
       </button>
+
 
       <!-- Informe de productividad -->
       <a href="/util/informe" class="btn btn-g-ghost"
@@ -173,6 +174,15 @@
       </button>
 
       <a href="/exportar" class="btn btn-g-success">⬇ Exportar Excel</a>
+      {% else %}
+      <!-- Trial caducado -->
+      <a href="/suscripcion" class="btn btn-g-ghost"
+         style="border-color:rgba(200,41,10,.5); color:rgba(200,41,10,.85);"
+         onmouseover="this.style.background='rgba(200,41,10,.08)'"
+         onmouseout="this.style.background=''">
+        🔒 Activar cuenta para desbloquear
+      </a>
+      {% endif %}
 
       <!-- Vista usuarios (admin) -->
       {% if session.get('es_admin', 0) >= 1 %}

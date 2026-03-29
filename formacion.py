@@ -183,30 +183,74 @@ def _safe_int(val):
         return 0
 
 def _fmt_examenes(val):
-    """Garantiza que el valor de examenes esté en formato R/S/T.
-    Acepta int (legacy) o string 'R/S/T'."""
+    """Normaliza el valor de exámenes preservando el número de partes introducidas.
+    Nueva semántica:
+      1 valor  → T           (total de exámenes)
+      2 valores → R/T        (realizados / totales)
+      3 valores → R/S/T      (realizados / superados / totales)
+    Limpia decimales y valores inválidos pero NO cambia el número de partes.
+    """
     if val is None:
-        return "0/0/0"
+        return "0"
     s = str(val).strip()
-    if "/" in s:
-        parts = s.split("/")
-        if len(parts) == 3:
-            return s
-    # Legacy: era un entero
-    try:
-        n = int(float(s))
-        return f"{n}/0/0"
-    except Exception:
-        return "0/0/0"
+    if not s or s.lower() in ("none", "nan", ""):
+        return "0"
+    raw_parts = [p.strip() for p in s.split("/")] if "/" in s else [s]
+    # Limpiar cada parte
+    cleaned = []
+    for p in raw_parts:
+        try:
+            cleaned.append(str(int(float(p))))
+        except Exception:
+            cleaned.append("0")
+    # Normalizar a 1, 2 o 3 partes
+    n = len(cleaned)
+    if n == 1:
+        return cleaned[0]
+    if n == 2:
+        return f"{cleaned[0]}/{cleaned[1]}"
+    return f"{cleaned[0]}/{cleaned[1]}/{cleaned[2]}"
+
+
+def _exam_modo(val):
+    """Devuelve el número de partes del valor (1, 2 o 3)."""
+    fmt = _fmt_examenes(val)
+    return len(fmt.split("/"))
+
 
 def _parse_examenes(val):
-    """Devuelve (realizados, superados, totales) como ints."""
-    fmt = _fmt_examenes(val)
+    """Devuelve (realizados, superados, totales) según la nueva semántica:
+      1 parte  → T          → (0, 0, T)
+      2 partes → R/T        → (R, 0, T)
+      3 partes → R/S/T      → (R, S, T)
+    """
+    fmt   = _fmt_examenes(val)
     parts = fmt.split("/")
     try:
+        if len(parts) == 1:
+            return 0, 0, int(parts[0])
+        if len(parts) == 2:
+            return int(parts[0]), 0, int(parts[1])
         return int(parts[0]), int(parts[1]), int(parts[2])
     except Exception:
         return 0, 0, 0
+
+
+def _display_examenes(val):
+    """Versión de visualización con guiones en campos no introducidos.
+      1 parte  → T  o —
+      2 partes → R/T  o —
+      3 partes → R/S/T  o —
+    """
+    fmt   = _fmt_examenes(val)
+    parts = fmt.split("/")
+    if all(p == "0" for p in parts):
+        return "\u2014"   # —
+    if len(parts) == 1:
+        return parts[0]
+    if len(parts) == 2:
+        return f"{parts[0]}/{parts[1]}"
+    return f"{parts[0]}/{parts[1]}/{parts[2]}"
 
 
 def _safe_date(val):
@@ -774,9 +818,10 @@ def formacion():
     alumnos = []
     for _a in _alumnos_raw:
         _a = dict(_a)
-        _a["examenes"]   = _fmt_examenes(_a.get("examenes"))
-        _ep              = _parse_examenes(_a["examenes"])
-        _a["ex_pending"] = _ep[2] > 0 and (_ep[0] / _ep[2]) < 0.75 and not _a.get("no_llamar")
+        _a["examenes"]         = _fmt_examenes(_a.get("examenes"))
+        _a["examenes_display"] = _display_examenes(_a["examenes"])
+        _ep                    = _parse_examenes(_a["examenes"])
+        _a["ex_pending"]       = _ep[2] > 0 and (_ep[0] / _ep[2]) < 0.75 and not _a.get("no_llamar")
         alumnos.append(_a)
     # Contar cursos archivados para el badge
     row_arch = conn.execute(
@@ -803,10 +848,14 @@ def formacion():
     completadas_hoy  = _get_completadas_hoy(tutor_id)
     alarmas_pendientes = sum(1 for a in alarmas_hoy if a["clave"] not in completadas_hoy)
 
+    # Detectar modo global de exámenes para la leyenda del encabezado
+    exam_modo = max((_exam_modo(a["examenes"]) for a in alumnos), default=1)
+
     return render_template("formacion.html", alumnos=alumnos, errores=errores, exito=exito,
                            alarmas_pendientes=alarmas_pendientes,
                            archivados_count=archivados_count,
-                           importaciones_por_curso=importaciones_por_curso)
+                           importaciones_por_curso=importaciones_por_curso,
+                           exam_modo=exam_modo)
 
 @formacion_bp.route("/formacion/deduplicar", methods=["POST"])
 @login_required
@@ -1388,7 +1437,12 @@ def formacion_dashboard():
     no_superan     = total - superan_75
     pct_exito      = round(superan_75 / total * 100, 1) if total else 0
     avg_progreso   = round(sum(a["progreso"] for a in alumnos) / total, 1) if total else 0
-    total_examenes = sum(_parse_examenes(a["examenes"])[0] for a in alumnos)
+    total_examenes = sum(_parse_examenes(a["examenes"])[2] for a in alumnos
+                         if _parse_examenes(a["examenes"])[2] > 0)
+    examenes_realizados = sum(_parse_examenes(a["examenes"])[0] for a in alumnos)
+    examenes_superados  = sum(_parse_examenes(a["examenes"])[1] for a in alumnos)
+    # Detectar el modo global (1=T, 2=R/T, 3=R/S/T) según el máximo de partes usado
+    exam_modo = max((_exam_modo(a["examenes"]) for a in alumnos), default=1)
 
     # Snapshots históricos (también como dicts)
     conn2     = get_form_conn()
@@ -1425,6 +1479,9 @@ def formacion_dashboard():
         pct_exito=pct_exito,
         avg_progreso=avg_progreso,
         total_examenes=total_examenes,
+        examenes_realizados=examenes_realizados,
+        examenes_superados=examenes_superados,
+        exam_modo=exam_modo,
         snapshots=snapshots,
         snap_labels=snap_labels,
         snap_pct=snap_pct,

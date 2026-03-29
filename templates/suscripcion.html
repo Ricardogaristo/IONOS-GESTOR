@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block title %}Activar cuenta — Gestor{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+  <div>
+    <h4 style="font-weight:700; margin:0;">🔑 Activar cuenta</h4>
+    <div style="font-family:var(--mono); font-size:.75rem; color:var(--text-muted); margin-top:.2rem;">
+      Tu período de prueba ha finalizado
+    </div>
+  </div>
+</div>
+
+<!-- Alertas flash -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, msg in messages %}
+  <div class="galert galert-{{ 'success' if category == 'success' else 'danger' if category == 'danger' else 'warning' }}">
+    {{ msg }}
+  </div>
+  {% endfor %}
+{% endwith %}
+
+<!-- ── Estado de solicitud actual ─────────────────────────────────────────── -->
+{% if ultima_solicitud %}
+  {% set s = ultima_solicitud %}
+  <div class="gcard mb-4">
+    <div class="gcard-header">
+      <span>📬</span>
+      <span class="gcard-title">Estado de tu solicitud</span>
+    </div>
+    <div class="gcard-body">
+      <div class="solicitud-estado-wrap">
+
+        {% if s.estado == 'pendiente' %}
+        <div class="sol-badge sol-pendiente">⏳ Pendiente de revisión</div>
+        <p style="margin:.75rem 0 0; font-size:.88rem; color:var(--text-muted);">
+          El administrador revisará tu solicitud y activará tu cuenta en cuanto confirme el pago por Bizum.
+        </p>
+
+        {% elif s.estado == 'aprobada' %}
+        <div class="sol-badge sol-aprobada">✅ Solicitud aprobada — cuenta activada</div>
+        <p style="margin:.75rem 0 0; font-size:.88rem; color:var(--text-muted);">
+          Tu cuenta ya está activa. Cierra sesión y vuelve a entrar para disfrutar del acceso completo.
+        </p>
+        {% if s.admin_nota %}
+        <div class="sol-nota">
+          <span style="font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted);">Nota del administrador</span>
+          <div style="margin-top:.3rem;">{{ s.admin_nota }}</div>
+        </div>
+        {% endif %}
+
+        {% elif s.estado == 'rechazada' %}
+        <div class="sol-badge sol-rechazada">❌ Solicitud rechazada</div>
+        {% if s.admin_nota %}
+        <div class="sol-nota sol-nota-red">
+          <span style="font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted);">Motivo</span>
+          <div style="margin-top:.3rem;">{{ s.admin_nota }}</div>
+        </div>
+        {% endif %}
+        <p style="margin:.75rem 0 0; font-size:.88rem; color:var(--text-muted);">
+          Puedes enviar una nueva solicitud si ya has completado el pago.
+        </p>
+        {% endif %}
+
+        <!-- Fechas seguras: la ruta Python ya las convirtió a datetime; si por
+             algún motivo llegaran como string el bloque simplemente no se muestra -->
+        <div style="font-size:.72rem; font-family:var(--mono); color:var(--text-muted); margin-top:.75rem;">
+          {% if s.fecha_envio %}
+            Enviada el
+            {% if s.fecha_envio is string %}
+              {{ s.fecha_envio[:16] | replace('T',' ') }}
+            {% else %}
+              {{ s.fecha_envio.strftime('%d/%m/%Y %H:%M') }}
+            {% endif %}
+          {% endif %}
+          {% if s.fecha_gestion %}
+            · Gestionada el
+            {% if s.fecha_gestion is string %}
+              {{ s.fecha_gestion[:16] | replace('T',' ') }}
+            {% else %}
+              {{ s.fecha_gestion.strftime('%d/%m/%Y %H:%M') }}
+            {% endif %}
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+<!-- ── Instrucciones de pago ────────────────────────────────────────────── -->
+<div class="gcard mb-4">
+  <div class="gcard-header">
+    <span style="color:var(--accent);">💳</span>
+    <span class="gcard-title">Cómo activar tu cuenta</span>
+  </div>
+  <div class="gcard-body">
+    <div class="pasos-wrap">
+
+      <div class="paso">
+        <div class="paso-num">1</div>
+        <div class="paso-texto">
+          <strong>Realiza el pago por Bizum</strong>
+          <div style="margin-top:.35rem; font-size:.85rem; color:var(--text-muted);">
+            Envía <strong style="color:var(--text);">25 €</strong> al número de Bizum del administrador
+            indicando tu nombre de usuario
+            <strong style="color:var(--accent);">{{ session.get('user') }}</strong> en el concepto.
+          </div>
+          <div class="bizum-box">
+            <span class="bizum-label">Número Bizum</span>
+            <!-- ⚠ CAMBIAR por el número real de Bizum del administrador -->
+            <span class="bizum-num" id="bizum-numero">+34 698157570</span>
+            <button class="btn-copiar" onclick="copiarBizum()" title="Copiar número">📋 Copiar</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="paso-sep">↓</div>
+
+      <div class="paso">
+        <div class="paso-num">2</div>
+        <div class="paso-texto">
+          <strong>Envía tu solicitud</strong>
+          <div style="margin-top:.35rem; font-size:.85rem; color:var(--text-muted);">
+            Rellena el formulario de abajo indicando que has realizado el pago.
+            El administrador lo verificará y activará tu cuenta.
+          </div>
+        </div>
+      </div>
+
+      <div class="paso-sep">↓</div>
+
+      <div class="paso">
+        <div class="paso-num">3</div>
+        <div class="paso-texto">
+          <strong>Acceso activado</strong>
+          <div style="margin-top:.35rem; font-size:.85rem; color:var(--text-muted);">
+            Una vez aprobada la solicitud, cierra sesión y vuelve a entrar para disfrutar del acceso completo.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── Formulario de solicitud ──────────────────────────────────────────── -->
+{% if not ultima_solicitud or ultima_solicitud.estado == 'rechazada' %}
+<div class="gcard">
+  <div class="gcard-header">
+    <span style="color:var(--blue);">✉</span>
+    <span class="gcard-title">Enviar solicitud de activación</span>
+  </div>
+  <div class="gcard-body">
+    <form method="POST" action="/suscripcion/solicitar">
+      <div class="mb-3">
+        <label class="form-label" style="font-size:.85rem; font-weight:600;">
+          Mensaje para el administrador
+          <span style="font-weight:400; color:var(--text-muted);">(opcional)</span>
+        </label>
+        <textarea name="mensaje" class="form-control" rows="4"
+                  placeholder="Ej: Acabo de hacer el Bizum de 25 € con el concepto '{{ session.get('user') }}'. Quedo a la espera de la activación."
+                  style="font-size:.85rem; resize:vertical;"></textarea>
+        <div style="font-size:.75rem; color:var(--text-muted); margin-top:.3rem;">
+          Indica tu nombre de usuario y confirma que has realizado el pago para agilizar la activación.
+        </div>
+      </div>
+      <button type="submit" class="btn btn-g-primary">📨 Enviar solicitud</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+.pasos-wrap { display:flex; flex-direction:column; gap:.5rem; }
+.paso {
+  display:flex; gap:1rem; align-items:flex-start;
+  padding:.85rem 1rem;
+  background:var(--bg2); border:1px solid var(--border); border-radius:10px;
+}
+.paso-num {
+  width:28px; height:28px; border-radius:50%;
+  background:var(--accent); color:var(--bg);
+  font-weight:800; font-size:.82rem;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; margin-top:.1rem;
+}
+.paso-texto { flex:1; font-size:.88rem; }
+.paso-sep   { text-align:center; color:var(--text-muted); font-size:1.1rem; padding:.1rem 0; }
+
+.bizum-box {
+  display:inline-flex; align-items:center; gap:.6rem; flex-wrap:wrap;
+  margin-top:.65rem; padding:.55rem .9rem;
+  background:var(--bg3); border:1.5px solid var(--accent); border-radius:10px;
+}
+.bizum-label { font-size:.68rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); font-family:var(--mono); }
+.bizum-num   { font-family:var(--mono); font-size:1.05rem; font-weight:800; color:var(--accent); letter-spacing:.04em; }
+.btn-copiar  {
+  background:none; border:1px solid var(--border); border-radius:6px;
+  padding:.2rem .55rem; font-size:.75rem; color:var(--text-muted); cursor:pointer; transition:all .15s;
+}
+.btn-copiar:hover { background:var(--bg2); color:var(--text); }
+
+.solicitud-estado-wrap { padding:.25rem 0; }
+.sol-badge {
+  display:inline-flex; align-items:center;
+  padding:.4rem .85rem; border-radius:8px; font-weight:700; font-size:.88rem;
+}
+.sol-pendiente  { background:rgba(227,179,65,.15); color:#e3b341;       border:1px solid rgba(227,179,65,.4);  }
+.sol-aprobada   { background:rgba(40,167,69,.12);  color:var(--accent); border:1px solid rgba(40,167,69,.35); }
+.sol-rechazada  { background:rgba(200,60,40,.1);   color:var(--red);    border:1px solid rgba(200,60,40,.35); }
+.sol-nota {
+  margin-top:.75rem; padding:.6rem .85rem;
+  background:var(--bg2); border:1px solid var(--border); border-radius:8px; font-size:.85rem;
+}
+.sol-nota-red { border-color:rgba(200,60,40,.3); }
+</style>
+<script>
+function copiarBizum() {
+  const num = document.getElementById('bizum-numero').textContent.replace(/\s/g,'');
+  navigator.clipboard.writeText(num).then(() => {
+    const btn = document.querySelector('.btn-copiar');
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copiado';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+</script>
+{% endblock %}

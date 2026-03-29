@@ -162,9 +162,9 @@ def historial_buscar():
     conn = get_form_conn()
 
     # Lista de alumnos con datos para filtros en cliente
-    # ANY_VALUE(nombre) necesario para MySQL con sql_mode=only_full_group_by
+    # MIN(nombre) en lugar de ANY_VALUE(): compatible con MariaDB y MySQL < 5.7.5
     _rows = conn.execute("""
-        SELECT ANY_VALUE(nombre)                                           AS nombre,
+        SELECT MIN(nombre)                                                 AS nombre,
                GROUP_CONCAT(DISTINCT curso ORDER BY curso SEPARATOR '||') AS cursos,
                MAX(supera_75)                                              AS supera_alguno,
                COUNT(*)                                                    AS n_cursos,
@@ -173,7 +173,7 @@ def historial_buscar():
         FROM alumnos
         WHERE tutor_id=%s
         GROUP BY LOWER(TRIM(nombre))
-        ORDER BY ANY_VALUE(nombre)
+        ORDER BY MIN(nombre)
     """, (tutor_id,)).fetchall()
 
     # nombres_sugeridos: lista de dicts con nombre, cursos, supera, activos, archivados
