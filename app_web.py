@@ -620,7 +620,7 @@ def informe_usuarios():
 @admin_required
 def usuarios():
     conn = get_connection()
-    usuarios_lista = conn.execute("""
+    usuarios_raw = conn.execute("""
         SELECT u.id, u.username, u.email, u.es_admin, u.perfil,
                COALESCE(u.pw_format, 0)                          AS pw_format,
                COALESCE(u.tipo, 'A')                             AS tipo,
@@ -639,6 +639,24 @@ def usuarios():
     """).fetchall()
     categorias = [r["cat"] for r in cats]
     conn.close()
+
+    # Calcular días de trial REALES (descontando los días ya transcurridos desde fecha_registro)
+    ahora = datetime.now()
+    usuarios_lista = []
+    for u in usuarios_raw:
+        u = dict(u)
+        dias_trial_bd = int(u.get("dias_trial") or 15)
+        fecha_reg     = u.get("fecha_registro")
+        if fecha_reg:
+            if isinstance(fecha_reg, str):
+                try:    fecha_reg = datetime.strptime(fecha_reg, "%Y-%m-%d %H:%M:%S")
+                except: fecha_reg = datetime.strptime(fecha_reg[:10], "%Y-%m-%d")
+            if hasattr(fecha_reg, "tzinfo") and fecha_reg.tzinfo is not None:
+                fecha_reg = fecha_reg.replace(tzinfo=None)
+            dias_transcurridos = max((ahora - fecha_reg).days, 0)
+            u["dias_trial"] = max(dias_trial_bd - dias_transcurridos, 0)
+        # sin fecha_registro → dejamos el valor de BD sin tocar
+        usuarios_lista.append(u)
 
     # Usuarios que necesitan reset (pw_format=0 → no pueden entrar)
     necesitan_reset = [u for u in usuarios_lista if (u["pw_format"] or 0) == 0]
