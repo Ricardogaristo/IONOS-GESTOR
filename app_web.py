@@ -693,6 +693,37 @@ def usuario_cambiar_perfil(uid):
     return jsonify({"ok": True})
 
 
+@app.route("/usuarios/cambiar_password/<int:uid>", methods=["POST"])
+@admin_required
+def usuario_cambiar_password(uid):
+    """Admin cambia la contraseña de otro usuario."""
+    import hashlib as _hashlib
+    data  = request.get_json(force=True) or {}
+    nueva = data.get("nueva", "")  # sha256 de 64 chars enviado desde el cliente
+
+    if len(nueva) != 64:
+        return jsonify({"ok": False, "error": "Error en el formato de contraseña."})
+
+    perfil_admin = session.get("perfil", 0)
+
+    # Admin (10) no puede cambiar la contraseña de otro Admin o SuperAdmin
+    if perfil_admin < PERFIL_SUPERADMIN:
+        conn   = get_connection()
+        target = conn.execute("SELECT perfil FROM usuarios WHERE id=%s", (uid,)).fetchone()
+        conn.close()
+        if target and target["perfil"] >= PERFIL_ADMIN:
+            return jsonify({"ok": False, "error": "No tienes permiso para cambiar la contraseña de un administrador."}), 403
+
+    conn = get_connection()
+    conn.execute(
+        "UPDATE usuarios SET password=%s, pw_format=1 WHERE id=%s",
+        (generate_password_hash(nueva), uid)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
 @app.route("/usuarios/cambiar_tipo/<int:uid>", methods=["POST"])
 @admin_required
 def usuario_cambiar_tipo(uid):
