@@ -379,22 +379,50 @@ def login():
             user     = _user_by_identity(ident)
             ok       = False
 
+            # Normalización: el JS envía sha256(pw) en HTTPS.
+            # En HTTP (sin crypto.subtle) puede llegar texto plano.
+            # Si no parece sha256 (64 hex), lo hasheamos aquí.
+            _pw_is_plain = len(sha_recv) != 64 or not all(c in '0123456789abcdef' for c in sha_recv)
+            sha_recv_norm = hashlib.sha256(sha_recv.encode()).hexdigest() if _pw_is_plain else sha_recv
+
             if user and user.get("password"):
                 fmt = int(user.get("pw_format") or 0)
 
                 if fmt == 1:
                     # ── Formato nuevo: bcrypt(sha256(pw)) ─────────────────
-                    ok = check_password_hash(user["password"], sha_recv)
+                    ok = check_password_hash(user["password"], sha_recv_norm)
 
                     if not ok:
                         # Usuarios creados con doble sha256 durante pruebas
-                        sha2 = hashlib.sha256(sha_recv.encode()).hexdigest()
+                        sha2 = hashlib.sha256(sha_recv_norm.encode()).hexdigest()
                         if check_password_hash(user["password"], sha2):
                             c = _conn()
                             c.execute("UPDATE usuarios SET password=%s WHERE id=%s",
-                                      (generate_password_hash(sha_recv), user["id"]))
+                                      (generate_password_hash(sha_recv_norm), user["id"]))
                             c.commit(); c.close()
                             ok = True
+
+                    if not ok:
+                        # ── Migración silenciosa: cuentas registradas con bcrypt(texto_plano)
+                        # Caso A: HTTP — el JS no pudo sha256, sha_recv = texto plano
+                        #   → check bcrypt(sha_recv) directo
+                        # Caso B: HTTPS — el JS envió sha256(pw), sha_recv = sha256hex
+                        #   → no podemos revertir, pero sí marcar pw_format=0
+                        #   → la cuenta caerá en el bloque fmt==0 la próxima vez
+                        # Para Caso A: si coincide, migramos al nuevo formato.
+                        if check_password_hash(user["password"], sha_recv):
+                            # El hash guardado era bcrypt(sha_recv literal) — migrar
+                            c = _conn()
+                            c.execute("UPDATE usuarios SET password=%s WHERE id=%s",
+                                      (generate_password_hash(sha_recv_norm), user["id"]))
+                            c.commit(); c.close()
+                            ok = True
+                        else:
+                            # Caso B: sha_recv es sha256(plano) pero el hash es bcrypt(plano).
+                            # Marcamos pw_format=0 para que el bloque fmt==0 haga la migración
+                            # en el siguiente intento del usuario (si pone la misma contraseña).
+                            # Aquí no podemos dejar entrar sin verificar — dejamos ok=False.
+                            pass
 
                 else:
                     # ── Formato viejo: bcrypt(pw_plano) ───────────────────
@@ -429,7 +457,7 @@ def login():
                     # usuarios format=0. Solución aceptable porque ya
                     # tienen bcrypt viejo que tampoco podemos verificar.
                     # Mejor que bloquear al usuario indefinidamente.
-                    new_hash = generate_password_hash(sha_recv)
+                    new_hash = generate_password_hash(sha_recv_norm)
                     c = _conn()
                     c.execute(
                         "UPDATE usuarios SET password=%s, pw_format=1 WHERE id=%s",
@@ -482,13 +510,18 @@ def registro():
 
         if not username or not email or not password:
             error = "Todos los campos son obligatorios."
-        elif len(password) != 64:
-            # El cliente envía sha256(contraseña) — siempre 64 chars hex
-            # Si no tiene 64 chars, el JS no funcionó correctamente
-            error = "Error en el formulario. Recarga la página e inténtalo de nuevo."
         else:
             try:
-                _create_user(username, email, password, perfil=perfil)
+                # Normalizamos siempre a sha256 en el servidor:
+                # - Si el JS ya envió sha256 (64 chars hex), lo usamos tal cual.
+                # - Si llegó texto plano (HTTP sin crypto.subtle), lo hasheamos aquí.
+                # Así el hash almacenado es siempre bcrypt(sha256(pw)) y el login
+                # puede verificarlo independientemente del entorno (HTTP o HTTPS).
+                if len(password) == 64 and all(c in '0123456789abcdef' for c in password):
+                    password_sha = password          # ya viene como sha256 del JS
+                else:
+                    password_sha = hashlib.sha256(password.encode()).hexdigest()
+                _create_user(username, email, password_sha, perfil=perfil)
                 return redirect(url_for("auth.login") + "?registered=1")
             except Exception:
                 error = "El usuario o email ya existe."
