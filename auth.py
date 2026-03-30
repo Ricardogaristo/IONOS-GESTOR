@@ -380,7 +380,7 @@ def login():
             ok       = False
 
             if user and user.get("password"):
-                fmt = user.get("pw_format", 0)
+                fmt = int(user.get("pw_format") or 0)
 
                 if fmt == 1:
                     # ── Formato nuevo: bcrypt(sha256(pw)) ─────────────────
