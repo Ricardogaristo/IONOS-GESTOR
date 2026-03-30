@@ -592,13 +592,16 @@ async function guardarPassword() {
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ nueva: sha })
     });
-    const data = await res.json();
-    if (data.ok) {
+
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+
+    if (res.ok && data.ok) {
       okEl.style.display  = 'block';
       document.getElementById('pw-nueva').value = '';
       setTimeout(() => cerrarModalPassword(), 1500);
     } else {
-      errEl.textContent   = data.error || 'No se pudo cambiar la contraseña.';
+      errEl.textContent   = data.error || `Error ${res.status}: No se pudo cambiar la contraseña.`;
       errEl.style.display = 'block';
     }
   } catch(e) {
