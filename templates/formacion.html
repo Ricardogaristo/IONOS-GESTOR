@@ -93,40 +93,169 @@
 <div class="galert galert-success">{{ exito }}</div>
 {% endif %}
 
-<!-- ── Importar Excel ──────────────────────────────────────────────────────── -->
+<!-- ── Importar Excel — botón que abre modal ────────────────────────────── -->
 <div class="gcard mb-4">
   <div class="gcard-header">
     <span style="color:var(--accent)">⬆</span>
     <span class="gcard-title">Importar alumnos desde Excel</span>
+    <div class="ms-auto d-flex gap-2">
+      <a href="{{ url_for('formacion.descargar_modelo') }}" class="btn btn-g-ghost btn-sm"
+         title="Descarga la plantilla Excel para importar alumnos">
+        📋 Descargar Modelo
+      </a>
+      <button type="button" class="btn btn-g-primary btn-sm" onclick="abrirModalImport()">
+        ⬆ Importar
+      </button>
+    </div>
   </div>
-  <div class="gcard-body">
-    <form method="POST" enctype="multipart/form-data">
-      <div class="row g-3 align-items-end">
-        <div class="col-md-6">
-          <label class="form-label">Archivo Excel (.xlsx / .xls)</label>
-          <input type="file" name="excel" accept=".xlsx,.xls" class="form-control" required>
-          <div style="margin-top:.5rem; font-size:.78rem; color:var(--text-muted);">
-            El Excel debe tener columnas:
-            <span style="font-family:var(--mono); color:var(--blue);">Nombre del curso</span>,
-            <span style="font-family:var(--mono); color:var(--blue);">Nombre</span>,
-            <span style="font-family:var(--mono); color:var(--blue);">Progreso (%)</span>,
-            <span style="font-family:var(--mono); color:var(--blue);">Exámenes</span>,
-            <span style="font-family:var(--mono); color:var(--blue);">Fecha Inicio</span>,
-            <span style="font-family:var(--mono); color:var(--blue);">Fecha Fin</span>,
-            <span style="font-family:var(--mono); color:var(--blue);">Teléfono</span>
-            (el orden puede variar, se detectan automáticamente).
-          </div>
-        </div>
-        <div class="col-md-3">
-          <a href="{{ url_for('formacion.descargar_modelo') }}" class="btn btn-g-ghost" title="Descarga la plantilla Excel para importar alumnos">
-            📋 Descargar Modelo
-          </a>
-          <button type="submit" class="btn btn-g-primary w-100">⬆ Importar</button>
-        </div>
-      </div>
-    </form>
+  <div class="gcard-body" style="padding:.6rem 1rem; font-size:.78rem; color:var(--text-muted); line-height:1.5;">
+    Columnas detectadas automáticamente:
+    <span style="font-family:var(--mono); color:var(--blue);">Nombre del curso</span>,
+    <span style="font-family:var(--mono); color:var(--blue);">Nombre</span>,
+    <span style="font-family:var(--mono); color:var(--blue);">Progreso (%)</span>,
+    <span style="font-family:var(--mono); color:var(--blue);">Exámenes</span>,
+    <span style="font-family:var(--mono); color:var(--blue);">Fecha Inicio</span>,
+    <span style="font-family:var(--mono); color:var(--blue);">Fecha Fin</span>,
+    <span style="font-family:var(--mono); color:var(--blue);">Teléfono</span>.
+    Pulsa <strong>Importar</strong> para ver el formato de exámenes y subir el archivo.
   </div>
 </div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL — Importar Excel con leyenda de progreso del estudiante
+══════════════════════════════════════════════════════════════════ -->
+<div id="modal-import" style="
+  display:none; position:fixed; inset:0; z-index:10500;
+  background:rgba(0,0,0,.60); backdrop-filter:blur(4px);
+  align-items:center; justify-content:center; padding:1rem;"
+  onclick="if(event.target===this)cerrarModalImport()">
+
+  <div style="
+    background:var(--bg2); border:1px solid var(--border);
+    border-radius:14px; width:100%; max-width:560px;
+    box-shadow:0 20px 60px rgba(0,0,0,.4);
+    display:flex; flex-direction:column;
+    max-height:92vh; overflow:hidden;">
+
+    <!-- Header -->
+    <div style="padding:1.1rem 1.4rem .85rem; border-bottom:1px solid var(--border);
+                display:flex; align-items:center; gap:.75rem; flex-shrink:0;">
+      <span style="font-size:1.2rem;">📥</span>
+      <div style="flex:1;">
+        <div style="font-weight:700; font-size:.97rem;">Importar alumnos desde Excel</div>
+        <div style="font-size:.72rem; color:var(--text-muted); margin-top:.1rem;">Revisa el formato antes de subir el archivo</div>
+      </div>
+      <button onclick="cerrarModalImport()" style="
+        background:none; border:none; cursor:pointer; color:var(--text-muted);
+        font-size:1.3rem; line-height:1; padding:.2rem .4rem;
+        border-radius:6px; transition:background .15s;"
+        onmouseover="this.style.background='var(--bg3)'"
+        onmouseout="this.style.background='none'">✕</button>
+    </div>
+
+    <!-- Body con scroll -->
+    <div style="padding:1.25rem 1.4rem; overflow-y:auto; display:flex; flex-direction:column; gap:1.1rem;">
+
+      <!-- ── Leyenda: Progreso del estudiante en cada informe ────────────── -->
+      <div>
+        <div style="font-size:.72rem; font-weight:700; text-transform:uppercase;
+                    letter-spacing:.08em; color:var(--text-muted); margin-bottom:.75rem;">
+          📊 Progreso del estudiante en cada informe
+        </div>
+        <p style="font-size:.8rem; color:var(--text-muted); margin-bottom:.85rem; line-height:1.55;">
+          La columna <strong>Exámenes</strong> acepta <strong>1, 2 o 3 valores</strong> separados por
+          <code style="background:var(--bg3); padding:.1rem .3rem; border-radius:3px;">/</code>.
+          El sistema detecta el formato automáticamente y calcula los porcentajes del dashboard en consecuencia.
+        </p>
+
+        <div style="display:flex; flex-direction:column; gap:.5rem;">
+
+          <!-- Formato T -->
+          <div style="display:flex; align-items:flex-start; gap:.65rem;
+                      padding:.55rem .75rem; background:var(--bg3);
+                      border-radius:8px; border-left:3px solid var(--blue);">
+            <span style="font-family:var(--mono); font-weight:800; color:var(--blue);
+                          font-size:.92rem; min-width:44px; padding-top:.1rem; flex-shrink:0;">T</span>
+            <div style="font-size:.8rem; line-height:1.5;">
+              <span style="font-weight:700;">1 valor — Total de exámenes del curso</span><br>
+              El Excel solo incluye el número de exámenes previstos.<br>
+              <span style="color:var(--text-muted);">
+                Ejemplo: <code style="background:var(--bg2); padding:.05rem .25rem; border-radius:3px;">3</code>
+                → 3 exámenes en total. El % de realización no se calcula.
+              </span>
+            </div>
+          </div>
+
+          <!-- Formato R/T -->
+          <div style="display:flex; align-items:flex-start; gap:.65rem;
+                      padding:.55rem .75rem; background:var(--bg3);
+                      border-radius:8px; border-left:3px solid var(--amber);">
+            <span style="font-family:var(--mono); font-weight:800; color:var(--amber);
+                          font-size:.92rem; min-width:44px; padding-top:.1rem; flex-shrink:0;">R/T</span>
+            <div style="font-size:.8rem; line-height:1.5;">
+              <span style="font-weight:700;">2 valores — Realizados / Totales</span><br>
+              El Excel incluye exámenes realizados y el total del curso.<br>
+              <span style="color:var(--text-muted);">
+                Ejemplo: <code style="background:var(--bg2); padding:.05rem .25rem; border-radius:3px;">2/3</code>
+                → 2 realizados de 3 totales.
+                <strong>% = Realizados ÷ Totales</strong> (66,7 %).
+              </span>
+            </div>
+          </div>
+
+          <!-- Formato R/S/T -->
+          <div style="display:flex; align-items:flex-start; gap:.65rem;
+                      padding:.55rem .75rem; background:var(--bg3);
+                      border-radius:8px; border-left:3px solid var(--accent);">
+            <span style="font-family:var(--mono); font-weight:800; color:var(--accent);
+                          font-size:.85rem; min-width:44px; padding-top:.1rem; flex-shrink:0;">R/S/T</span>
+            <div style="font-size:.8rem; line-height:1.5;">
+              <span style="font-weight:700;">3 valores — Realizados / Superados / Totales</span><br>
+              El Excel incluye realizados, superados y el total.<br>
+              <span style="color:var(--text-muted);">
+                Ejemplo: <code style="background:var(--bg2); padding:.05rem .25rem; border-radius:3px;">2/1/3</code>
+                → 2 realizados, 1 superado, de 3 totales.
+                <strong>% = Realizados ÷ Totales</strong> (66,7 %).
+              </span>
+            </div>
+          </div>
+
+        </div>
+
+        <p style="font-size:.73rem; color:var(--text-muted); margin-top:.7rem; margin-bottom:0; line-height:1.4;">
+          💡 Usa el mismo formato en todo el Excel de un mismo informe. La leyenda de la cabecera
+          de la tabla se actualiza automáticamente al importar.
+        </p>
+      </div>
+
+      <!-- Separador -->
+      <div style="border-top:1px solid var(--border);"></div>
+
+      <!-- ── Formulario de subida ──────────────────────────────────────── -->
+      <form method="POST" enctype="multipart/form-data" action="{{ url_for('formacion.formacion') }}">
+        <div style="margin-bottom:.85rem;">
+          <label class="form-label" style="font-weight:600; font-size:.83rem;">
+            Archivo Excel <span style="color:var(--text-muted); font-weight:400;">(.xlsx / .xls)</span>
+          </label>
+          <input type="file" name="excel" accept=".xlsx,.xls" class="form-control" required>
+        </div>
+        <div style="display:flex; gap:.6rem; justify-content:flex-end; align-items:center;">
+          <a href="{{ url_for('formacion.descargar_modelo') }}"
+             class="btn btn-g-ghost btn-sm" style="margin-right:auto;">
+            📋 Descargar Modelo
+          </a>
+          <button type="button" class="btn btn-g-ghost btn-sm" onclick="cerrarModalImport()">
+            Cancelar
+          </button>
+          <button type="submit" class="btn btn-g-primary btn-sm">
+            ⬆ Importar
+          </button>
+        </div>
+      </form>
+
+    </div><!-- /body -->
+  </div><!-- /modal-box -->
+</div><!-- /modal-import -->
 
 {% set cursos_activos = alumnos | map(attribute='curso') | select | unique | list | sort %}
 <!-- ── Lista de alumnos ───────────────────────────────────────────────────── -->
@@ -211,7 +340,7 @@
                                border-radius:50%; width:13px; height:13px; display:inline-flex;
                                align-items:center; justify-content:center; line-height:1; flex-shrink:0;">i</span>
                 </span>
-                <span style="font-size:.6rem; font-weight:400; color:var(--text-muted); letter-spacing:.03em; line-height:1;">
+                <span id="th-exam-leyenda" style="font-size:.6rem; font-weight:400; color:var(--text-muted); letter-spacing:.03em; line-height:1;">
                   {% if exam_modo == 1 %}Total
                   {% elif exam_modo == 2 %}R&nbsp;/&nbsp;T
                   {% else %}R&nbsp;/&nbsp;S&nbsp;/&nbsp;T{% endif %}
@@ -233,7 +362,8 @@
           {% set examenes_disp = a['examenes_display'] if a['examenes_display'] is defined else examenes_val %}
           <tr data-search="{{ nombre_val|lower }} {{ curso_val|lower }}"
               data-curso="{{ curso_val }}"
-              data-estado="{{ 'supera' if a['supera_75'] == 1 else 'no_supera' }}">
+              data-estado="{{ 'supera' if a['supera_75'] == 1 else 'no_supera' }}"
+              data-exam-modo="{{ (examenes_val.split('/')|length) if examenes_val and examenes_val != '0' else 1 }}">
 
             <td data-label="Curso" style="max-width:160px;">
               {% if curso_val %}
@@ -1284,9 +1414,22 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') cerrarMoodle();
 });
 
-// ════════════════════════════════════════════════════════════════
-//  Borrar curso seleccionado
-// ════════════════════════════════════════════════════════════════
+// ── Actualizar leyenda de exámenes según filas visibles ──────────
+function actualizarLeyendaExamen(visibleRows) {
+  const el = document.getElementById('th-exam-leyenda');
+  if (!el) return;
+  // Detectar el modo máximo entre las filas visibles
+  let modoMax = 1;
+  visibleRows.forEach(tr => {
+    const m = parseInt(tr.dataset.examModo) || 1;
+    if (m > modoMax) modoMax = m;
+  });
+  if (modoMax === 1)      el.textContent = 'Total';
+  else if (modoMax === 2) el.innerHTML   = 'R\u00a0/\u00a0T';
+  else                    el.innerHTML   = 'R\u00a0/\u00a0S\u00a0/\u00a0T';
+}
+
+
 const btnBorrarCurso = document.getElementById('btn-borrar-curso');
 
 // Muestra u oculta el botón según si hay curso seleccionado
@@ -1400,6 +1543,8 @@ function render() {
     pagWrap.style.display = '';
     buildPagination(pages);
   }
+  // Actualizar leyenda de exámenes según el modo de las filas visibles
+  actualizarLeyendaExamen(rows);
 }
 
 // ── Construir controles de paginación ────────────────────────
@@ -1950,6 +2095,19 @@ async function borrarObservacion(obs_id, btnEl) {
     if (!n) lista.innerHTML = '<div id="ma-obs-empty" style="font-size:.8rem;color:var(--text-muted);text-align:center;padding:.5rem 0;">Sin observaciones aún</div>';
   } catch(e) {}
 }
+// ── Modal importar Excel ──────────────────────────────────────────────────────
+function abrirModalImport() {
+  document.getElementById('modal-import').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function cerrarModalImport() {
+  document.getElementById('modal-import').style.display = 'none';
+  document.body.style.overflow = '';
+}
+{% if errores %}
+// Reabrir modal si el servidor devolvió errores de importación
+document.addEventListener('DOMContentLoaded', () => abrirModalImport());
+{% endif %}
 // ── Modal info formato exámenes ───────────────────────────────────────────────
 function abrirModalExamInfo() {
   document.getElementById('modal-exam-info').style.display = 'flex';
@@ -1963,6 +2121,8 @@ document.getElementById('modal-exam-info').addEventListener('click', function(e)
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape' && document.getElementById('modal-exam-info').style.display === 'flex')
     cerrarModalExamInfo();
+  if (e.key === 'Escape' && document.getElementById('modal-import').style.display === 'flex')
+    cerrarModalImport();
 });
 </script>
 {% endblock %}

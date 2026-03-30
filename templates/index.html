@@ -4,23 +4,56 @@
 {% block content %}
 
 <!-- ── Banner de trial ──────────────────────────────────────────────────── -->
-{% if not session.get('es_admin', 0) >= 1 %}
+{% if session.get('perfil', 0) < 10 %}
   {% if not plan_activo %}
+  {# Trial caducado — no está suscrito #}
   <div class="trial-banner trial-expired">
     <span class="trial-icon">🔒</span>
     <div>
-      <strong>Tu periodo de prueba ha expirado.</strong>
-      Contacta con el administrador para renovar tu acceso.
+      <strong>Tu periodo de prueba Gratuito (15 días) ha caducado.</strong>
+      Contacta con el administrador para activar tu cuenta.
     </div>
+    <a href="/suscripcion" class="btn btn-sm"
+       style="margin-left:auto; background:var(--red); color:#fff; white-space:nowrap; border-radius:6px; padding:.3rem .9rem; font-size:.8rem;">
+      Activar cuenta
+    </a>
   </div>
-  {% elif dias_restantes <= 5 %}
-  <div class="trial-banner trial-warning">
-    <span class="trial-icon">⏳</span>
-    <div>
-      <strong>{{ dias_restantes }} día{{ 's' if dias_restantes != 1 else '' }} restante{{ 's' if dias_restantes != 1 else '' }} de prueba.</strong>
-      Contacta con el administrador para ampliar tu acceso.
+  {% elif not session.get('suscrito', False) %}
+  {# Trial activo — mostrar cuenta atrás de días #}
+    {% if dias_restantes <= 3 %}
+    <div class="trial-banner trial-expired">
+      <span class="trial-icon">🔴</span>
+      <div>
+        <strong>¡Solo {{ dias_restantes }} día{{ 's' if dias_restantes != 1 else '' }} restante{{ 's' if dias_restantes != 1 else '' }} de prueba!</strong>
+        Activa tu cuenta antes de que caduque el acceso.
+      </div>
+      <a href="/suscripcion" class="btn btn-sm"
+         style="margin-left:auto; background:var(--red); color:#fff; white-space:nowrap; border-radius:6px; padding:.3rem .9rem; font-size:.8rem;">
+        Activar cuenta
+      </a>
     </div>
-  </div>
+    {% elif dias_restantes <= 7 %}
+    <div class="trial-banner trial-warning">
+      <span class="trial-icon">⏳</span>
+      <div>
+        <strong>{{ dias_restantes }} día{{ 's' if dias_restantes != 1 else '' }} restante{{ 's' if dias_restantes != 1 else '' }} de prueba gratuita.</strong>
+        Contacta con el administrador para ampliar tu acceso.
+      </div>
+      <a href="/suscripcion" class="btn btn-sm"
+         style="margin-left:auto; background:var(--amber); color:#000; white-space:nowrap; border-radius:6px; padding:.3rem .9rem; font-size:.8rem;">
+        Solicitar activación
+      </a>
+    </div>
+    {% elif dias_restantes <= 15 %}
+    <div class="trial-banner trial-info"
+         style="background:var(--blue-dim,#1a2d4a); border-left:3px solid var(--blue); color:var(--text); padding:.75rem 1rem; border-radius:8px; display:flex; align-items:center; gap:.75rem; margin-bottom:1rem;">
+      <span class="trial-icon">🎉</span>
+      <div>
+        <strong>Período de prueba gratuita: {{ dias_restantes }} día{{ 's' if dias_restantes != 1 else '' }} restante{{ 's' if dias_restantes != 1 else '' }}.</strong>
+        Estás disfrutando del acceso completo Gratuito (15 días).
+      </div>
+    </div>
+    {% endif %}
   {% endif %}
 {% endif %}
 

@@ -1259,6 +1259,9 @@ def _parse_fecha(val):
 @app.route("/suscripcion")
 @login_required
 def suscripcion():
+    # Admin y SuperAdmin nunca necesitan activar cuenta
+    if session.get("perfil", 0) >= PERFIL_ADMIN:
+        return redirect("/")
     user_id = session.get("user_id")
     conn    = get_connection()
     ultima_raw = conn.execute(
@@ -1279,6 +1282,9 @@ def suscripcion():
 @app.route("/suscripcion/solicitar", methods=["POST"])
 @login_required
 def solicitar_activacion():
+    # Admin y SuperAdmin nunca activan cuenta
+    if session.get("perfil", 0) >= PERFIL_ADMIN:
+        return redirect("/")
     user_id = session.get("user_id")
     mensaje = (request.form.get("mensaje") or "").strip()[:1000]
     conn    = get_connection()

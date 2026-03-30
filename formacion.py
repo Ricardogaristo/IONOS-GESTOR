@@ -1437,12 +1437,53 @@ def formacion_dashboard():
     no_superan     = total - superan_75
     pct_exito      = round(superan_75 / total * 100, 1) if total else 0
     avg_progreso   = round(sum(a["progreso"] for a in alumnos) / total, 1) if total else 0
-    total_examenes = sum(_parse_examenes(a["examenes"])[2] for a in alumnos
-                         if _parse_examenes(a["examenes"])[2] > 0)
-    examenes_realizados = sum(_parse_examenes(a["examenes"])[0] for a in alumnos)
-    examenes_superados  = sum(_parse_examenes(a["examenes"])[1] for a in alumnos)
     # Detectar el modo global (1=T, 2=R/T, 3=R/S/T) según el máximo de partes usado
     exam_modo = max((_exam_modo(a["examenes"]) for a in alumnos), default=1)
+
+    # Calcular exámenes respetando el modo individual de cada alumno.
+    # _parse_examenes devuelve (realizados, superados, totales) con semántica:
+    #   modo 1 → (0, 0, T)   — solo hay total, realizados=0
+    #   modo 2 → (R, 0, T)   — realizados/totales, superados=0
+    #   modo 3 → (R, S, T)   — realizados/superados/totales
+    # Para los acumulados globales sumamos solo los campos que tienen sentido
+    # según el modo de CADA alumno, no del modo global.
+    examenes_realizados = 0
+    examenes_superados  = 0
+    total_examenes      = 0
+    tiene_realizados    = False   # ¿algún alumno aporta dato de realizados?
+    tiene_superados     = False   # ¿algún alumno aporta dato de superados?
+
+    for a in alumnos:
+        modo_a = _exam_modo(a["examenes"])
+        r, s, t = _parse_examenes(a["examenes"])
+        if modo_a == 1:
+            # Solo total — no suma a realizados ni superados
+            if t > 0:
+                total_examenes += t
+        elif modo_a == 2:
+            # Realizados / Totales
+            examenes_realizados += r
+            if t > 0:
+                total_examenes += t
+            tiene_realizados = True
+        else:
+            # Realizados / Superados / Totales
+            examenes_realizados += r
+            examenes_superados  += s
+            if t > 0:
+                total_examenes += t
+            tiene_realizados = True
+            tiene_superados  = True
+
+    # Porcentaje: realizados ÷ totales (solo si hay datos de realizados)
+    if exam_modo == 1:
+        pct_examenes = None   # con solo "total" no hay porcentaje de realización
+    else:
+        pct_examenes = round(examenes_realizados / total_examenes * 100, 1) if total_examenes > 0 else 0
+
+    # Flags para el template: qué columnas mostrar
+    exam_tiene_realizados = tiene_realizados
+    exam_tiene_superados  = tiene_superados
 
     # Snapshots históricos (también como dicts)
     conn2     = get_form_conn()
@@ -1481,7 +1522,10 @@ def formacion_dashboard():
         total_examenes=total_examenes,
         examenes_realizados=examenes_realizados,
         examenes_superados=examenes_superados,
+        pct_examenes=pct_examenes,
         exam_modo=exam_modo,
+        exam_tiene_realizados=exam_tiene_realizados,
+        exam_tiene_superados=exam_tiene_superados,
         snapshots=snapshots,
         snap_labels=snap_labels,
         snap_pct=snap_pct,
@@ -2015,8 +2059,29 @@ def exportar_curso_excel():
     ws.row_dimensions[4].height = 26
     ws.row_dimensions[5].height = 5
 
-    # ── Cabeceras ──
-    COLS = ["#", "Nombre", "Progreso (%)", "Ex. Realizados", "Ex. Superados", "Ex. Totales", "Fecha Inicio", "Fecha Fin", "Supera 75%", "Teléfono", "Progreso General", "% Exámenes realizados", "Observaciones"]
+    # ── Detectar modo global de exámenes del conjunto ──
+    exam_modo_export = max((_exam_modo(a.get("examenes")) for a in alumnos), default=1)
+
+    # ── Cabeceras dinámicas según modo ──
+    if exam_modo_export == 1:
+        ex_cols  = ["Ex. Totales"]
+        ex_widths = [10]
+    elif exam_modo_export == 2:
+        ex_cols  = ["Ex. Realizados", "Ex. Totales"]
+        ex_widths = [10, 10]
+    else:
+        ex_cols  = ["Ex. Realizados", "Ex. Superados", "Ex. Totales"]
+        ex_widths = [10, 10, 10]
+
+    COLS = ["#", "Nombre", "Progreso (%)"] + ex_cols + ["Fecha Inicio", "Fecha Fin", "Supera 75%", "Teléfono", "Progreso General", "% Exámenes realizados", "Observaciones"]
+    col_fi  = 4 + len(ex_cols)       # columna Fecha Inicio
+    col_ff  = col_fi + 1
+    col_s75 = col_fi + 2
+    col_tel = col_fi + 3
+    col_est = col_fi + 4
+    col_pct = col_fi + 5
+    col_obs = col_fi + 6
+
     ws.row_dimensions[6].height = 40
     for c_i, h in enumerate(COLS, 1):
         hdr(ws.cell(6, c_i), h, bg="4A6FA5" if h == "Observaciones" else None)
@@ -2043,42 +2108,49 @@ def exportar_curso_excel():
             if fmt: cell.number_format = fmt
 
         nombre_val = a.get("nombre", "") + (" 🔕 NO Participa" if es_no_llamar else "")
-        dc(1, r_i - 6,                                 center=True, color="64748B")
-        dc(2, nombre_val,                              bold=True)
-        dc(3, f"{p:.1f}%",                             center=True, bold=True, color=prog_color)
+        dc(1, r_i - 6, center=True, color="64748B")
+        dc(2, nombre_val, bold=True)
+        dc(3, f"{p:.1f}%", center=True, bold=True, color=prog_color)
+
         _ep = _parse_examenes(a.get("examenes"))
         _ex_color = "7C3AED" if (_ep[2] > 0 and (_ep[0] / _ep[2]) < 0.75) else None
-        dc(4, _ep[0], center=True, color=_ex_color)
-        dc(5, _ep[1], center=True, color=_ex_color)
-        dc(6, _ep[2], center=True, color=_ex_color)
-        dc(7, _fmt_fecha(a.get("fecha_inicio")),        center=True)
-        dc(8, _fmt_fecha(a.get("fecha_fin")),           center=True)
-        dc(9, "✔ Sí" if a.get("supera_75") else "✖ No", center=True, bold=True,
+        if exam_modo_export == 1:
+            dc(4, _ep[2], center=True, color=_ex_color)
+        elif exam_modo_export == 2:
+            dc(4, _ep[0], center=True, color=_ex_color)
+            dc(5, _ep[2], center=True, color=_ex_color)
+        else:
+            dc(4, _ep[0], center=True, color=_ex_color)
+            dc(5, _ep[1], center=True, color=_ex_color)
+            dc(6, _ep[2], center=True, color=_ex_color)
+
+        dc(col_fi,  _fmt_fecha(a.get("fecha_inicio")), center=True)
+        dc(col_ff,  _fmt_fecha(a.get("fecha_fin")),    center=True)
+        dc(col_s75, "✔ Sí" if a.get("supera_75") else "✖ No", center=True, bold=True,
            color=C_GREEN if a.get("supera_75") else C_AMBER)
-        dc(10, a.get("telefono", "—") or "—")
-        estado = "✅ Supera 75%" if a.get("supera_75") else "⚠ Bajo 75%"
-        dc(11, estado, center=True, bold=True,
+        dc(col_tel, a.get("telefono", "—") or "—")
+        dc(col_est, "✅ Supera 75%" if a.get("supera_75") else "⚠ Bajo 75%",
+           center=True, bold=True,
            color=C_GREEN if a.get("supera_75") else C_AMBER)
-        # % Exámenes realizados
-        _ep_pct = _parse_examenes(a.get("examenes"))
-        if _ep_pct[2] > 0:
-            pct_ex = round(_ep_pct[0] / _ep_pct[2] * 100, 1)
+
+        # % Exámenes realizados (solo tiene sentido en modo 2 y 3)
+        if exam_modo_export >= 2 and _ep[2] > 0:
+            pct_ex = round(_ep[0] / _ep[2] * 100, 1)
             pct_ex_color = C_GREEN if pct_ex >= 75 else (C_AMBER if pct_ex >= 34 else C_RED_TXT)
             pct_ex_val = f"{pct_ex:.1f}%"
-            pct_ex_fmt = None
         else:
             pct_ex_val = "—"
             pct_ex_color = "64748B"
-            pct_ex_fmt = None
-        dc(12, pct_ex_val, fmt=pct_ex_fmt, center=True, bold=True, color=pct_ex_color)
-        pct_ex_cell = ws.cell(r_i, 12)
+        dc(col_pct, pct_ex_val, center=True, bold=True, color=pct_ex_color)
+        pct_ex_cell = ws.cell(r_i, col_pct)
         pct_ex_cell.fill = PatternFill("solid", fgColor=(
-            "D4EDDA" if (isinstance(pct_ex_val, str) and pct_ex_val != "—" and float(pct_ex_val[:-1]) >= 75) else
-            "FFF3CD" if (isinstance(pct_ex_val, str) and pct_ex_val != "—" and float(pct_ex_val[:-1]) >= 34) else
-            "F8D7DA" if (isinstance(pct_ex_val, str) and pct_ex_val != "—") else bg_row
+            "D4EDDA" if pct_ex_val != "—" and float(pct_ex_val[:-1]) >= 75 else
+            "FFF3CD" if pct_ex_val != "—" and float(pct_ex_val[:-1]) >= 34 else
+            "F8D7DA" if pct_ex_val != "—" else bg_row
         ))
+
         # Observaciones
-        obs_cell = ws.cell(r_i, 13, obs_texto or "—")
+        obs_cell = ws.cell(r_i, col_obs, obs_texto or "—")
         obs_cell.fill      = rf
         obs_cell.font      = Font(name="Arial", size=8, italic=bool(obs_texto), color="334155")
         obs_cell.border    = thin()
@@ -2087,7 +2159,8 @@ def exportar_curso_excel():
     last = 6 + len(alumnos)
     ws.auto_filter.ref = f"A6:{get_column_letter(len(COLS))}{last}"
     ws.freeze_panes    = "A7"
-    for i, w in enumerate([4, 28, 14, 10, 10, 10, 14, 14, 12, 18, 16, 12, 40], 1):
+    base_widths = [4, 28, 14] + ex_widths + [14, 14, 12, 18, 16, 12, 40]
+    for i, w in enumerate(base_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
     # ── Leyenda ──
@@ -2175,9 +2248,31 @@ def exportar_excel():
     ws.row_dimensions[1].height = 26
     ws.row_dimensions[2].height = 6
 
+    # ── Detectar modo global de exámenes ──
+    exam_modo_export2 = max((_exam_modo(a.get("examenes")) for a in alumnos), default=1)
+
+    if exam_modo_export2 == 1:
+        ex_cols2   = ["Ex. Totales"]
+        ex_widths2 = [10]
+    elif exam_modo_export2 == 2:
+        ex_cols2   = ["Ex. Realizados", "Ex. Totales"]
+        ex_widths2 = [10, 10]
+    else:
+        ex_cols2   = ["Ex. Realizados", "Ex. Superados", "Ex. Totales"]
+        ex_widths2 = [10, 10, 10]
+
     # Cabeceras
-    COLS = ["#","Curso","Nombre","Progreso (%)","Ex. Realizados","Ex. Superados","Ex. Totales","Fecha Inicio",
+    COLS = ["#","Curso","Nombre","Progreso (%)"] + ex_cols2 + ["Fecha Inicio",
             "Fecha Fin","Supera 75%","Teléfono","Progreso General","% Exámenes","Importado","Observaciones"]
+    col2_fi  = 5 + len(ex_cols2)
+    col2_ff  = col2_fi + 1
+    col2_s75 = col2_fi + 2
+    col2_tel = col2_fi + 3
+    col2_est = col2_fi + 4
+    col2_pct = col2_fi + 5
+    col2_imp = col2_fi + 6
+    col2_obs = col2_fi + 7
+
     ws.row_dimensions[3].height = 30
     for c_i, h in enumerate(COLS, 1):
         hdr(ws.cell(3, c_i), h, bg="4A6FA5" if h == "Observaciones" else None)
@@ -2201,41 +2296,48 @@ def exportar_excel():
         dc(1,  r-3,                       center=True, color="64748B")
         dc(2,  a.get("curso","—") or "—")
         dc(3,  a.get("nombre",""),         bold=True)
-        dc(4,  f"{p:.1f}%",                        center=True, bold=True, color=prog_color)
+        dc(4,  f"{p:.1f}%",               center=True, bold=True, color=prog_color)
+
         _ep2 = _parse_examenes(a.get("examenes"))
         _ex2_color = "7C3AED" if (_ep2[2] > 0 and (_ep2[0] / _ep2[2]) < 0.75) else None
-        dc(5,  _ep2[0], center=True, color=_ex2_color)
-        dc(6,  _ep2[1], center=True, color=_ex2_color)
-        dc(7,  _ep2[2], center=True, color=_ex2_color)
-        dc(8,  _fmt_fecha(a.get("fecha_inicio")), center=True)
-        dc(9,  _fmt_fecha(a.get("fecha_fin")),    center=True)
-        dc(10, "✔ Sí" if a.get("supera_75") else "✖ No", center=True, bold=True,
+        if exam_modo_export2 == 1:
+            dc(5, _ep2[2], center=True, color=_ex2_color)
+        elif exam_modo_export2 == 2:
+            dc(5, _ep2[0], center=True, color=_ex2_color)
+            dc(6, _ep2[2], center=True, color=_ex2_color)
+        else:
+            dc(5, _ep2[0], center=True, color=_ex2_color)
+            dc(6, _ep2[1], center=True, color=_ex2_color)
+            dc(7, _ep2[2], center=True, color=_ex2_color)
+
+        dc(col2_fi,  _fmt_fecha(a.get("fecha_inicio")), center=True)
+        dc(col2_ff,  _fmt_fecha(a.get("fecha_fin")),    center=True)
+        dc(col2_s75, "✔ Sí" if a.get("supera_75") else "✖ No", center=True, bold=True,
            color=C_GREEN if a.get("supera_75") else C_AMBER)
-        dc(11, a.get("telefono","—") or "—")
-        dc(12, "✅ Supera 75%" if a.get("supera_75") else "⚠ Bajo 75%",
+        dc(col2_tel, a.get("telefono","—") or "—")
+        dc(col2_est, "✅ Supera 75%" if a.get("supera_75") else "⚠ Bajo 75%",
            center=True, bold=True,
            color=C_GREEN if a.get("supera_75") else C_AMBER)
-        # % Exámenes realizados
-        _ep2_pct = _parse_examenes(a.get("examenes"))
-        if _ep2_pct[2] > 0:
-            pct_ex2 = round(_ep2_pct[0] / _ep2_pct[2] * 100, 1)
+
+        # % Exámenes realizados (solo modo 2 y 3)
+        if exam_modo_export2 >= 2 and _ep2[2] > 0:
+            pct_ex2 = round(_ep2[0] / _ep2[2] * 100, 1)
             pct_ex2_color = C_GREEN if pct_ex2 >= 75 else (C_AMBER if pct_ex2 >= 34 else C_RED)
             pct_ex2_val = f"{pct_ex2:.1f}%"
-            pct_ex2_fmt = None
         else:
             pct_ex2_val = "—"
             pct_ex2_color = "64748B"
-            pct_ex2_fmt = None
-        dc(13, pct_ex2_val, fmt=pct_ex2_fmt, center=True, bold=True, color=pct_ex2_color)
-        pct_ex2_cell = ws.cell(r, 13)
+        dc(col2_pct, pct_ex2_val, center=True, bold=True, color=pct_ex2_color)
+        pct_ex2_cell = ws.cell(r, col2_pct)
         pct_ex2_cell.fill = PatternFill("solid", fgColor=(
-            "D4EDDA" if (isinstance(pct_ex2_val, str) and pct_ex2_val != "—" and float(pct_ex2_val[:-1]) >= 75) else
-            "FFF3CD" if (isinstance(pct_ex2_val, str) and pct_ex2_val != "—" and float(pct_ex2_val[:-1]) >= 34) else
-            "F8D7DA" if (isinstance(pct_ex2_val, str) and pct_ex2_val != "—") else (C_ALT if r % 2 == 0 else C_WHITE)
+            "D4EDDA" if pct_ex2_val != "—" and float(pct_ex2_val[:-1]) >= 75 else
+            "FFF3CD" if pct_ex2_val != "—" and float(pct_ex2_val[:-1]) >= 34 else
+            "F8D7DA" if pct_ex2_val != "—" else (C_ALT if r % 2 == 0 else C_WHITE)
         ))
-        dc(14, (a.get("created_at","") or "")[:10], center=True, color="64748B")
+        dc(col2_imp, (a.get("created_at","") or "")[:10], center=True, color="64748B")
+
         # Observaciones
-        obs_cell2 = ws.cell(r, 15, obs_texto2 or "—")
+        obs_cell2 = ws.cell(r, col2_obs, obs_texto2 or "—")
         obs_cell2.fill      = rf
         obs_cell2.font      = Font(name="Arial", size=8, italic=bool(obs_texto2), color="334155")
         obs_cell2.border    = thin()
@@ -2249,7 +2351,8 @@ def exportar_excel():
         )
     ws.auto_filter.ref = f"A3:{get_column_letter(len(COLS))}{last_data}"
     ws.freeze_panes    = "A4"
-    for i, w in enumerate([5,32,22,14,10,10,10,14,14,12,18,16,12,18,40], 1):
+    base_widths2 = [5, 32, 22, 14] + ex_widths2 + [14, 14, 12, 18, 16, 12, 18, 40]
+    for i, w in enumerate(base_widths2, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
     # ════════════════════════════════════════
@@ -2272,15 +2375,31 @@ def exportar_excel():
         hdr(ws2.cell(3, c_i), h)
 
     from collections import defaultdict
-    resumen = defaultdict(lambda: {"total":0,"superan":0,"prog":0,"exam":0})
+    resumen = defaultdict(lambda: {"total":0,"superan":0,"prog":0,"exam_r":0,"exam_t":0,"modo_max":1})
     for a in alumnos:
         k = a.get("curso") or "Sin curso"
-        resumen[k]["total"]  += 1
+        resumen[k]["total"]   += 1
         resumen[k]["superan"] += int(a.get("supera_75") or 0)
-        resumen[k]["prog"]   += float(a.get("progreso") or 0)
-        resumen[k]["exam"]   += _parse_examenes(a.get("examenes"))[0]
+        resumen[k]["prog"]    += float(a.get("progreso") or 0)
+        _ep_r = _parse_examenes(a.get("examenes"))
+        _modo_a = _exam_modo(a.get("examenes"))
+        resumen[k]["exam_r"] += _ep_r[0] if _modo_a >= 2 else 0
+        resumen[k]["exam_t"] += _ep_r[2]
+        if _modo_a > resumen[k]["modo_max"]:
+            resumen[k]["modo_max"] = _modo_a
 
-    totales = {"total":0,"superan":0,"prog":0,"exam":0}
+    # Cabecera de exámenes dinámica según modo global del conjunto
+    modo_global_resumen = max((d["modo_max"] for d in resumen.values()), default=1)
+    col_exam_lbl = "Total Exámenes" if modo_global_resumen == 1 else "Ex. Realizados / Totales"
+    col_prom_lbl = "Prom. Exámenes" if modo_global_resumen == 1 else "Prom. Realizados"
+
+    COLS2 = ["Curso","Total Alumnos","Superan 75%","Bajo 75%",
+             "Tasa Éxito (%)","Prog. Promedio (%)", col_exam_lbl, col_prom_lbl]
+    ws2.row_dimensions[3].height = 30
+    for c_i, h in enumerate(COLS2, 1):
+        hdr(ws2.cell(3, c_i), h)
+
+    totales = {"total":0,"superan":0,"prog":0,"exam_r":0,"exam_t":0}
     for r, (curso, d) in enumerate(sorted(resumen.items()), 4):
         ws2.row_dimensions[r].height = 18
         rf2 = PatternFill("solid", fgColor=C_ALT if r % 2 == 0 else C_WHITE)
@@ -2288,11 +2407,15 @@ def exportar_excel():
         sup = d["superan"]
         pct = round(sup/n*100, 1) if n else 0
         avg = round(d["prog"]/n, 1) if n else 0
-        avg_e = round(d["exam"]/n, 1) if n else 0
-        totales["total"]  += n
+        exam_val = d["exam_r"] if modo_global_resumen >= 2 else d["exam_t"]
+        exam_tot = d["exam_t"]
+        exam_display = f"{exam_val}/{exam_tot}" if modo_global_resumen == 2 else (exam_val if modo_global_resumen >= 2 else exam_tot)
+        avg_e = round(exam_val/n, 1) if n else 0
+        totales["total"]   += n
         totales["superan"] += sup
-        totales["prog"]   += d["prog"]
-        totales["exam"]   += d["exam"]
+        totales["prog"]    += d["prog"]
+        totales["exam_r"]  += d["exam_r"]
+        totales["exam_t"]  += d["exam_t"]
 
         for c_i, (val, fmt, center, bold, color) in enumerate([
             (curso,          None,  False, True,  "1E293B"),
@@ -2301,7 +2424,7 @@ def exportar_excel():
             (n-sup,          None,  True,  False, C_AMBER),
             (f"{pct:.1f}%",  None,  True,  True,  C_GREEN if pct>=75 else (C_AMBER if pct>=50 else C_RED)),
             (f"{avg:.1f}%",  None,  True,  False, "1E293B"),
-            (d["exam"],      None,  True,  False, "1E293B"),
+            (exam_display,   None,  True,  False, "1E293B"),
             (avg_e,          "0.0", True,  False, "1E293B"),
         ], 1):
             cell = ws2.cell(r, c_i, val)
@@ -2312,16 +2435,18 @@ def exportar_excel():
             if fmt: cell.number_format = fmt
 
     # Fila totales
-    tr = 4 + len(resumen)
+    tr  = 4 + len(resumen)
     tn  = totales["total"]
     tsu = totales["superan"]
     tp  = round(tsu/tn*100, 1) if tn else 0
     ta  = round(totales["prog"]/tn, 1) if tn else 0
-    te  = totales["exam"]
-    tae = round(te/tn, 1) if tn else 0
+    te_r = totales["exam_r"]
+    te_t = totales["exam_t"]
+    te_display = f"{te_r}/{te_t}" if modo_global_resumen == 2 else (te_r if modo_global_resumen >= 2 else te_t)
+    tae = round((te_r if modo_global_resumen >= 2 else te_t)/tn, 1) if tn else 0
     for c_i, (val, fmt) in enumerate([
         ("TOTAL GENERAL",None),(tn,None),(tsu,None),(tn-tsu,None),
-        (f"{tp:.1f}%",None),(f"{ta:.1f}%",None),(te,None),(tae,"0.0"),
+        (f"{tp:.1f}%",None),(f"{ta:.1f}%",None),(te_display,None),(tae,"0.0"),
     ], 1):
         cell = ws2.cell(tr, c_i, val)
         cell.font      = Font(bold=True, color=C_WHITE, name="Arial", size=9)
