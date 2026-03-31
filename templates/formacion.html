@@ -14,7 +14,7 @@
   
   <div class="d-flex gap-2 flex-wrap">
 
-    {% if session.get('acceso_completo', False) %}
+    {% if session.get('acceso_completo', False) or session.get('es_admin', 0) >= 1 %}
     
     <button onclick="exportarCursoExcel()" class="btn btn-g-primary" id="btn-exportar-curso"
       title="Exportar curso seleccionado en el filtro"
@@ -1009,7 +1009,7 @@
                           inicio:   '{{ a["fecha_inicio"] if a["fecha_inicio"] else "" }}',
                           fin:      '{{ a["fecha_fin"]    if a["fecha_fin"]    else "" }}'
                         })">📨</button>
-                {% if session.get('acceso_completo', False) %}
+                {% if session.get('acceso_completo', False) or session.get('es_admin', 0) >= 1 %}
                 <button type="button" class="btn btn-g-ghost btn-sm btn-ia-alumno"
                         data-id="{{ a['id'] }}" data-nombre="{{ nombre_val }}"
                         data-curso="{{ curso_val }}" title="Analizar con IA">🤖</button>
@@ -1062,7 +1062,7 @@
 </div>
 
 <!-- ── Archivar curso ──────────────────────────────────────────────────────── -->
-{% if session.get('acceso_completo', False) %}
+{% if session.get('acceso_completo', False) or session.get('es_admin', 0) >= 1 %}
 {% if cursos_activos %}
 <div class="gcard mb-4 mt-4">
   <div class="gcard-header">
