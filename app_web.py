@@ -223,6 +223,12 @@ def _hashear_passwords():
     cursor.execute("UPDATE usuarios SET perfil=2  WHERE es_admin=0 AND (perfil IS NULL OR perfil=0)")
     cursor.execute("UPDATE usuarios SET perfil=10 WHERE es_admin=1")
     cursor.execute("UPDATE usuarios SET perfil=20 WHERE es_admin=2")
+    # Usuarios sin fecha_registro (creados antes de que existiera la columna):
+    # Les asignamos una fecha antigua para que su trial figure como expirado.
+    # Usamos '2000-01-01' como placeholder inequívoco de "antiguo sin fecha".
+    cursor.execute(
+        "UPDATE usuarios SET fecha_registro='2000-01-01 00:00:00' WHERE fecha_registro IS NULL"
+    )
     conn.commit()
     conn.close()
 
@@ -655,7 +661,10 @@ def usuarios():
                 fecha_reg = fecha_reg.replace(tzinfo=None)
             dias_transcurridos = max((ahora - fecha_reg).days, 0)
             u["dias_trial"] = max(dias_trial_bd - dias_transcurridos, 0)
-        # sin fecha_registro → dejamos el valor de BD sin tocar
+        else:
+            # fecha_registro NULL → usuario creado antes de que existiera la columna.
+            # Llevan más de 15 días con toda seguridad → trial expirado.
+            u["dias_trial"] = 0
         usuarios_lista.append(u)
 
     # Usuarios que necesitan reset (pw_format=0 → no pueden entrar)

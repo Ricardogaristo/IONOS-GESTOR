@@ -103,7 +103,10 @@
          title="Descarga la plantilla Excel para importar alumnos">
         📋 Descargar Modelo
       </a>
-      <button type="button" class="btn btn-g-primary btn-sm" onclick="abrirModalImport()">
+      <button type="button" class="btn btn-g-primary btn-sm" onclick="abrirModalImport()"
+        id="btn-importar"
+        onmouseenter="_showTooltipImportar(this)"
+        onmouseleave="_hideTooltipImportar()">
         ⬆ Importar
       </button>
     </div>
@@ -155,6 +158,23 @@
 
     <!-- Body con scroll -->
     <div style="padding:1.25rem 1.4rem; overflow-y:auto; display:flex; flex-direction:column; gap:1.1rem;">
+
+      <!-- ── Botón: Cómo funciona la importación ──────────────────────── -->
+      <div>
+        <button type="button" onclick="abrirModalComoFunciona()"
+          style="display:inline-flex; align-items:center; gap:.45rem;
+                 background:var(--bg3); border:1px solid var(--border);
+                 border-radius:8px; padding:.45rem .85rem;
+                 font-size:.8rem; font-weight:600; color:var(--text-muted);
+                 cursor:pointer; transition:border-color .15s, color .15s;"
+          onmouseover="this.style.borderColor='var(--accent)'; this.style.color='var(--accent)'"
+          onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-muted)'">
+          <span style="font-size:.85rem;">ℹ</span> ¿Cómo funciona la importación?
+        </button>
+      </div>
+
+      <!-- Separador -->
+      <div style="border-top:1px solid var(--border);"></div>
 
       <!-- ── Leyenda: Progreso del estudiante en cada informe ────────────── -->
       <div>
@@ -257,6 +277,432 @@
   </div><!-- /modal-box -->
 </div><!-- /modal-import -->
 
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL — Info columna Progreso
+══════════════════════════════════════════════════════════════════ -->
+<div id="modal-info-progreso" style="
+  display:none; position:fixed; inset:0; z-index:10600;
+  background:rgba(0,0,0,.6); backdrop-filter:blur(4px);
+  align-items:center; justify-content:center; padding:1rem;"
+  onclick="if(event.target===this)cerrarModalInfoProgreso()">
+  <div style="background:var(--bg2); border:1px solid var(--border);
+    border-radius:14px; width:100%; max-width:420px;
+    box-shadow:0 24px 64px rgba(0,0,0,.4);
+    display:flex; flex-direction:column; overflow:hidden;">
+    <div style="padding:1rem 1.3rem .8rem; border-bottom:1px solid var(--border);
+                display:flex; align-items:center; gap:.7rem;">
+      <span style="font-size:1.2rem;">📊</span>
+      <div style="flex:1;">
+        <div style="font-weight:700; font-size:.95rem;">Columna Progreso</div>
+        <div style="font-size:.72rem; color:var(--text-muted); margin-top:.1rem;">Cómo se calcula e interpreta</div>
+      </div>
+      <button onclick="cerrarModalInfoProgreso()" style="background:none; border:none; cursor:pointer;
+        color:var(--text-muted); font-size:1.25rem; line-height:1; padding:.2rem .4rem;
+        border-radius:6px; transition:background .15s;"
+        onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'">✕</button>
+    </div>
+    <div style="padding:1.15rem 1.3rem; display:flex; flex-direction:column; gap:.5rem;">
+      <p style="font-size:.82rem; color:var(--text-muted); margin:0 0 .25rem; line-height:1.55;">
+        Indica el <strong>porcentaje de avance del alumno en el curso</strong>,
+        tal como viene registrado en el Excel importado.
+      </p>
+      <div style="display:flex; align-items:flex-start; gap:.65rem;
+                  padding:.6rem .8rem; background:var(--bg3); border-radius:8px; border-left:3px solid var(--accent);">
+        <span style="font-size:.95rem; flex-shrink:0;">📈</span>
+        <div style="font-size:.8rem; line-height:1.45;">
+          <strong>Barra de progreso</strong><br>
+          <span style="color:var(--text-muted);">Verde ≥ 75% · Amarillo ≥ 50% · Rojo &lt; 50%.
+            El valor exacto se muestra junto a la barra.</span>
+        </div>
+      </div>
+      <div style="display:flex; align-items:flex-start; gap:.65rem;
+                  padding:.6rem .8rem; background:var(--bg3); border-radius:8px; border-left:3px solid var(--blue);">
+        <span style="font-size:.95rem; flex-shrink:0;">↕</span>
+        <div style="font-size:.8rem; line-height:1.45;">
+          <strong>Delta (▲ ▼)</strong><br>
+          <span style="color:var(--text-muted);">Variación respecto a la importación anterior.
+            Verde si avanza, rojo si retrocede.</span>
+        </div>
+      </div>
+      <div style="display:flex; align-items:flex-start; gap:.65rem;
+                  padding:.6rem .8rem; background:var(--bg3); border-radius:8px; border-left:3px solid var(--amber);">
+        <span style="font-size:.95rem; flex-shrink:0;">⚠</span>
+        <div style="font-size:.8rem; line-height:1.45;">
+          <strong>Nota importante</strong><br>
+          <span style="color:var(--text-muted);">El progreso refleja el avance en el contenido del curso,
+            <em>no</em> el resultado de los exámenes. El estado <strong>OK</strong>
+            se determina por el % de exámenes superados.</span>
+        </div>
+      </div>
+    </div>
+    <div style="padding:.85rem 1.3rem; border-top:1px solid var(--border); text-align:right;">
+      <button type="button" onclick="cerrarModalInfoProgreso()" class="btn btn-g-ghost btn-sm">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL — Info columna Estado
+══════════════════════════════════════════════════════════════════ -->
+<div id="modal-info-estado" style="
+  display:none; position:fixed; inset:0; z-index:10600;
+  background:rgba(0,0,0,.6); backdrop-filter:blur(4px);
+  align-items:center; justify-content:center; padding:1rem;"
+  onclick="if(event.target===this)cerrarModalInfoEstado()">
+  <div style="background:var(--bg2); border:1px solid var(--border);
+    border-radius:14px; width:100%; max-width:420px;
+    box-shadow:0 24px 64px rgba(0,0,0,.4);
+    display:flex; flex-direction:column; overflow:hidden;">
+    <div style="padding:1rem 1.3rem .8rem; border-bottom:1px solid var(--border);
+                display:flex; align-items:center; gap:.7rem;">
+      <span style="font-size:1.2rem;">🎯</span>
+      <div style="flex:1;">
+        <div style="font-weight:700; font-size:.95rem;">Columna Estado</div>
+        <div style="font-size:.72rem; color:var(--text-muted); margin-top:.1rem;">Cómo se asigna cada estado</div>
+      </div>
+      <button onclick="cerrarModalInfoEstado()" style="background:none; border:none; cursor:pointer;
+        color:var(--text-muted); font-size:1.25rem; line-height:1; padding:.2rem .4rem;
+        border-radius:6px; transition:background .15s;"
+        onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'">✕</button>
+    </div>
+    <div style="padding:1.15rem 1.3rem; display:flex; flex-direction:column; gap:.5rem;">
+      <p style="font-size:.82rem; color:var(--text-muted); margin:0 0 .25rem; line-height:1.55;">
+        El estado se basa en el <strong>porcentaje de exámenes superados</strong>,
+        no en el progreso del curso.
+      </p>
+      <div style="display:flex; align-items:flex-start; gap:.65rem;
+                  padding:.6rem .8rem; background:var(--bg3); border-radius:8px; border-left:3px solid var(--accent);">
+        <span class="badge-g badge-done" style="font-size:.65rem; padding:.2rem .5rem; flex-shrink:0; margin-top:.1rem;">✔ OK</span>
+        <div style="font-size:.8rem; line-height:1.45;">
+          <strong>Supera el 75% de exámenes</strong><br>
+          <span style="color:var(--text-muted);">Exámenes superados ÷ totales ≥ 75%.
+            En formato R/T se usan los realizados como referencia.</span>
+        </div>
+      </div>
+      <div style="display:flex; align-items:flex-start; gap:.65rem;
+                  padding:.6rem .8rem; background:var(--bg3); border-radius:8px; border-left:3px solid var(--amber);">
+        <span class="badge-g badge-pending" style="font-size:.65rem; padding:.2rem .5rem; flex-shrink:0; margin-top:.1rem;">● &lt;75%</span>
+        <div style="font-size:.8rem; line-height:1.45;">
+          <strong>Por debajo del 75%</strong><br>
+          <span style="color:var(--text-muted);">El alumno tiene datos de examen pero
+            no alcanza el umbral mínimo del 75%.</span>
+        </div>
+      </div>
+      <div style="display:flex; align-items:flex-start; gap:.65rem;
+                  padding:.6rem .8rem; background:var(--bg3); border-radius:8px; border-left:3px solid var(--border);">
+        <span class="badge-g" style="font-size:.65rem; padding:.2rem .5rem; flex-shrink:0; margin-top:.1rem;
+              background:var(--bg3); border-color:var(--border); color:var(--text-muted);">— sin exam.</span>
+        <div style="font-size:.8rem; line-height:1.45;">
+          <strong>Sin datos de examen</strong><br>
+          <span style="color:var(--text-muted);">No hay información de exámenes en el Excel.
+            Importa un archivo con la columna Exámenes rellena para ver el estado.</span>
+        </div>
+      </div>
+    </div>
+    <div style="padding:.85rem 1.3rem; border-top:1px solid var(--border); text-align:right;">
+      <button type="button" onclick="cerrarModalInfoEstado()" class="btn btn-g-ghost btn-sm">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL — Info columna Import.
+══════════════════════════════════════════════════════════════════ -->
+<div id="modal-info-import" style="
+  display:none; position:fixed; inset:0; z-index:10600;
+  background:rgba(0,0,0,.6); backdrop-filter:blur(4px);
+  align-items:center; justify-content:center; padding:1rem;"
+  onclick="if(event.target===this)cerrarModalInfoImport()">
+
+  <div style="
+    background:var(--bg2); border:1px solid var(--border);
+    border-radius:14px; width:100%; max-width:440px;
+    box-shadow:0 24px 64px rgba(0,0,0,.4);
+    display:flex; flex-direction:column; overflow:hidden;">
+
+    <!-- Header -->
+    <div style="padding:1rem 1.3rem .8rem; border-bottom:1px solid var(--border);
+                display:flex; align-items:center; gap:.7rem;">
+      <span style="font-size:1.2rem;">📥</span>
+      <div style="flex:1;">
+        <div style="font-weight:700; font-size:.95rem;">Columna Import.</div>
+        <div style="font-size:.72rem; color:var(--text-muted); margin-top:.1rem;">
+          Qué muestra y cómo interpretarla
+        </div>
+      </div>
+      <button onclick="cerrarModalInfoImport()" style="
+        background:none; border:none; cursor:pointer; color:var(--text-muted);
+        font-size:1.25rem; line-height:1; padding:.2rem .4rem;
+        border-radius:6px; transition:background .15s;"
+        onmouseover="this.style.background='var(--bg3)'"
+        onmouseout="this.style.background='none'">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:1.15rem 1.3rem; display:flex; flex-direction:column; gap:.5rem;">
+
+      <p style="font-size:.82rem; color:var(--text-muted); margin:0 0 .35rem; line-height:1.55;">
+        Esta columna muestra el <strong>número de veces que se han importado datos</strong>
+        para cada alumno desde un archivo Excel.
+      </p>
+
+      <div style="display:flex; align-items:flex-start; gap:.65rem;
+                  padding:.6rem .8rem; background:var(--bg3);
+                  border-radius:8px; border-left:3px solid var(--blue);">
+        <span style="font-family:var(--mono); font-weight:800; color:var(--blue);
+                     font-size:1rem; flex-shrink:0; min-width:24px; text-align:center;">13</span>
+        <div style="font-size:.8rem; line-height:1.45;">
+          <strong>Número azul — varias importaciones</strong><br>
+          <span style="color:var(--text-muted);">El alumno ha sido actualizado en múltiples
+            importaciones. Pincha el número para ver el historial completo de cambios.</span>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:flex-start; gap:.65rem;
+                  padding:.6rem .8rem; background:var(--bg3);
+                  border-radius:8px; border-left:3px solid var(--text-muted);">
+        <span style="font-family:var(--mono); font-weight:800; color:var(--text-muted);
+                     font-size:1rem; flex-shrink:0; min-width:24px; text-align:center;">1</span>
+        <div style="font-size:.8rem; line-height:1.45;">
+          <strong>Número gris — primera importación</strong><br>
+          <span style="color:var(--text-muted);">El alumno se registró en una única
+            importación y aún no tiene actualizaciones posteriores.</span>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:flex-start; gap:.65rem;
+                  padding:.6rem .8rem; background:var(--bg3);
+                  border-radius:8px; border-left:3px solid var(--text-muted); opacity:.7;">
+        <span style="font-family:var(--mono); font-weight:800; color:var(--text-muted);
+                     font-size:1rem; flex-shrink:0; min-width:24px; text-align:center;">—</span>
+        <div style="font-size:.8rem; line-height:1.45;">
+          <strong>Guion — sin importaciones</strong><br>
+          <span style="color:var(--text-muted);">El alumno fue creado manualmente o
+            sus datos aún no se han importado desde Excel.</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:.85rem 1.3rem; border-top:1px solid var(--border);
+                display:flex; gap:.6rem; justify-content:flex-end;">
+      <button type="button" onclick="cerrarModalInfoImport(); abrirModalImport()"
+              class="btn btn-g-primary btn-sm">⬆ Ir a Importar</button>
+      <button type="button" onclick="cerrarModalInfoImport()"
+              class="btn btn-g-ghost btn-sm">Cerrar</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL — Sin importaciones (explicativo)
+══════════════════════════════════════════════════════════════════ -->
+<div id="modal-sin-import" style="
+  display:none; position:fixed; inset:0; z-index:10600;
+  background:rgba(0,0,0,.6); backdrop-filter:blur(4px);
+  align-items:center; justify-content:center; padding:1rem;"
+  onclick="if(event.target===this)cerrarModalSinImport()">
+
+  <div style="
+    background:var(--bg2); border:1px solid var(--border);
+    border-radius:14px; width:100%; max-width:440px;
+    box-shadow:0 24px 64px rgba(0,0,0,.4);
+    display:flex; flex-direction:column; overflow:hidden;">
+
+    <!-- Header -->
+    <div style="padding:1rem 1.3rem .8rem; border-bottom:1px solid var(--border);
+                display:flex; align-items:center; gap:.7rem;">
+      <span style="font-size:1.2rem;">📭</span>
+      <div style="flex:1;">
+        <div style="font-weight:700; font-size:.95rem;">Sin importaciones registradas</div>
+        <div id="modal-sin-import-sub" style="font-size:.72rem; color:var(--text-muted); margin-top:.1rem;">
+          Este alumno aún no tiene datos importados
+        </div>
+      </div>
+      <button onclick="cerrarModalSinImport()" style="
+        background:none; border:none; cursor:pointer; color:var(--text-muted);
+        font-size:1.25rem; line-height:1; padding:.2rem .4rem;
+        border-radius:6px; transition:background .15s;"
+        onmouseover="this.style.background='var(--bg3)'"
+        onmouseout="this.style.background='none'">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:1.15rem 1.3rem; display:flex; flex-direction:column; gap:.75rem;">
+
+      <p style="font-size:.82rem; color:var(--text-muted); margin:0; line-height:1.55;">
+        Para que aparezcan datos de importación en este alumno, sigue estos pasos:
+      </p>
+
+      <div style="display:flex; flex-direction:column; gap:.4rem;">
+
+        <div style="display:flex; align-items:flex-start; gap:.65rem;
+                    padding:.6rem .8rem; background:var(--bg3);
+                    border-radius:8px; border-left:3px solid var(--accent);">
+          <span style="font-size:.95rem; flex-shrink:0;">1️⃣</span>
+          <div style="font-size:.8rem; line-height:1.45;">
+            <strong>Descarga la plantilla Excel</strong><br>
+            <span style="color:var(--text-muted);">Usa el botón <em>📋 Descargar Modelo</em>
+              para obtener el formato correcto.</span>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:flex-start; gap:.65rem;
+                    padding:.6rem .8rem; background:var(--bg3);
+                    border-radius:8px; border-left:3px solid var(--blue);">
+          <span style="font-size:.95rem; flex-shrink:0;">2️⃣</span>
+          <div style="font-size:.8rem; line-height:1.45;">
+            <strong>Rellena el Excel con los datos del alumno</strong><br>
+            <span style="color:var(--text-muted);">Incluye su nombre exacto, el curso,
+              progreso (%), exámenes, fechas y teléfono.</span>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:flex-start; gap:.65rem;
+                    padding:.6rem .8rem; background:var(--bg3);
+                    border-radius:8px; border-left:3px solid var(--amber);">
+          <span style="font-size:.95rem; flex-shrink:0;">3️⃣</span>
+          <div style="font-size:.8rem; line-height:1.45;">
+            <strong>Importa el archivo</strong><br>
+            <span style="color:var(--text-muted);">Pulsa el botón <em>⬆ Importar</em>
+              en la parte superior, selecciona tu Excel y confirma.</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:.85rem 1.3rem; border-top:1px solid var(--border);
+                display:flex; gap:.6rem; justify-content:flex-end; align-items:center;">
+      <button type="button" onclick="cerrarModalSinImport(); abrirModalImport()"
+              class="btn btn-g-primary btn-sm">
+        ⬆ Ir a Importar
+      </button>
+      <button type="button" onclick="cerrarModalSinImport()" class="btn btn-g-ghost btn-sm">
+        Cerrar
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Tooltip global importar — fuera de cualquier contenedor con overflow -->
+<div id="tooltip-importar" style="
+  position:fixed; z-index:20000;
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:8px; padding:.5rem .85rem;
+  font-size:.78rem; color:var(--text-muted); line-height:1.45;
+  max-width:240px; white-space:normal; text-align:center;
+  box-shadow:0 6px 20px rgba(0,0,0,.3);
+  pointer-events:none;
+  opacity:0; visibility:hidden;
+  transition:opacity .18s, visibility .18s;">
+  📋 Pincha para introducir los datos de los alumnos
+  <div id="tooltip-importar-arrow" style="
+    position:absolute; bottom:-5px; left:50%; transform:translateX(-50%) rotate(45deg);
+    width:9px; height:9px;
+    background:var(--bg2);
+    border-right:1px solid var(--border);
+    border-bottom:1px solid var(--border);">
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL SECUNDARIO — Cómo funciona la importación
+══════════════════════════════════════════════════════════════════ -->
+<div id="modal-como-funciona" style="
+  display:none; position:fixed; inset:0; z-index:10600;
+  background:rgba(0,0,0,.65); backdrop-filter:blur(4px);
+  align-items:center; justify-content:center; padding:1rem;"
+  onclick="if(event.target===this)cerrarModalComoFunciona()">
+
+  <div style="
+    background:var(--bg2); border:1px solid var(--border);
+    border-radius:14px; width:100%; max-width:480px;
+    box-shadow:0 24px 64px rgba(0,0,0,.45);
+    display:flex; flex-direction:column;
+    max-height:90vh; overflow:hidden;">
+
+    <!-- Header -->
+    <div style="padding:1rem 1.3rem .8rem; border-bottom:1px solid var(--border);
+                display:flex; align-items:center; gap:.7rem; flex-shrink:0;">
+      <span style="font-size:1.15rem;">⚡</span>
+      <div style="flex:1;">
+        <div style="font-weight:700; font-size:.95rem;">Cómo funciona la importación</div>
+        <div style="font-size:.7rem; color:var(--text-muted); margin-top:.1rem;">Qué ocurre al subir tu Excel</div>
+      </div>
+      <button onclick="cerrarModalComoFunciona()" style="
+        background:none; border:none; cursor:pointer; color:var(--text-muted);
+        font-size:1.25rem; line-height:1; padding:.2rem .4rem;
+        border-radius:6px; transition:background .15s;"
+        onmouseover="this.style.background='var(--bg3)'"
+        onmouseout="this.style.background='none'">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:1.2rem 1.3rem; overflow-y:auto; display:flex; flex-direction:column; gap:.55rem;">
+
+      <div style="display:flex; align-items:flex-start; gap:.7rem;
+                  padding:.65rem .85rem; background:var(--bg3);
+                  border-radius:8px; border-left:3px solid var(--accent);">
+        <span style="font-size:1rem; flex-shrink:0; margin-top:.05rem;">1️⃣</span>
+        <div style="font-size:.82rem; line-height:1.5;">
+          <strong>Lee el Excel fila a fila</strong><br>
+          <span style="color:var(--text-muted);">Detecta las columnas por nombre automáticamente,
+            sin importar en qué orden estén.</span>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:flex-start; gap:.7rem;
+                  padding:.65rem .85rem; background:var(--bg3);
+                  border-radius:8px; border-left:3px solid var(--blue);">
+        <span style="font-size:1rem; flex-shrink:0; margin-top:.05rem;">2️⃣</span>
+        <div style="font-size:.82rem; line-height:1.5;">
+          <strong>Crea o actualiza cada alumno</strong><br>
+          <span style="color:var(--text-muted);">Si el par <em>Nombre + Curso</em> ya existe,
+            actualiza sus datos. Si no existe, lo añade como nuevo.</span>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:flex-start; gap:.7rem;
+                  padding:.65rem .85rem; background:var(--bg3);
+                  border-radius:8px; border-left:3px solid var(--amber);">
+        <span style="font-size:1rem; flex-shrink:0; margin-top:.05rem;">3️⃣</span>
+        <div style="font-size:.82rem; line-height:1.5;">
+          <strong>Calcula el estado automáticamente</strong><br>
+          <span style="color:var(--text-muted);">Marca como ✔ si el progreso ≥ 75 %,
+            "No participa" si el valor es 0 o vacío, y activa alerta de seguimiento
+            si lleva más de 15 días sin avanzar.</span>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:flex-start; gap:.7rem;
+                  padding:.65rem .85rem; background:var(--bg3);
+                  border-radius:8px; border-left:3px solid var(--text-muted);">
+        <span style="font-size:1rem; flex-shrink:0; margin-top:.05rem;">4️⃣</span>
+        <div style="font-size:.82rem; line-height:1.5;">
+          <strong>No borra datos previos</strong><br>
+          <span style="color:var(--text-muted);">Los alumnos que no aparezcan en el Excel
+            se conservan exactamente como están.</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:.85rem 1.3rem; border-top:1px solid var(--border); flex-shrink:0; text-align:right;">
+      <button type="button" onclick="cerrarModalComoFunciona()" class="btn btn-g-ghost btn-sm">
+        Cerrar
+      </button>
+    </div>
+
+  </div>
+</div>
+
 {% set cursos_activos = alumnos | map(attribute='curso') | select | unique | list | sort %}
 <!-- ── Lista de alumnos ───────────────────────────────────────────────────── -->
 <div class="gcard">
@@ -331,7 +777,15 @@
           <tr>
             <th style="max-width:120px;">Curso</th>
             <th>Nombre</th>
-            <th style="min-width:100px;">Progreso</th>
+            <th style="min-width:100px;">
+              <span onclick="abrirModalInfoProgreso()"
+                    style="cursor:pointer; display:inline-flex; align-items:center; gap:.3rem;">
+                Progreso
+                <span style="font-size:.6rem; color:var(--text-muted); border:1px solid var(--text-muted);
+                             border-radius:50%; width:13px; height:13px; display:inline-flex;
+                             align-items:center; justify-content:center; line-height:1; flex-shrink:0;">i</span>
+              </span>
+            </th>
             <th style="text-align:center; white-space:nowrap;">
               <span onclick="abrirModalExamInfo()" style="cursor:pointer; display:inline-flex; flex-direction:column; align-items:center; gap:.1rem;">
                 <span style="display:inline-flex; align-items:center; gap:.3rem;">
@@ -347,9 +801,27 @@
                 </span>
               </span>
             </th>
-            <th style="text-align:center; white-space:nowrap;">Import.</th>
+            <th style="text-align:center; white-space:nowrap;">
+              <span onclick="abrirModalInfoImport()"
+                    style="cursor:pointer; display:inline-flex; flex-direction:column; align-items:center; gap:.1rem;">
+                <span style="display:inline-flex; align-items:center; gap:.3rem;">
+                  Import.
+                  <span style="font-size:.6rem; color:var(--text-muted); border:1px solid var(--text-muted);
+                               border-radius:50%; width:13px; height:13px; display:inline-flex;
+                               align-items:center; justify-content:center; line-height:1; flex-shrink:0;">i</span>
+                </span>
+              </span>
+            </th>
             <th style="white-space:nowrap;">Inicio / Fin</th>
-            <th style="text-align:center;">Estado</th>
+            <th style="text-align:center; white-space:nowrap;">
+              <span onclick="abrirModalInfoEstado()"
+                    style="cursor:pointer; display:inline-flex; align-items:center; gap:.3rem;">
+                Estado
+                <span style="font-size:.6rem; color:var(--text-muted); border:1px solid var(--text-muted);
+                             border-radius:50%; width:13px; height:13px; display:inline-flex;
+                             align-items:center; justify-content:center; line-height:1; flex-shrink:0;">i</span>
+              </span>
+            </th>
             <th style="min-width:110px;">Teléfono</th>
             <th class="col-acciones">Acciones</th>
           </tr>
@@ -467,7 +939,17 @@
                 </div>
               </button>
               {% else %}
-              <span style="font-family:var(--mono); font-size:.78rem; color:var(--text-muted);">—</span>
+              <button type="button"
+                      onclick="abrirModalSinImport('{{ nombre_val | replace("'","\\'") }}', '{{ curso_val | replace("'","\\'") }}')"
+                      style="background:none; border:none; cursor:pointer; padding:.15rem .3rem;
+                             border-radius:6px; transition:background .15s;"
+                      onmouseover="this.style.background='var(--bg3)'"
+                      onmouseout="this.style.background='none'"
+                      title="Sin importaciones aún — ver cómo importar">
+                <span style="font-family:var(--mono); font-size:.78rem; color:var(--text-muted);
+                             text-decoration:underline; text-decoration-style:dotted;">—</span>
+                <div style="font-size:.6rem; color:var(--text-muted); line-height:1; margin-top:.1rem;">sin datos</div>
+              </button>
               {% endif %}
             </td>
 
@@ -479,10 +961,21 @@
             </td>
 
             <td data-label="Estado" style="text-align:center;">
+              {# supera_75 ya viene calculado desde formacion.py basándose en % exámenes superados #}
               {% if a['supera_75'] == 1 %}
                 <span class="badge-g badge-done" style="font-size:.65rem; padding:.2rem .5rem;">✔ OK</span>
               {% else %}
-                <span class="badge-g badge-pending" style="font-size:.65rem; padding:.2rem .5rem;">● &lt;75%</span>
+                {# Distinguir: sin datos de examen vs. bajo 75% #}
+                {% set ex_str = (a['examenes'] | string) if a['examenes'] is not none else '0' %}
+                {% set ex_parts = ex_str.split('/') %}
+                {% if ex_parts | length == 1 and ex_parts[0] in ['0', '', '—'] %}
+                  <span class="badge-g" style="font-size:.65rem; padding:.2rem .5rem;
+                        background:var(--bg3); border-color:var(--border); color:var(--text-muted);">
+                    — sin exam.
+                  </span>
+                {% else %}
+                  <span class="badge-g badge-pending" style="font-size:.65rem; padding:.2rem .5rem;">● &lt;75%</span>
+                {% endif %}
               {% endif %}
             </td>
 
@@ -2095,6 +2588,100 @@ async function borrarObservacion(obs_id, btnEl) {
     if (!n) lista.innerHTML = '<div id="ma-obs-empty" style="font-size:.8rem;color:var(--text-muted);text-align:center;padding:.5rem 0;">Sin observaciones aún</div>';
   } catch(e) {}
 }
+// ── Modal info columna Progreso ─────────────────────────────────────────────
+function abrirModalInfoProgreso() {
+  document.getElementById('modal-info-progreso').style.display = 'flex';
+}
+function cerrarModalInfoProgreso() {
+  document.getElementById('modal-info-progreso').style.display = 'none';
+}
+
+// ── Modal info columna Estado ────────────────────────────────────────────────
+function abrirModalInfoEstado() {
+  document.getElementById('modal-info-estado').style.display = 'flex';
+}
+function cerrarModalInfoEstado() {
+  document.getElementById('modal-info-estado').style.display = 'none';
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    cerrarModalInfoProgreso();
+    cerrarModalInfoEstado();
+  }
+});
+
+// ── Modal info columna Import. ───────────────────────────────────────────────
+function abrirModalInfoImport() {
+  document.getElementById('modal-info-import').style.display = 'flex';
+}
+function cerrarModalInfoImport() {
+  document.getElementById('modal-info-import').style.display = 'none';
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.getElementById('modal-info-import').style.display === 'flex')
+    cerrarModalInfoImport();
+});
+
+// ── Modal sin importaciones ──────────────────────────────────────────────────
+function abrirModalSinImport(nombre, curso) {
+  var sub = document.getElementById('modal-sin-import-sub');
+  if (nombre) {
+    sub.textContent = nombre + (curso ? ' — ' + curso : '') + ' aún no tiene datos importados';
+  } else {
+    sub.textContent = 'Este alumno aún no tiene datos importados';
+  }
+  document.getElementById('modal-sin-import').style.display = 'flex';
+}
+function cerrarModalSinImport() {
+  document.getElementById('modal-sin-import').style.display = 'none';
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.getElementById('modal-sin-import').style.display === 'flex')
+    cerrarModalSinImport();
+});
+
+// ── Tooltip botón Importar ───────────────────────────────────────────────────
+function _showTooltipImportar(btn) {
+  const tt  = document.getElementById('tooltip-importar');
+  const r   = btn.getBoundingClientRect();
+  tt.style.visibility = 'hidden';
+  tt.style.opacity    = '0';
+  tt.style.display    = 'block';
+  const ttW = tt.offsetWidth;
+  const ttH = tt.offsetHeight;
+  // Centrado horizontalmente sobre el botón, encima de él
+  let left = r.left + r.width / 2 - ttW / 2;
+  let top  = r.top - ttH - 10;
+  // Evitar que se salga por la derecha o izquierda
+  left = Math.max(8, Math.min(left, window.innerWidth - ttW - 8));
+  // Ajustar flecha horizontalmente
+  const arrow = document.getElementById('tooltip-importar-arrow');
+  const btnCenterRel = r.left + r.width / 2 - left;
+  arrow.style.left = Math.min(Math.max(btnCenterRel, 14), ttW - 14) + 'px';
+  tt.style.left    = left + 'px';
+  tt.style.top     = top  + 'px';
+  tt.style.visibility = 'visible';
+  tt.style.opacity    = '1';
+}
+function _hideTooltipImportar() {
+  const tt = document.getElementById('tooltip-importar');
+  tt.style.opacity    = '0';
+  tt.style.visibility = 'hidden';
+}
+
+// ── Modal cómo funciona la importación ───────────────────────────────────────
+function abrirModalComoFunciona() {
+  document.getElementById('modal-como-funciona').style.display = 'flex';
+}
+function cerrarModalComoFunciona() {
+  document.getElementById('modal-como-funciona').style.display = 'none';
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.getElementById('modal-como-funciona').style.display === 'flex')
+    cerrarModalComoFunciona();
+});
+
 // ── Modal importar Excel ──────────────────────────────────────────────────────
 function abrirModalImport() {
   document.getElementById('modal-import').style.display = 'flex';

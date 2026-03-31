@@ -737,7 +737,17 @@ def formacion():
                         f_inicio = _safe_date(row[i2_fi])  if i2_fi is not None and i2_fi < len(row) else None
                         f_fin    = _safe_date(row[i2_ff])  if i2_ff is not None and i2_ff < len(row) else None
                         curso    = str(row[i2_c]).strip()  if i2_c  is not None and i2_c  < len(row) and row[i2_c] else None
-                        supera75 = 1 if progreso >= 75 else 0
+                        # OK solo si el % de exámenes SUPERADOS ≥ 75 %.
+                        # _parse_examenes → (realizados, superados, totales)
+                        # Formato R/S/T: pct_sup = superados / totales * 100
+                        # Formato R/T  : sin dato de superados → usamos realizados
+                        # Formato T    : solo total, no hay porcentaje → fallback a progreso
+                        _ex_r, _ex_s, _ex_t = _parse_examenes(examenes)
+                        if _ex_t > 0:
+                            _pct_exam = (_ex_s / _ex_t * 100) if _ex_s > 0 else (_ex_r / _ex_t * 100)
+                            supera75  = 1 if _pct_exam >= 75 else 0
+                        else:
+                            supera75  = 1 if progreso >= 75 else 0  # sin datos de examen → fallback
                         telefono = tel_map.get(norm(nombre))
                         if not telefono: cnt_sin_tel += 1
 
