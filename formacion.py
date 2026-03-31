@@ -188,14 +188,20 @@ def _fmt_examenes(val):
       1 valor  → T           (total de exámenes)
       2 valores → R/T        (realizados / totales)
       3 valores → R/S/T      (realizados / superados / totales)
-    Limpia decimales y valores inválidos pero NO cambia el número de partes.
+    Acepta como separador '/' o la palabra 'de' (con o sin espacios, cualquier case).
+    Ejemplos validos: "1/1/1", "1/1", "1", "1 de 1 de 1", "1 de 1", "1de1", "1DE1DE1".
+    Limpia decimales y valores invalidos pero NO cambia el numero de partes.
     """
+    import re as _re
     if val is None:
         return "0"
     s = str(val).strip()
     if not s or s.lower() in ("none", "nan", ""):
         return "0"
-    raw_parts = [p.strip() for p in s.split("/")] if "/" in s else [s]
+    # Normalizar separador: 'de' (pegado o con espacios, cualquier case) → '/'
+    # El lookbehind/lookahead evita reemplazar 'de' dentro de palabras.
+    s = _re.sub(r'\s*(?<![a-zA-Z])de(?![a-zA-Z])\s*', '/', s, flags=_re.IGNORECASE)
+    raw_parts = [p.strip() for p in s.split("/") if p.strip()]
     # Limpiar cada parte
     cleaned = []
     for p in raw_parts:
@@ -203,6 +209,8 @@ def _fmt_examenes(val):
             cleaned.append(str(int(float(p))))
         except Exception:
             cleaned.append("0")
+    if not cleaned:
+        return "0"
     # Normalizar a 1, 2 o 3 partes
     n = len(cleaned)
     if n == 1:

@@ -1497,6 +1497,12 @@ function toTitleCase(str) {
   return str.toLowerCase().replace(/(?:^|\s)\S/g, c => c.toUpperCase());
 }
 
+// Normaliza separador de examenes: "1 de 1", "1de1", "1DE1" → "1/1"
+function normExam(v) {
+  if (!v) return '0';
+  return String(v).replace(/\s*(?<![a-zA-Z])de(?![a-zA-Z])\s*/gi, '/');
+}
+
 function abrirMoodle(alumno) {
   _alumnoActual = alumno;
   _tipoActual   = 'seguimiento';
@@ -1569,7 +1575,7 @@ function rellenarPlantilla() {
 
   // Datos de exámenes — nueva semántica según partes:
   // 1 parte → T (total)  ·  2 partes → R/T  ·  3 partes → R/S/T
-  const exRaw   = a.examenes || '0';
+  const exRaw   = normExam(a.examenes || '0');
   const exParts = exRaw.split('/');
   const exModo  = exParts.length;
   let exR = 0, exS = 0, exT = 0;
@@ -1704,7 +1710,7 @@ function abrirModalAlumno(a) {
   document.getElementById('ma-pct').style.color      = color;
   document.getElementById('ma-barra').style.width    = Math.min(pct, 100) + '%';
   document.getElementById('ma-barra').style.background = color;
-  const exVal   = a.examenes || '0';
+  const exVal   = normExam(a.examenes || '0');
   const exParts = exVal.split('/');
   const exEl    = document.getElementById('ma-examenes');
   const exBox   = document.getElementById('ma-examenes-box');
