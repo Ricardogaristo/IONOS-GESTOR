@@ -77,7 +77,7 @@
         <span class="gcard-title">Por categoría</span>
       </div>
       <div class="gcard-body">
-        <canvas id="chartCat" style="max-height:260px;"></canvas>
+        <canvas id="chartCat" style="max-height:300px;"></canvas>
       </div>
     </div>
   </div>
@@ -348,6 +348,7 @@ new Chart(document.getElementById('chartCat'),{
     borderRadius:6, borderSkipped:false }]},
   options:{
     responsive:true,
+    layout:{padding:{bottom:10}},
     onClick(e,els){ if(els.length) abrirModalCat(cats[els[0].index],els[0].index); },
     onHover(e,els){ e.native.target.style.cursor=els.length?'pointer':'default'; },
     plugins:{
@@ -360,20 +361,13 @@ new Chart(document.getElementById('chartCat'),{
     scales:{
       y:{beginAtZero:true,ticks:{color:textColor,stepSize:1},grid:{color:gridColor}},
       x:{ticks:{color:textColor,
-          maxRotation:35,minRotation:0,
-          font:{size:11},
+          maxRotation:45,minRotation:45,
+          font:{size:10},
+          autoSkip:false,
           callback:function(val){
             const lbl=this.getLabelForValue(val);
             if(typeof lbl!=='string') return lbl;
-            // Partir etiquetas largas en líneas de máx 14 caracteres
-            const words=lbl.split(' ');
-            const lines=[]; let cur='';
-            words.forEach(w=>{
-              if((cur+' '+w).trim().length>14){ if(cur) lines.push(cur); cur=w; }
-              else { cur=(cur+' '+w).trim(); }
-            });
-            if(cur) lines.push(cur);
-            return lines;
+            return lbl.length>18 ? lbl.slice(0,17)+'…' : lbl;
           }
         },grid:{display:false}}
     }
