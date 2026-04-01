@@ -56,13 +56,6 @@
     <a href="{{ url_for('historial_alumno.historial_buscar') }}" class="btn btn-g-ghost">
       📊 Historial alumno
     </a>
-    {% else %}
-    <a href="/suscripcion" class="btn btn-g-ghost"
-       style="border-color:rgba(200,41,10,.5); color:rgba(200,41,10,.85);"
-       onmouseover="this.style.background='rgba(200,41,10,.08)'"
-       onmouseout="this.style.background=''">
-      🔒 Activar cuenta
-    </a>
     {% endif %}
   </div>
 </div>
@@ -1096,14 +1089,6 @@
     </form>
   </div>
 </div>
-{% else %}
-<!-- Trial caducado -->
-<a href="/suscripcion" class="btn btn-g-ghost"
-   style="border-color:rgba(200,41,10,.5); color:rgba(200,41,10,.85);"
-   onmouseover="this.style.background='rgba(200,41,10,.08)'"
-   onmouseout="this.style.background=''">
-  🔒 Activar cuenta para desbloquear
-</a>
 {% endif %}
 {% endif %}
 
