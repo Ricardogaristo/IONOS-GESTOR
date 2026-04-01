@@ -359,7 +359,23 @@ new Chart(document.getElementById('chartCat'),{
           return `✔ ${ok} completadas · ● ${ts.length-ok} pendientes`; }}}},
     scales:{
       y:{beginAtZero:true,ticks:{color:textColor,stepSize:1},grid:{color:gridColor}},
-      x:{ticks:{color:textColor},grid:{display:false}}
+      x:{ticks:{color:textColor,
+          maxRotation:35,minRotation:0,
+          font:{size:11},
+          callback:function(val){
+            const lbl=this.getLabelForValue(val);
+            if(typeof lbl!=='string') return lbl;
+            // Partir etiquetas largas en líneas de máx 14 caracteres
+            const words=lbl.split(' ');
+            const lines=[]; let cur='';
+            words.forEach(w=>{
+              if((cur+' '+w).trim().length>14){ if(cur) lines.push(cur); cur=w; }
+              else { cur=(cur+' '+w).trim(); }
+            });
+            if(cur) lines.push(cur);
+            return lines;
+          }
+        },grid:{display:false}}
     }
   }
 });
