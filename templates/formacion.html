@@ -14,8 +14,6 @@
   
   <div class="d-flex gap-2 flex-wrap">
 
-    {% if session.get('acceso_completo', False) or session.get('es_admin', 0) >= 1 %}
-    
     <button onclick="exportarCursoExcel()" class="btn btn-g-primary" id="btn-exportar-curso"
       title="Exportar curso seleccionado en el filtro"
       style="width:210px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
@@ -56,7 +54,6 @@
     <a href="{{ url_for('historial_alumno.historial_buscar') }}" class="btn btn-g-ghost">
       📊 Historial alumno
     </a>
-    {% endif %}
   </div>
 </div>
 
@@ -1002,7 +999,6 @@
                           inicio:   '{{ a["fecha_inicio"] if a["fecha_inicio"] else "" }}',
                           fin:      '{{ a["fecha_fin"]    if a["fecha_fin"]    else "" }}'
                         })">📨</button>
-                {% if session.get('acceso_completo', False) or session.get('es_admin', 0) >= 1 %}
                 <button type="button" class="btn btn-g-ghost btn-sm btn-ia-alumno"
                         data-id="{{ a['id'] }}" data-nombre="{{ nombre_val }}"
                         data-curso="{{ curso_val }}" title="Analizar con IA">🤖</button>
@@ -1010,7 +1006,6 @@
                    class="btn btn-g-blue btn-sm" title="Historial">📊</a>
                 <a href="{{ url_for('formacion.expediente_alumno', alumno_id=a['id']) }}"
                    class="btn btn-g-ghost btn-sm" title="Expediente">📋</a>
-                {% endif %}
                 <a href="{{ url_for('formacion.eliminar_alumno', alumno_id=a['id']) }}"
                    class="btn btn-g-danger btn-sm" title="Eliminar"
                    onclick="return confirm('¿Eliminar a {{ nombre_val }}? Esta acción no se puede deshacer.')">🗑</a>
@@ -1055,7 +1050,6 @@
 </div>
 
 <!-- ── Archivar curso ──────────────────────────────────────────────────────── -->
-{% if session.get('acceso_completo', False) or session.get('es_admin', 0) >= 1 %}
 {% if cursos_activos %}
 <div class="gcard mb-4 mt-4">
   <div class="gcard-header">
@@ -1089,7 +1083,6 @@
     </form>
   </div>
 </div>
-{% endif %}
 {% endif %}
 
 <!-- Formulario oculto para borrar curso seleccionado -->
