@@ -2226,6 +2226,17 @@ def exportar_excel():
         fecha = str(ob["created_at"] or "")[:10]
         linea = f"{fecha}: {ob['texto']}" if fecha else ob["texto"]
         obs_map2.setdefault(aid, []).append(linea)
+
+    # Cargar historial de importaciones por alumno
+    hist_rows = conn.execute(
+        "SELECT alumno_id, fecha_import, progreso, examenes, delta_progreso, avanzo "
+        "FROM progreso_historial WHERE tutor_id=%s ORDER BY alumno_id, fecha_import ASC",
+        (tutor_id,)
+    ).fetchall()
+    hist_map = {}
+    for h in hist_rows:
+        aid = h["alumno_id"]
+        hist_map.setdefault(aid, []).append(dict(h))
     conn.close()
 
     # ── Colores ──
@@ -2281,15 +2292,16 @@ def exportar_excel():
 
     # Cabeceras
     COLS = ["#","Curso","Nombre","Progreso (%)"] + ex_cols2 + ["Fecha Inicio",
-            "Fecha Fin","Supera 75%","Teléfono","Progreso General","% Exámenes","Importado","Observaciones"]
-    col2_fi  = 5 + len(ex_cols2)
-    col2_ff  = col2_fi + 1
-    col2_s75 = col2_fi + 2
-    col2_tel = col2_fi + 3
-    col2_est = col2_fi + 4
-    col2_pct = col2_fi + 5
-    col2_imp = col2_fi + 6
-    col2_obs = col2_fi + 7
+            "Fecha Fin","Supera 75%","Teléfono","Progreso General","% Exámenes","Importado","Historial Importaciones","Observaciones"]
+    col2_fi   = 5 + len(ex_cols2)
+    col2_ff   = col2_fi + 1
+    col2_s75  = col2_fi + 2
+    col2_tel  = col2_fi + 3
+    col2_est  = col2_fi + 4
+    col2_pct  = col2_fi + 5
+    col2_imp  = col2_fi + 6
+    col2_hist = col2_fi + 7
+    col2_obs  = col2_fi + 8
 
     ws.row_dimensions[3].height = 30
     for c_i, h in enumerate(COLS, 1):
@@ -2354,6 +2366,44 @@ def exportar_excel():
         ))
         dc(col2_imp, (a.get("created_at","") or "")[:10], center=True, color="64748B")
 
+        # Historial de importaciones
+        hist_alumno = hist_map.get(a.get("id"), [])
+        if hist_alumno:
+            lineas_hist = []
+            for h in hist_alumno:
+                fecha_h  = str(h.get("fecha_import", "") or "")[:10]
+                prog_h   = float(h.get("progreso") or 0)
+                delta_h  = float(h.get("delta_progreso") or 0)
+                avanzo_h = h.get("avanzo", 0)
+                flecha   = "▲" if avanzo_h else ("—" if delta_h == 0 else "▼")
+                delta_str = f"+{delta_h:.1f}%" if delta_h > 0 else (f"{delta_h:.1f}%" if delta_h < 0 else "sin cambio")
+                lineas_hist.append(f"{fecha_h}  {prog_h:.1f}%  {flecha} {delta_str}")
+            # Evaluar tendencia general
+            if len(hist_alumno) >= 2:
+                avances = sum(1 for h in hist_alumno if h.get("avanzo"))
+                total_h = len(hist_alumno)
+                pct_av  = avances / total_h * 100
+                if pct_av >= 66:
+                    tendencia = "✅ Progresando"
+                elif pct_av >= 33:
+                    tendencia = "⚠ Progreso irregular"
+                else:
+                    tendencia = "🔴 Sin avance"
+                lineas_hist.insert(0, f"Tendencia: {tendencia} ({avances}/{total_h} importaciones con avance)")
+            hist_texto = chr(10).join(lineas_hist)
+        else:
+            hist_texto = "Sin importaciones"
+        hist_cell = ws.cell(r, col2_hist, hist_texto)
+        hist_color = ("1A5E20" if hist_texto.startswith("✅") else
+                      ("7D5C00" if hist_texto.startswith("⚠") else
+                       ("7B1A1A" if hist_texto.startswith("🔴") else "64748B")))
+        hist_cell.fill      = rf
+        hist_cell.font      = Font(name="Arial", size=8, color=hist_color)
+        hist_cell.border    = thin()
+        hist_cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+        if hist_alumno:
+            ws.row_dimensions[r].height = max(ws.row_dimensions[r].height, 15 * len(hist_alumno) + 15)
+
         # Observaciones
         obs_cell2 = ws.cell(r, col2_obs, obs_texto2 or "—")
         obs_cell2.fill      = rf
@@ -2369,7 +2419,7 @@ def exportar_excel():
         )
     ws.auto_filter.ref = f"A3:{get_column_letter(len(COLS))}{last_data}"
     ws.freeze_panes    = "A4"
-    base_widths2 = [5, 32, 22, 14] + ex_widths2 + [14, 14, 12, 18, 16, 12, 18, 40]
+    base_widths2 = [5, 32, 22, 14] + ex_widths2 + [14, 14, 12, 18, 16, 12, 18, 30, 40]
     for i, w in enumerate(base_widths2, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
