@@ -125,9 +125,31 @@ def inicializar_formacion():
     # Migrar examenes de INT a VARCHAR(20) si todavía es tipo numérico
     try:
         cursor.execute("ALTER TABLE alumnos MODIFY COLUMN examenes VARCHAR(20) DEFAULT '0/0/0'")
-        cursor.execute("ALTER TABLE progreso_historial MODIFY COLUMN examenes VARCHAR(20) DEFAULT '0/0/0'")
     except Exception:
-        pass  # Ya es VARCHAR o BD no soporta MODIFY
+        pass  # Ya es VARCHAR
+
+    # Migraciones seguras para progreso_historial — añade/convierte columnas si no existen
+    for col_ph, ddl_ph in [
+        ("examenes",       "VARCHAR(20) DEFAULT '0/0/0'"),
+        ("delta_progreso", "DOUBLE DEFAULT 0"),
+        ("avanzo",         "INT DEFAULT 0"),
+    ]:
+        if not column_exists(cursor, 'progreso_historial', col_ph):
+            cursor.execute(f"ALTER TABLE progreso_historial ADD COLUMN {col_ph} {ddl_ph}")
+        else:
+            try:
+                cursor.execute(f"ALTER TABLE progreso_historial MODIFY COLUMN {col_ph} {ddl_ph}")
+            except Exception:
+                pass
+
+    # Migraciones seguras para progreso_historial — añade columnas si no existen
+    for col_ph, ddl_ph in [
+        ("examenes",       "VARCHAR(20) DEFAULT '0/0/0'"),
+        ("delta_progreso", "DOUBLE DEFAULT 0"),
+        ("avanzo",         "INT DEFAULT 0"),
+    ]:
+        if not column_exists(cursor, 'progreso_historial', col_ph):
+            cursor.execute(f"ALTER TABLE progreso_historial ADD COLUMN {col_ph} {ddl_ph}")
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS observaciones_alumno (
@@ -793,13 +815,16 @@ def formacion():
 
                         # Registro historial de progreso
                         old_p = float(existing["progreso"] or 0) if existing else 0.0
-                        curs.execute("""
-                            INSERT INTO progreso_historial
-                                (alumno_id, tutor_id, fecha_import, progreso, examenes, delta_progreso, avanzo)
-                            VALUES (%s,%s,%s,%s,%s,%s,%s)
-                        """, (alumno_id, tutor_id, fecha_import, progreso, examenes,
-                              round(progreso - old_p, 2) if existing else 0.0,
-                              1 if (progreso - old_p) > 0 else (-1 if (progreso - old_p) < 0 else 0) if existing else 0))
+                        try:
+                            curs.execute("""
+                                INSERT INTO progreso_historial
+                                    (alumno_id, tutor_id, fecha_import, progreso, examenes, delta_progreso, avanzo)
+                                VALUES (%s,%s,%s,%s,%s,%s,%s)
+                            """, (alumno_id, tutor_id, fecha_import, progreso, examenes,
+                                  round(progreso - old_p, 2) if existing else 0.0,
+                                  1 if (progreso - old_p) > 0 else (-1 if (progreso - old_p) < 0 else 0) if existing else 0))
+                        except Exception as _hist_err:
+                            print(f"⚠️ Error historial alumno {alumno_id}: {_hist_err}")
 
                         # Actualizar mapa para evitar duplicados dentro del mismo Excel
                         existentes[key] = {"id": alumno_id, "nombre": nombre,
@@ -2012,6 +2037,17 @@ def exportar_curso_excel():
         fecha = str(ob["created_at"] or "")[:10]
         linea = f"{fecha}: {ob['texto']}" if fecha else ob["texto"]
         obs_map.setdefault(aid, []).append(linea)
+
+    # Cargar historial de importaciones por alumno
+    hist_rows_c = conn.execute(
+        "SELECT alumno_id, fecha_import, progreso, examenes, delta_progreso, avanzo "
+        "FROM progreso_historial WHERE tutor_id=%s ORDER BY alumno_id, fecha_import ASC",
+        (tutor_id,)
+    ).fetchall()
+    hist_map_c = {}
+    for h in hist_rows_c:
+        aid = h["alumno_id"]
+        hist_map_c.setdefault(aid, []).append(dict(h))
     conn.close()
 
     C_DARK    = "1E3A5F"
@@ -2040,12 +2076,7 @@ def exportar_curso_excel():
     ws.title = titulo_curso[:28] if len(titulo_curso) > 28 else titulo_curso
 
     # ── Título ──
-    ws.merge_cells("A1:M1")
-    c = ws["A1"]
-    c.value     = f"{titulo_curso}  ·  {_dt.now().strftime('%d/%m/%Y')}  ·  {len(alumnos)} alumnos"
-    c.font      = Font(bold=True, size=13, color=C_DARK, name="Arial")
-    c.fill      = PatternFill("solid", fgColor="E8F0FA")
-    c.alignment = Alignment(horizontal="center", vertical="center")
+    # título se aplica tras calcular COLS (merge dinámico)
     ws.row_dimensions[1].height = 28
     ws.row_dimensions[2].height = 5
 
@@ -2091,14 +2122,25 @@ def exportar_curso_excel():
         ex_cols  = ["Ex. Realizados", "Ex. Superados", "Ex. Totales"]
         ex_widths = [10, 10, 10]
 
-    COLS = ["#", "Nombre", "Progreso (%)"] + ex_cols + ["Fecha Inicio", "Fecha Fin", "Supera 75%", "Teléfono", "Progreso General", "% Exámenes realizados", "Observaciones"]
-    col_fi  = 4 + len(ex_cols)       # columna Fecha Inicio
-    col_ff  = col_fi + 1
-    col_s75 = col_fi + 2
-    col_tel = col_fi + 3
-    col_est = col_fi + 4
-    col_pct = col_fi + 5
-    col_obs = col_fi + 6
+    COLS = ["#", "Nombre", "Progreso (%)"] + ex_cols + ["Fecha Inicio", "Fecha Fin", "Supera 75%", "Teléfono", "No Participa", "Progreso General", "% Exámenes realizados", "Historial Importaciones", "Observaciones"]
+    col_fi   = 4 + len(ex_cols)       # columna Fecha Inicio
+    col_ff   = col_fi + 1
+    col_s75  = col_fi + 2
+    col_tel  = col_fi + 3
+    col_nll  = col_fi + 4             # No Participa
+    col_est  = col_fi + 5             # Progreso General
+    col_pct  = col_fi + 6             # % Exámenes realizados
+    col_hist = col_fi + 7             # Historial Importaciones
+    col_obs  = col_fi + 8             # Observaciones
+
+    # ── Título dinámico (ahora que sabemos cuántas columnas hay) ──
+    last_col_letter = get_column_letter(len(COLS))
+    ws.merge_cells(f"A1:{last_col_letter}1")
+    c = ws["A1"]
+    c.value     = f"{titulo_curso}  ·  {_dt.now().strftime('%d/%m/%Y')}  ·  {len(alumnos)} alumnos"
+    c.font      = Font(bold=True, size=13, color=C_DARK, name="Arial")
+    c.fill      = PatternFill("solid", fgColor="E8F0FA")
+    c.alignment = Alignment(horizontal="center", vertical="center")
 
     ws.row_dimensions[6].height = 40
     for c_i, h in enumerate(COLS, 1):
@@ -2147,6 +2189,8 @@ def exportar_curso_excel():
         dc(col_s75, "✔ Sí" if a.get("supera_75") else "✖ No", center=True, bold=True,
            color=C_GREEN if a.get("supera_75") else C_AMBER)
         dc(col_tel, a.get("telefono", "—") or "—")
+        dc(col_nll, "🔕 Sí" if es_no_llamar else "No", center=True,
+           color="C0392B" if es_no_llamar else "2D9D78", bold=es_no_llamar)
         dc(col_est, "✅ Supera 75%" if a.get("supera_75") else "⚠ Bajo 75%",
            center=True, bold=True,
            color=C_GREEN if a.get("supera_75") else C_AMBER)
@@ -2167,6 +2211,44 @@ def exportar_curso_excel():
             "F8D7DA" if pct_ex_val != "—" else bg_row
         ))
 
+        # Historial de importaciones
+        hist_alumno_c = hist_map_c.get(a.get("id"), [])
+        if hist_alumno_c:
+            lineas_hist_c = []
+            for h in hist_alumno_c:
+                fecha_h  = str(h.get("fecha_import", "") or "")[:10]
+                prog_h   = float(h.get("progreso") or 0)
+                delta_h  = float(h.get("delta_progreso") or 0)
+                avanzo_h = h.get("avanzo", 0)
+                flecha   = "▲" if avanzo_h else ("—" if delta_h == 0 else "▼")
+                delta_str = f"+{delta_h:.1f}%" if delta_h > 0 else (f"{delta_h:.1f}%" if delta_h < 0 else "sin cambio")
+                lineas_hist_c.append(f"{fecha_h}  {prog_h:.1f}%  {flecha} {delta_str}")
+            if len(hist_alumno_c) >= 2:
+                avances_c = sum(1 for h in hist_alumno_c if h.get("avanzo"))
+                total_hc  = len(hist_alumno_c)
+                pct_av_c  = avances_c / total_hc * 100
+                if pct_av_c >= 66:
+                    tendencia_c = "✅ Progresando"
+                elif pct_av_c >= 33:
+                    tendencia_c = "⚠ Progreso irregular"
+                else:
+                    tendencia_c = "🔴 Sin avance"
+                lineas_hist_c.insert(0, f"Tendencia: {tendencia_c} ({avances_c}/{total_hc} importaciones con avance)")
+            hist_texto_c = chr(10).join(lineas_hist_c)
+        else:
+            hist_texto_c = "Sin importaciones"
+        hist_cell_c = ws.cell(r_i, col_hist, hist_texto_c)
+        _tc = hist_texto_c
+        hist_color_c = ("1A5E20" if "✅" in _tc[:40] else
+                        ("7D5C00" if "⚠" in _tc[:40] else
+                         ("7B1A1A" if "🔴" in _tc[:40] else "64748B")))
+        hist_cell_c.fill      = rf
+        hist_cell_c.font      = Font(name="Arial", size=8, color=hist_color_c)
+        hist_cell_c.border    = thin()
+        hist_cell_c.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+        if hist_alumno_c:
+            ws.row_dimensions[r_i].height = max(ws.row_dimensions[r_i].height, 15 * len(hist_alumno_c) + 15)
+
         # Observaciones
         obs_cell = ws.cell(r_i, col_obs, obs_texto or "—")
         obs_cell.fill      = rf
@@ -2177,7 +2259,7 @@ def exportar_curso_excel():
     last = 6 + len(alumnos)
     ws.auto_filter.ref = f"A6:{get_column_letter(len(COLS))}{last}"
     ws.freeze_panes    = "A7"
-    base_widths = [4, 28, 14] + ex_widths + [14, 14, 12, 18, 16, 12, 40]
+    base_widths = [4, 28, 14] + ex_widths + [14, 14, 12, 18, 12, 16, 12, 30, 40]
     for i, w in enumerate(base_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
@@ -2292,16 +2374,17 @@ def exportar_excel():
 
     # Cabeceras
     COLS = ["#","Curso","Nombre","Progreso (%)"] + ex_cols2 + ["Fecha Inicio",
-            "Fecha Fin","Supera 75%","Teléfono","Progreso General","% Exámenes","Importado","Historial Importaciones","Observaciones"]
+            "Fecha Fin","Supera 75%","Teléfono","No Participa","Progreso General","% Exámenes","Importado","Historial Importaciones","Observaciones"]
     col2_fi   = 5 + len(ex_cols2)
     col2_ff   = col2_fi + 1
     col2_s75  = col2_fi + 2
     col2_tel  = col2_fi + 3
-    col2_est  = col2_fi + 4
-    col2_pct  = col2_fi + 5
-    col2_imp  = col2_fi + 6
-    col2_hist = col2_fi + 7
-    col2_obs  = col2_fi + 8
+    col2_nll  = col2_fi + 4
+    col2_est  = col2_fi + 5
+    col2_pct  = col2_fi + 6
+    col2_imp  = col2_fi + 7
+    col2_hist = col2_fi + 8
+    col2_obs  = col2_fi + 9
 
     ws.row_dimensions[3].height = 30
     for c_i, h in enumerate(COLS, 1):
@@ -2345,6 +2428,9 @@ def exportar_excel():
         dc(col2_s75, "✔ Sí" if a.get("supera_75") else "✖ No", center=True, bold=True,
            color=C_GREEN if a.get("supera_75") else C_AMBER)
         dc(col2_tel, a.get("telefono","—") or "—")
+        es_no_llamar2 = bool(a.get("no_llamar"))
+        dc(col2_nll, "🔕 Sí" if es_no_llamar2 else "No", center=True,
+           color="C0392B" if es_no_llamar2 else "2D9D78", bold=es_no_llamar2)
         dc(col2_est, "✅ Supera 75%" if a.get("supera_75") else "⚠ Bajo 75%",
            center=True, bold=True,
            color=C_GREEN if a.get("supera_75") else C_AMBER)
@@ -2394,9 +2480,9 @@ def exportar_excel():
         else:
             hist_texto = "Sin importaciones"
         hist_cell = ws.cell(r, col2_hist, hist_texto)
-        hist_color = ("1A5E20" if hist_texto.startswith("✅") else
-                      ("7D5C00" if hist_texto.startswith("⚠") else
-                       ("7B1A1A" if hist_texto.startswith("🔴") else "64748B")))
+        hist_color = ("1A5E20" if "✅" in hist_texto[:40] else
+                      ("7D5C00" if "⚠" in hist_texto[:40] else
+                       ("7B1A1A" if "🔴" in hist_texto[:40] else "64748B")))
         hist_cell.fill      = rf
         hist_cell.font      = Font(name="Arial", size=8, color=hist_color)
         hist_cell.border    = thin()
@@ -2419,7 +2505,7 @@ def exportar_excel():
         )
     ws.auto_filter.ref = f"A3:{get_column_letter(len(COLS))}{last_data}"
     ws.freeze_panes    = "A4"
-    base_widths2 = [5, 32, 22, 14] + ex_widths2 + [14, 14, 12, 18, 16, 12, 18, 30, 40]
+    base_widths2 = [5, 32, 22, 14] + ex_widths2 + [14, 14, 12, 18, 12, 16, 12, 18, 30, 40]
     for i, w in enumerate(base_widths2, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
