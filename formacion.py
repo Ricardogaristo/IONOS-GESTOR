@@ -2263,26 +2263,26 @@ def exportar_curso_excel():
             fecha_ult  = _fmt_d(hist_alumno_c[-1].get("fecha_import", ""))
 
             # ── Aplicar reglas (orden de prioridad) ────────────────────────
-            if avanza_7:
-                # VERDE — progresando en los últimos 7 informes
+            if supera or avanza_7:
+                # VERDE — superó el 75% O avanza en las últimas 7 importaciones
                 hist_texto_c = texto_av or f"▲ Progresando\n{fecha_ult}"
                 hist_color_c = "1A7A3C"
                 hist_fgcolor = "D4EDDA"
 
-            elif nunca_av and not supera:
-                # MORADO — nunca avanzó y < 75%: fecha = primer import
+            elif nunca_av:
+                # MORADO — nunca avanzó en ninguna importación
                 hist_texto_c = f"⚠ Sin progreso\nDesde {primera_f}"
                 hist_color_c = "6B21A8"
                 hist_fgcolor = "F3E8FF"
 
-            elif sin_av_7d and not supera:
-                # NARANJA — sin avance últimos 7 días y < 75%
+            elif not supera and sin_av_7d:
+                # NARANJA — no llega al 75% y sin avance en las últimas 7 importaciones
                 hist_texto_c = texto_av or f"— Sin avance\n{primera_f}"
                 hist_color_c = "B35900"
                 hist_fgcolor = "FFF0DC"
 
             else:
-                # GRIS — resto (avanza pero no cumple los 7 seguidos, o ya superó 75%)
+                # GRIS — avanzó alguna vez pero no cumple verde/naranja, o superó 75% sin avance reciente
                 hist_texto_c = texto_av or f"— {prog_ult:.1f}%\n{fecha_ult}"
                 hist_color_c = "475569"
                 hist_fgcolor = bg_row
