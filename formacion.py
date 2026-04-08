@@ -2213,7 +2213,8 @@ def exportar_curso_excel():
 
         # ── Historial: 3 reglas de color ──────────────────────────────────
         hist_alumno_c = hist_map_c.get(a.get("id"), [])
-        supera        = bool(a.get("supera_75"))
+        # Calcular supera directo del progreso real (el flag supera_75 puede estar desactualizado)
+        supera        = _safe_float(a.get("progreso", 0)) >= 75
 
         if hist_alumno_c:
             from datetime import datetime as _dtt, date as _date_cls
@@ -2228,9 +2229,9 @@ def exportar_curso_excel():
             deltas = [float(h.get("delta_progreso") or 0) for h in hist_alumno_c]
 
             # ── Cálculos de reglas ──────────────────────────────────────────
-            # R3: avanza en los últimos 7 informes importados (todos positivos)
+            # Verde por avance: al menos un avance positivo en las últimas 7 importaciones
             ult7_imp   = hist_alumno_c[-7:]
-            avanza_7   = len(ult7_imp) >= 2 and all(
+            avanza_7   = any(
                 float(h.get("delta_progreso") or 0) > 0 for h in ult7_imp
             )
 
