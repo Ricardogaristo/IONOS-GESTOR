@@ -2263,17 +2263,17 @@ def exportar_curso_excel():
             )
 
             # ── Aplicar reglas (orden de prioridad) ────────────────────────
-            if nunca_av:
+            if supera_exam_c:
+                # VERDE MUY CLARO — exámenes realizados >= 75%, icono aplauso (prioridad máxima)
+                hist_texto_c = f"👏 {pct_exam_c:.0f}% exámenes\n{texto_av or fecha_ult}"
+                hist_color_c = "2D6A4F"
+                hist_fgcolor = "D8F3DC"
+
+            elif nunca_av:
                 # MORADO — nunca avanzó en ninguna importación
                 hist_texto_c = f"⚠ Sin avance\nDesde {primera_f}"
                 hist_color_c = "6B21A8"
                 hist_fgcolor = "F3E8FF"
-
-            elif supera_exam_c:
-                # VERDE MUY CLARO — exámenes realizados >= 75%, icono aplauso
-                hist_texto_c = f"👏 {pct_exam_c:.0f}% exámenes\n{texto_av or fecha_ult}"
-                hist_color_c = "2D6A4F"
-                hist_fgcolor = "D8F3DC"
 
             elif progresa:
                 # VERDE CLARO — avanzó en las últimas 7 importaciones pero < 75% exámenes
