@@ -2236,53 +2236,37 @@ def exportar_curso_excel():
             avances_l = [h for h in hist_alumno_c if float(h.get("delta_progreso") or 0) > 0]
             if avances_l:
                 ult      = avances_l[-1]
-                texto_av = f"+{float(ult.get('delta_progreso') or 0):.1f}%  {float(ult.get('progreso') or 0):.1f}%\n{_fmt_d(ult.get('fecha_import',''))}"
+                texto_av = f"▲ +{float(ult.get('delta_progreso') or 0):.1f}%  →  {float(ult.get('progreso') or 0):.1f}%\n{_fmt_d(ult.get('fecha_import',''))}"
             else:
                 texto_av = None
 
-            # ── Condiciones ─────────────────────────────────────────────────
-            # Sin avance: nunca hubo ningún delta positivo
-            nunca_av = all(d <= 0 for d in deltas)
+            # ── Regla 1: VERDE — progreso del historial >= 75% ─────────────
+            supera_75_hist = prog_ult >= 75
 
-            # Exámenes realizados > 75%: usar el campo examenes del alumno (R/S/T o R/T)
-            _ep_c       = _parse_examenes(a.get("examenes"))
-            _r_c, _s_c, _t_c = _ep_c
-            if _t_c > 0:
-                pct_exam_c = (_s_c / _t_c * 100) if _s_c > 0 else (_r_c / _t_c * 100)
-            else:
-                pct_exam_c = 0
-            supera_exam_c = pct_exam_c >= 75
+            # ── Regla 2: VERDE ESPERANZA — algún avance en las últimas 7 importaciones ──
+            ult7_imp = hist_alumno_c[-7:]
+            progresa = any(float(h.get("delta_progreso") or 0) > 0 for h in ult7_imp)
 
-            # Avanzó en las últimas 7 importaciones (al menos una positiva)
-            ult7_imp  = hist_alumno_c[-7:]
-            progresa  = any(float(h.get("delta_progreso") or 0) > 0 for h in ult7_imp)
-
-            # Sin avance en las últimas 7+ importaciones (todas <= 0)
+            # ── Regla 3: NARANJA — sin avance en las últimas 7+ importaciones ─────
             sin_av_7imp = len(hist_alumno_c) >= 7 and all(
                 float(h.get("delta_progreso") or 0) <= 0 for h in hist_alumno_c[-7:]
             )
 
             # ── Aplicar reglas (orden de prioridad) ────────────────────────
-            if nunca_av:
-                # MORADO — nunca avanzó en ninguna importación
-                hist_texto_c = f"⚠ Sin avance\nDesde {primera_f}"
-                hist_color_c = "6B21A8"
-                hist_fgcolor = "F3E8FF"
-
-            elif supera_exam_c:
-                # VERDE MUY CLARO — exámenes realizados > 75%, icono aplauso
-                hist_texto_c = f"👏 {pct_exam_c:.0f}% exámenes\n{texto_av or fecha_ult}"
-                hist_color_c = "2D6A4F"
-                hist_fgcolor = "D8F3DC"
+            if supera_75_hist:
+                # VERDE — el progreso del historial supera el 75%
+                hist_texto_c = texto_av or f"✅ {prog_ult:.1f}%\n{fecha_ult}"
+                hist_color_c = "1A5E35"
+                hist_fgcolor = "C8F0D8"
 
             elif progresa:
-                # VERDE CLARO — avanzó en las últimas 7 importaciones pero < 75% exámenes
-                hist_texto_c = f"↑ {texto_av or f'Progresando\n{fecha_ult}'}"
+                # VERDE ESPERANZA — está progresando en las últimas importaciones
+                hist_texto_c = texto_av or f"▲ Progresando\n{fecha_ult}"
                 hist_color_c = "3A7D44"
                 hist_fgcolor = "E8F5E9"
 
             elif sin_av_7imp:
-                # NARANJA — más de 7 importaciones sin avanzar
+                # NARANJA — sin avance en las últimas 7+ importaciones
                 hist_texto_c = texto_av or f"— Sin avance\n{primera_f}"
                 hist_color_c = "B35900"
                 hist_fgcolor = "FFF0DC"
@@ -2302,6 +2286,9 @@ def exportar_curso_excel():
         hist_cell_c.font      = Font(name="Arial", size=9, bold=True, color=hist_color_c)
         hist_cell_c.border    = thin()
         hist_cell_c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        # Ajustar altura de fila según líneas del historial (mínimo 30)
+        n_lineas = len(str(hist_texto_c).split("\n")) if hist_texto_c else 1
+        ws.row_dimensions[r_i].height = max(30, n_lineas * 16)
 
         # Observaciones
         obs_cell = ws.cell(r_i, col_obs, obs_texto or "—")
