@@ -2286,9 +2286,9 @@ def exportar_curso_excel():
         hist_cell_c.font      = Font(name="Arial", size=9, bold=True, color=hist_color_c)
         hist_cell_c.border    = thin()
         hist_cell_c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        # Ajustar altura de fila según líneas del historial (mínimo 30)
-        n_lineas = len(str(hist_texto_c).split("\n")) if hist_texto_c else 1
-        ws.row_dimensions[r_i].height = max(30, n_lineas * 16)
+        # Altura dinámica según número de líneas del historial
+        _hl = len(str(hist_texto_c).split("\n")) if hist_texto_c else 1
+        ws.row_dimensions[r_i].height = max(38, _hl * 20)
 
         # Observaciones
         obs_cell = ws.cell(r_i, col_obs, obs_texto or "—")
