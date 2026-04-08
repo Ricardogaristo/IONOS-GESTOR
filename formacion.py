@@ -2151,7 +2151,7 @@ def exportar_curso_excel():
         es_no_llamar = bool(a.get("no_llamar"))
         p = float(a.get("progreso") or 0)
         obs_texto = "\n".join(obs_map.get(a.get("id"), []))
-        ws.row_dimensions[r_i].height = max(18, 15 * len(obs_map.get(a.get("id"), []))) if obs_texto else 18
+        ws.row_dimensions[r_i].height = 30  # altura fija, se sobreescribe abajo si hace falta
 
         bg_row = C_RED_BG if es_no_llamar else (C_ALT if r_i % 2 == 0 else C_WHITE)
         rf     = PatternFill("solid", fgColor=bg_row)
@@ -2211,55 +2211,59 @@ def exportar_curso_excel():
             "F8D7DA" if pct_ex_val != "—" else bg_row
         ))
 
-        # Historial de importaciones
+        # Historial — solo último avance significativo
         hist_alumno_c = hist_map_c.get(a.get("id"), [])
         if hist_alumno_c:
-            lineas_hist_c = []
-            for h in hist_alumno_c:
-                fecha_h  = str(h.get("fecha_import", "") or "")[:10]
-                prog_h   = float(h.get("progreso") or 0)
-                delta_h  = float(h.get("delta_progreso") or 0)
-                avanzo_h = h.get("avanzo", 0)
-                flecha   = "▲" if avanzo_h else ("—" if delta_h == 0 else "▼")
-                delta_str = f"+{delta_h:.1f}%" if delta_h > 0 else (f"{delta_h:.1f}%" if delta_h < 0 else "sin cambio")
-                lineas_hist_c.append(f"{fecha_h}  {prog_h:.1f}%  {flecha} {delta_str}")
-            if len(hist_alumno_c) >= 2:
-                avances_c = sum(1 for h in hist_alumno_c if h.get("avanzo"))
-                total_hc  = len(hist_alumno_c)
-                pct_av_c  = avances_c / total_hc * 100
-                if pct_av_c >= 66:
-                    tendencia_c = "✅ Progresando"
-                elif pct_av_c >= 33:
-                    tendencia_c = "⚠ Progreso irregular"
-                else:
-                    tendencia_c = "🔴 Sin avance"
-                lineas_hist_c.insert(0, f"Tendencia: {tendencia_c} ({avances_c}/{total_hc} importaciones con avance)")
-            hist_texto_c = chr(10).join(lineas_hist_c)
+            # Último registro con delta > 0 (avance real)
+            avances_c = [h for h in hist_alumno_c if float(h.get("delta_progreso") or 0) > 0]
+            if avances_c:
+                ult = avances_c[-1]
+                fecha_raw = str(ult.get("fecha_import", "") or "")[:10]
+                try:
+                    from datetime import datetime as _dtt
+                    fecha_fmt = _dtt.strptime(fecha_raw, "%Y-%m-%d").strftime("%d/%m/%Y")
+                except Exception:
+                    fecha_fmt = fecha_raw
+                prog_h  = float(ult.get("progreso") or 0)
+                delta_h = float(ult.get("delta_progreso") or 0)
+                hist_texto_c = f"▲ +{delta_h:.1f}%  →  {prog_h:.1f}%\n{fecha_fmt}"
+                hist_color_c = "1A5E20"
+            else:
+                # Sin avance: mostrar último registro
+                ult = hist_alumno_c[-1]
+                fecha_raw = str(ult.get("fecha_import", "") or "")[:10]
+                try:
+                    from datetime import datetime as _dtt
+                    fecha_fmt = _dtt.strptime(fecha_raw, "%Y-%m-%d").strftime("%d/%m/%Y")
+                except Exception:
+                    fecha_fmt = fecha_raw
+                prog_h = float(ult.get("progreso") or 0)
+                hist_texto_c = f"— Sin avance  {prog_h:.1f}%\n{fecha_fmt}"
+                hist_color_c = "7D5C00"
         else:
             hist_texto_c = "Sin importaciones"
+            hist_color_c = "94A3B8"
+
         hist_cell_c = ws.cell(r_i, col_hist, hist_texto_c)
-        _tc = hist_texto_c
-        hist_color_c = ("1A5E20" if "✅" in _tc[:40] else
-                        ("7D5C00" if "⚠" in _tc[:40] else
-                         ("7B1A1A" if "🔴" in _tc[:40] else "64748B")))
         hist_cell_c.fill      = rf
-        hist_cell_c.font      = Font(name="Arial", size=8, color=hist_color_c)
+        hist_cell_c.font      = Font(name="Arial", size=9, bold=True, color=hist_color_c)
         hist_cell_c.border    = thin()
-        hist_cell_c.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
-        if hist_alumno_c:
-            ws.row_dimensions[r_i].height = max(ws.row_dimensions[r_i].height, 15 * len(hist_alumno_c) + 15)
+        hist_cell_c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        # Altura fija para todas las filas
+        ws.row_dimensions[r_i].height = 30
 
         # Observaciones
         obs_cell = ws.cell(r_i, col_obs, obs_texto or "—")
         obs_cell.fill      = rf
         obs_cell.font      = Font(name="Arial", size=8, italic=bool(obs_texto), color="334155")
         obs_cell.border    = thin()
-        obs_cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+        obs_cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=False)
 
     last = 6 + len(alumnos)
     ws.auto_filter.ref = f"A6:{get_column_letter(len(COLS))}{last}"
     ws.freeze_panes    = "A7"
-    base_widths = [4, 28, 14] + ex_widths + [14, 14, 12, 18, 12, 16, 12, 30, 40]
+    base_widths = [4, 28, 14] + ex_widths + [14, 14, 12, 18, 12, 16, 12, 22, 30]
     for i, w in enumerate(base_widths, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
