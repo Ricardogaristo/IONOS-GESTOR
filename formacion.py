@@ -2211,79 +2211,68 @@ def exportar_curso_excel():
             "F8D7DA" if pct_ex_val != "—" else bg_row
         ))
 
-        # ── Historial: 3 reglas de color ──────────────────────────────────
+        # ── Historial: reglas de color ────────────────────────────────────
         hist_alumno_c = hist_map_c.get(a.get("id"), [])
-        # Calcular supera directo del progreso real (el flag supera_75 puede estar desactualizado)
-        supera        = _safe_float(a.get("progreso", 0)) >= 75
 
-        if hist_alumno_c:
+        if es_no_llamar:
+            # NO PARTICIPA: celda vacía, sin color ni historial
+            hist_texto_c = ""
+            hist_color_c = "94A3B8"
+            hist_fgcolor = bg_row
+        elif hist_alumno_c:
             from datetime import datetime as _dtt, date as _date_cls
 
             def _fmt_d(s):
                 try:    return _dtt.strptime(str(s)[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
                 except: return str(s)[:10]
 
-            hoy = _date_cls.today()
+            # ── Variables base del historial ────────────────────────────────
+            deltas    = [float(h.get("delta_progreso") or 0) for h in hist_alumno_c]
+            prog_ult  = float(hist_alumno_c[-1].get("progreso") or 0)
+            fecha_ult = _fmt_d(hist_alumno_c[-1].get("fecha_import", ""))
+            primera_f = _fmt_d(hist_alumno_c[0].get("fecha_import", ""))
 
-            # Deltas de cada registro
-            deltas = [float(h.get("delta_progreso") or 0) for h in hist_alumno_c]
+            # Último avance real (para el texto informativo)
+            avances_l = [h for h in hist_alumno_c if float(h.get("delta_progreso") or 0) > 0]
+            if avances_l:
+                ult      = avances_l[-1]
+                texto_av = f"▲ +{float(ult.get('delta_progreso') or 0):.1f}%  →  {float(ult.get('progreso') or 0):.1f}%\n{_fmt_d(ult.get('fecha_import',''))}"
+            else:
+                texto_av = None
 
-            # ── Cálculos de reglas ──────────────────────────────────────────
-            # Verde por avance: al menos un avance positivo en las últimas 7 importaciones
-            ult7_imp   = hist_alumno_c[-7:]
-            avanza_7   = any(
-                float(h.get("delta_progreso") or 0) > 0 for h in ult7_imp
+            # ── Regla 1: VERDE — progreso del historial >= 75% ─────────────
+            supera_75_hist = prog_ult >= 75
+
+            # ── Regla 2: VERDE ESPERANZA — algún avance en las últimas 7 importaciones ──
+            ult7_imp = hist_alumno_c[-7:]
+            progresa = any(float(h.get("delta_progreso") or 0) > 0 for h in ult7_imp)
+
+            # ── Regla 3: NARANJA — sin avance en las últimas 7+ importaciones ─────
+            sin_av_7imp = len(hist_alumno_c) >= 7 and all(
+                float(h.get("delta_progreso") or 0) <= 0 for h in hist_alumno_c[-7:]
             )
 
-            # R2: sin avance en los últimos 7 días calendario
-            # (incluye el caso de no tener ningún import en los últimos 7 días)
-            ult7_dias  = [
-                h for h in hist_alumno_c
-                if (hoy - _dtt.strptime(str(h.get("fecha_import",""))[:10], "%Y-%m-%d").date()).days <= 7
-            ]
-            if ult7_dias:
-                # Hay imports recientes pero ninguno con avance
-                sin_av_7d = all(float(h.get("delta_progreso") or 0) <= 0 for h in ult7_dias)
-            else:
-                # No hay ningún import en los últimos 7 días → sin avance reciente
-                sin_av_7d = True
-
-            # R1: NUNCA avanzó (todos los deltas <= 0)
-            nunca_av   = all(d <= 0 for d in deltas)
-
-            # Último avance real
-            avances_l  = [h for h in hist_alumno_c if float(h.get("delta_progreso") or 0) > 0]
-            if avances_l:
-                ult        = avances_l[-1]
-                texto_av   = f"▲ +{float(ult.get('delta_progreso') or 0):.1f}%  →  {float(ult.get('progreso') or 0):.1f}%\n{_fmt_d(ult.get('fecha_import',''))}"
-            else:
-                texto_av   = None
-
-            primera_f  = _fmt_d(hist_alumno_c[0].get("fecha_import", ""))
-            prog_ult   = float(hist_alumno_c[-1].get("progreso") or 0)
-            fecha_ult  = _fmt_d(hist_alumno_c[-1].get("fecha_import", ""))
-
             # ── Aplicar reglas (orden de prioridad) ────────────────────────
-            if supera or avanza_7:
-                # VERDE — superó el 75% O avanza en las últimas 7 importaciones
+            if supera_75_hist:
+                # VERDE — el progreso del historial supera el 75%
+                hist_texto_c = texto_av or f"✅ {prog_ult:.1f}%\n{fecha_ult}"
+                hist_color_c = "1A5E35"
+                hist_fgcolor = "C8F0D8"
+
+            elif progresa:
+                # VERDE ESPERANZA — está progresando en las últimas importaciones
                 hist_texto_c = texto_av or f"▲ Progresando\n{fecha_ult}"
-                hist_color_c = "1A7A3C"
-                hist_fgcolor = "D4EDDA"
+                hist_color_c = "3A7D44"
+                hist_fgcolor = "E8F5E9"
 
-            elif nunca_av:
-                # MORADO — nunca avanzó en ninguna importación
-                hist_texto_c = f"⚠ Sin progreso\nDesde {primera_f}"
-                hist_color_c = "6B21A8"
-                hist_fgcolor = "F3E8FF"
-
-            elif not supera and sin_av_7d:
-                # NARANJA — no llega al 75% y sin avance en las últimas 7 importaciones
+            elif sin_av_7imp:
+                # NARANJA — sin avance en las últimas 7+ importaciones
                 hist_texto_c = texto_av or f"— Sin avance\n{primera_f}"
                 hist_color_c = "B35900"
                 hist_fgcolor = "FFF0DC"
 
             else:
-                # GRIS — avanzó alguna vez pero no cumple verde/naranja, o superó 75% sin avance reciente
+                # GRIS — resto de casos
                 hist_texto_c = texto_av or f"— {prog_ult:.1f}%\n{fecha_ult}"
                 hist_color_c = "475569"
                 hist_fgcolor = bg_row
