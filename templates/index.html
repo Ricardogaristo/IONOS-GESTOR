@@ -19,7 +19,14 @@
           <input name="descripcion" class="form-control" placeholder="Descripción *" required autocomplete="off">
         </div>
         <div class="col-sm-6 col-md-2">
-          <input name="categoria" class="form-control" placeholder="Categoría" autocomplete="off">
+          <input name="categoria" id="input-categoria" class="form-control"
+                 placeholder="Categoría" autocomplete="off"
+                 list="categorias-datalist">
+          <datalist id="categorias-datalist">
+            {% for cat in categorias_lista %}
+            <option value="{{ cat }}">
+            {% endfor %}
+          </datalist>
         </div>
         <div class="col-sm-6 col-md-1">
           <select name="prioridad" class="form-control" style="font-size:.8rem;">
