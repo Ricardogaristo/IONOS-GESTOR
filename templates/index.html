@@ -3,649 +3,784 @@
 
 {% block content %}
 
-<!-- ── Nueva tarea ──────────────────────────────────────────────────── -->
-<div class="gcard mb-4">
-  <div class="gcard-header">
-    <span style="color:var(--accent)">＋</span>
-    <span class="gcard-title">Nueva tarea</span>
+<!-- ══════════════════════════════════════════════════════════
+     BOTÓN FLOTANTE — abrir panel nueva tarea
+═══════════════════════════════════════════════════════════ -->
+<button id="btn-nueva" onclick="abrirPanel()" title="Nueva tarea">＋</button>
+
+<!-- ══════════════════════════════════════════════════════════
+     OVERLAY + PANEL LATERAL — Nueva tarea
+═══════════════════════════════════════════════════════════ -->
+<div id="panel-overlay" onclick="cerrarPanel()"></div>
+<aside id="panel-nueva">
+  <div class="panel-header">
+    <span class="panel-title">✏ Nueva tarea</span>
+    <button class="panel-close" onclick="cerrarPanel()">✕</button>
   </div>
-  <div class="gcard-body">
+  <div class="panel-body">
     <form action="/agregar" method="post">
-      <div class="row g-2">
-        <div class="col-sm-6 col-md-2">
-          <input name="codigo" class="form-control" placeholder="Código" autocomplete="off">
+
+      <div class="field-group">
+        <label class="field-label">Prioridad</label>
+        <div class="prio-selector">
+          <label class="prio-opt prio-alta">
+            <input type="radio" name="prioridad" value="1">
+            <span>🔴 Alta</span>
+          </label>
+          <label class="prio-opt prio-media">
+            <input type="radio" name="prioridad" value="2" checked>
+            <span>🟡 Media</span>
+          </label>
+          <label class="prio-opt prio-baja">
+            <input type="radio" name="prioridad" value="3">
+            <span>🟢 Baja</span>
+          </label>
         </div>
-        <div class="col-sm-6 col-md-3">
-          <input name="descripcion" class="form-control" placeholder="Descripción *" required autocomplete="off">
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="np-desc">Descripción <span style="color:#ef4444">*</span></label>
+        <textarea name="descripcion" id="np-desc" class="field-input field-textarea"
+                  placeholder="¿Qué hay que hacer?" required rows="2"></textarea>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="np-cat">Categoría</label>
+        <input name="categoria" id="np-cat" class="field-input"
+               placeholder="Ej: Marketing, IT…"
+               list="cats-datalist" autocomplete="off">
+        <datalist id="cats-datalist">
+          {% for cat in categorias_lista %}<option value="{{ cat }}">{% endfor %}
+        </datalist>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="np-cod">Código</label>
+        <input name="codigo" id="np-cod" class="field-input" placeholder="Ref. opcional" autocomplete="off">
+      </div>
+
+      <div class="field-row-2">
+        <div class="field-group">
+          <label class="field-label">Fecha inicio</label>
+          <input name="fecha_inicio" type="date" class="field-input">
         </div>
-        <div class="col-sm-6 col-md-2">
-          <input name="categoria" id="input-categoria" class="form-control"
-                 placeholder="Categoría" autocomplete="off"
-                 list="categorias-datalist">
-          <datalist id="categorias-datalist">
+        <div class="field-group">
+          <label class="field-label">Fecha fin</label>
+          <input name="fecha" type="date" class="field-input">
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="np-notas">Notas</label>
+        <textarea name="notas" id="np-notas" class="field-input field-textarea"
+                  placeholder="Información adicional…" rows="2"></textarea>
+      </div>
+
+      <button type="submit" class="btn-submit">＋ Agregar tarea</button>
+    </form>
+  </div>
+</aside>
+
+<!-- ══════════════════════════════════════════════════════════
+     CABECERA + FILTROS
+═══════════════════════════════════════════════════════════ -->
+<div class="tasks-header">
+  <div class="tasks-title-row">
+    <h1 class="tasks-title">Mis tareas</h1>
+    <span id="cnt-badge" class="cnt-badge"></span>
+  </div>
+
+  <form id="filter-form" method="get" action="/">
+    <input type="hidden" name="page"     value="1">
+    <input type="hidden" id="hid-estado" name="estado" value="{{ filtro_estado }}">
+    <input type="hidden" id="hid-cat"    name="cat"    value="{{ filtro_cat }}">
+    <input type="hidden" id="hid-prio"   name="prio"   value="{{ filtro_prio }}">
+    <input type="hidden" id="hid-fav"    name="fav"    value="{{ filtro_fav }}">
+    <input type="hidden" id="hid-user"   name="user"   value="{{ filtro_user|default('') }}">
+
+    <div class="filter-strip">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="filtro-texto" name="q" class="search-input"
+               placeholder="Buscar tarea…" autocomplete="off" value="{{ filtro_q }}">
+      </div>
+      <div class="pill-group">
+        <button type="button" class="fpill {{ 'on' if filtro_estado=='all'     else '' }}" data-st="all">Todas</button>
+        <button type="button" class="fpill {{ 'on' if filtro_estado=='pending' else '' }}" data-st="pending">⏳ Pendientes</button>
+        <button type="button" class="fpill {{ 'on' if filtro_estado=='done'    else '' }}" data-st="done">✔ Hechas</button>
+        <button type="button" class="fpill fav-pill {{ 'on' if filtro_fav=='1' else '' }}" data-fav="1">⭐</button>
+      </div>
+      <div class="pill-group">
+        <button type="button" class="fpill {{ 'on' if filtro_prio==''  else '' }}" data-prio="">Prioridad</button>
+        <button type="button" class="fpill {{ 'on' if filtro_prio=='1' else '' }}" data-prio="1">🔴</button>
+        <button type="button" class="fpill {{ 'on' if filtro_prio=='2' else '' }}" data-prio="2">🟡</button>
+        <button type="button" class="fpill {{ 'on' if filtro_prio=='3' else '' }}" data-prio="3">🟢</button>
+      </div>
+      {% if categorias_lista %}
+      <div class="cat-wrap" id="cat-wrap">
+        <button type="button" class="fpill cat-trigger {% if filtro_cat %}on{% endif %}" id="cat-trigger-btn" onclick="toggleCatPopover()">
+          📁 Categoría<span class="cat-badge" id="cat-badge" {% if not filtro_cat %}style="display:none"{% endif %}>1</span>
+        </button>
+        <div class="cat-popover" id="cat-popover" style="display:none">
+          <div class="cat-search-wrap">
+            <input class="cat-search-input" id="cat-search" placeholder="Buscar categoría…" oninput="filterCatList()" autocomplete="off">
+          </div>
+          <div class="cat-list" id="cat-list">
             {% for cat in categorias_lista %}
-            <option value="{{ cat }}">
+            <div class="cat-item {% if filtro_cat==cat %}selected{% endif %}" data-val="{{ cat }}" onclick="selectCat('{{ cat }}')">
+              <span class="cat-check">{% if filtro_cat==cat %}✓{% endif %}</span>
+              {{ cat }}
+            </div>
             {% endfor %}
-          </datalist>
-        </div>
-        <div class="col-sm-6 col-md-1">
-          <select name="prioridad" class="form-control" style="font-size:.8rem;">
-            <option value="1">🔴 Alta</option>
-            <option value="2" selected>🟡 Media</option>
-            <option value="3">🟢 Baja</option>
-          </select>
-        </div>
-        <div class="col-sm-6 col-md-2">
-          <input name="fecha" type="date" class="form-control">
-        </div>
-        <div class="col-12 col-md-2">
-          <button type="submit" class="btn btn-g-primary w-100">＋ Agregar</button>
-        </div>
-      </div>
-      <div class="row g-2 mt-1">
-        <div class="col-12">
-          <input name="notas" class="form-control" placeholder="Notas opcionales…"
-                 autocomplete="off" style="font-size:.82rem;">
-        </div>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- ── Lista de tareas ───────────────────────────────────────────────── -->
-<div class="gcard">
-  <div class="gcard-header">
-    <span style="color:var(--text-muted)">⊞</span>
-    <span class="gcard-title">Lista de tareas</span>
-    <span id="cnt-badge" class="badge-g badge-pending ms-auto" style="font-size:.68rem;"></span>
-  </div>
-  <div class="gcard-body pb-0">
-
-    <!-- Filter bar -->
-    <form id="filter-form" method="get" action="/">
-      <input type="hidden" name="page"     value="1">
-      <input type="hidden" id="hid-estado" name="estado" value="{{ filtro_estado }}">
-      <input type="hidden" id="hid-cat"    name="cat"    value="{{ filtro_cat }}">
-      <input type="hidden" id="hid-prio"   name="prio"   value="{{ filtro_prio }}">
-      <input type="hidden" id="hid-fav"    name="fav"    value="{{ filtro_fav }}">
-      <input type="hidden" id="hid-user"   name="user"   value="{{ filtro_user|default('') }}">
-      <div class="filter-bar">
-
-        <!-- Fila 1: estado + favoritas + búsqueda -->
-        <div class="filter-row">
-          <span class="filter-label">Estado</span>
-          <button type="button" class="fpill s-all     {{ 'on' if filtro_estado=='all'     else '' }}" data-st="all">⊞ Todas</button>
-          <button type="button" class="fpill s-pending {{ 'on' if filtro_estado=='pending' else '' }}" data-st="pending">⏳ Pendientes</button>
-          <button type="button" class="fpill s-done    {{ 'on' if filtro_estado=='done'    else '' }}" data-st="done">✔ Completadas</button>
-          <button type="button" class="fpill s-fav     {{ 'on' if filtro_fav=='1'          else '' }}" data-fav="1">⭐ Favoritas</button>
-          <div class="filter-search">
-            <span class="si">🔍</span>
-            <input type="text" id="filtro-texto" name="q" class="form-control"
-                   placeholder="Buscar…" autocomplete="off" value="{{ filtro_q }}">
+          </div>
+          <div class="cat-footer">
+            <button type="button" class="cat-clear-btn" onclick="clearCat()">Limpiar</button>
+            <button type="button" class="cat-apply-btn" onclick="applyCat()">Aplicar</button>
           </div>
         </div>
-
-        <!-- Fila 2: prioridad + categoría -->
-        <div class="filter-row">
-          <span class="filter-label">Prioridad</span>
-          <button type="button" class="fpill prio-all  {{ 'on' if filtro_prio==''  else '' }}" data-prio="">Todas</button>
-          <button type="button" class="fpill prio-high {{ 'on' if filtro_prio=='1' else '' }}" data-prio="1">🔴 Alta</button>
-          <button type="button" class="fpill prio-med  {{ 'on' if filtro_prio=='2' else '' }}" data-prio="2">🟡 Media</button>
-          <button type="button" class="fpill prio-low  {{ 'on' if filtro_prio=='3' else '' }}" data-prio="3">🟢 Baja</button>
-          <div class="ms-auto" style="display:flex; align-items:center; gap:.5rem;">
-            {% if categorias_lista | length > 0 %}
-            <div class="cat-select-wrap" style="margin:0;">
-              <span class="cat-select-icon">⊟</span>
-              <select id="cat-select" class="cat-select">
-                <option value="">Todas las categorías</option>
-                {% for cat in categorias_lista %}
-                <option value="{{ cat }}" {{ 'selected' if filtro_cat==cat else '' }}>{{ cat }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            {% endif %}
-            {% if session.get('es_admin', 0) >= 1 and usuarios_lista %}
-            <div class="cat-select-wrap" style="margin:0;">
-              <span class="cat-select-icon">👤</span>
-              <select id="user-select" class="cat-select">
-                <option value="">Todos los usuarios</option>
-                {% for uname in usuarios_lista %}
-                <option value="{{ uname }}" {{ 'selected' if filtro_user == uname else '' }}>{{ uname }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            {% endif %}
-          </div>
-        </div>
-
       </div>
-    </form>
-
-    <!-- Tabla -->
-    <div class="table-responsive">
-      <table class="gtable">
-        <thead>
-          <tr>
-            <th style="width:160px;">Estado</th>
-            <th>Descripción</th>
-            <th style="width:130px;">Categoría</th>
-            <th style="width:110px;">Fecha</th>
-            <th style="width:130px;">Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="task-tbody">
-          {% for t in tareas %}
-          {% set tid    = t[0] %}
-          {% set tdesc  = t[1] %}
-          {% set tcat   = t[2] or 'General' %}
-          {% set tfecha = t[3] %}
-          {% set tcomp  = t[4] %}
-          {% set tcod   = t[5] %}
-          {% set tprio  = t[7] or 2 %}
-          {% set tfav   = t[8] or 0 %}
-          {% set tnotas = t[9] or '' %}
-          {% set tsubs  = subtareas_map.get(tid, []) %}
-          {% set n_hechas = tsubs | selectattr('hecha', 'equalto', 1) | list | length %}
-
-          <!-- Fila principal -->
-          <tr class="task-row {{ 'row-done' if tcomp==1 else '' }} row-prio-{{ tprio }}"
-              data-st="{{ 'done' if tcomp==1 else 'pending' }}"
-              data-prio="{{ tprio }}" data-fav="{{ tfav }}" data-tid="{{ tid }}">
-
-            <!-- COLUMNA: Estado + Prioridad + Favorita (fusionadas) -->
-            <td data-label="Estado" class="td-estado">
-              <div class="estado-cell">
-                <!-- Fila superior: dot de prioridad + badge de estado -->
-                <div class="estado-top">
-                  {% if tprio==1 %}
-                    <span class="prio-dot prio-dot-high" title="Alta"></span>
-                  {% elif tprio==3 %}
-                    <span class="prio-dot prio-dot-low" title="Baja"></span>
-                  {% else %}
-                    <span class="prio-dot prio-dot-med" title="Media"></span>
-                  {% endif %}
-                  {% if tcomp==1 %}
-                    <span class="badge-g badge-done">✔ Hecha</span>
-                  {% else %}
-                    <span class="badge-g badge-pending">● Pendiente</span>
-                  {% endif %}
-                </div>
-                <!-- Fila inferior: favorita + etiqueta de prioridad -->
-                <div class="estado-meta">
-                  <a href="/favorita/{{ tid }}"
-                     class="fav-btn {{ 'active' if tfav==1 else '' }}"
-                     title="{{ 'Quitar favorita' if tfav==1 else 'Marcar favorita' }}">
-                    {{ '⭐' if tfav==1 else '☆' }}
-                  </a>
-                  <span class="prio-label prio-label-{{ tprio }}">
-                    {% if tprio==1 %}Alta{% elif tprio==3 %}Baja{% else %}Media{% endif %}
-                  </span>
-                </div>
-              </div>
-            </td>
-
-            <!-- COLUMNA: Código + Descripción + Badges (fusionadas) -->
-            <td data-label="Descripción" class="td-desc">
-              <!-- Código como etiqueta sutil -->
-              {% if tcod %}
-              <div class="task-code-tag">{{ tcod }}</div>
-              {% endif %}
-              <!-- Descripción: expandible solo si tiene notas o subtareas -->
-              {% if tnotas or tsubs %}
-              <details class="task-details">
-                <summary class="desc-summary">
-                  <span style="filter:none; opacity:1;">{{ tdesc }}</span>
-                  {% if tsubs %}
-                  <span class="badge-g subtask-badge {{ 'subtask-done' if n_hechas==tsubs|length else '' }}"
-                        title="{{ n_hechas }}/{{ tsubs|length }} subtareas completadas">
-                    ✓ {{ n_hechas }}/{{ tsubs|length }}
-                  </span>
-                  {% endif %}
-                  {% if tnotas %}
-                  <span style="font-size:.82rem; color:var(--text-muted);" title="Tiene notas">📝</span>
-                  {% endif %}
-                </summary>
-                <div class="task-inline-detail">
-                  {% if tnotas %}
-                  <div class="detail-section">
-                    <div class="detail-section-title">📝 Notas</div>
-                    <form method="POST" action="/editar/{{ tid }}" class="d-flex gap-2 align-items-start">
-                      <input type="hidden" name="codigo"      value="{{ tcod or '' }}">
-                      <input type="hidden" name="descripcion" value="{{ tdesc }}">
-                      <input type="hidden" name="categoria"   value="{{ tcat }}">
-                      <input type="hidden" name="fecha"       value="{{ tfecha or '' }}">
-                      <input type="hidden" name="completada"  value="{{ tcomp }}">
-                      <input type="hidden" name="prioridad"   value="{{ tprio }}">
-                      <textarea name="notas" class="form-control" rows="2"
-                                style="font-size:.82rem; resize:vertical;"
-                                placeholder="Escribe notas sobre esta tarea…">{{ tnotas }}</textarea>
-                      <button type="submit" class="btn btn-g-primary btn-sm"
-                              style="white-space:nowrap;">💾 Guardar</button>
-                    </form>
-                  </div>
-                  {% endif %}
-                  {% if tsubs %}
-                  <div class="detail-section">
-                    <div class="detail-section-title">
-                      ☑ Subtareas
-                      <span style="font-weight:400; color:var(--text-muted); font-size:.75rem; margin-left:.4rem;">
-                        {{ n_hechas }}/{{ tsubs|length }} completadas
-                      </span>
-                    </div>
-                    <ul class="subtask-list">
-                      {% for s in tsubs %}
-                      <li class="subtask-item {{ 'hecha' if s.hecha else '' }}">
-                        <a href="/subtarea/toggle/{{ s.id }}" class="subtask-check">
-                          {{ '☑' if s.hecha else '☐' }}
-                        </a>
-                        <span class="subtask-texto">{{ s.texto }}</span>
-                        <a href="/subtarea/eliminar/{{ s.id }}" class="subtask-del"
-                           onclick="return confirm('¿Eliminar subtarea?')">×</a>
-                      </li>
-                      {% endfor %}
-                    </ul>
-                  </div>
-                  {% endif %}
-                </div>
-              </details>
-              {% else %}
-              <div class="desc-summary" style="cursor:default;">
-                <span style="filter:none; opacity:1;">{{ tdesc }}</span>
-              </div>
-              {% endif %}
-            </td>
-
-            <!-- COLUMNA: Categoría -->
-            <td data-label="Categoría">
-              <span class="badge-g badge-cat" style="cursor:pointer;"
-                    onclick="setCat('{{ tcat }}')" title="Filtrar por categoría">{{ tcat }}</span>
-            </td>
-
-            <!-- COLUMNA: Fecha -->
-            <td data-label="Fecha" class="td-fecha">
-              {% if tfecha %}
-                {% set parts = tfecha.split('-') %}
-                <span class="fecha-val">{{ parts[2] }}/{{ parts[1] }}/{{ parts[0] }}</span>
-              {% else %}
-                <span style="color:var(--text-muted); font-size:.8rem;">—</span>
-              {% endif %}
-            </td>
-
-            <!-- COLUMNA: Acciones -->
-            <td data-label="Acciones" class="td-acciones">
-              <div class="acciones-group">
-                {% if tcomp==0 %}
-                  <a href="/completar/{{ tid }}" class="btn btn-g-success btn-sm" title="Completar">✔</a>
-                {% else %}
-                  <span class="btn btn-g-ghost btn-sm" style="cursor:default;opacity:.35;">✔</span>
-                {% endif %}
-                <a href="/editar/{{ tid }}"   class="btn btn-g-warning btn-sm" title="Editar">✏</a>
-                <a href="/duplicar/{{ tid }}" class="btn btn-g-ghost   btn-sm" title="Duplicar tarea">⧉</a>
-                <a href="/eliminar/{{ tid }}" class="btn btn-g-danger  btn-sm"
-                   onclick="return confirm('¿Eliminar esta tarea?')" title="Eliminar">🗑</a>
-              </div>
-            </td>
-          </tr>
-{% else %}
-          <tr id="empty-row">
-            <td colspan="5" style="text-align:center; padding:3rem; color:var(--text-muted);">
-              <div style="font-size:2rem; margin-bottom:.5rem;">📋</div>
-              No hay tareas todavía. ¡Agrega la primera!
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      <div id="no-results" style="display:none; text-align:center; padding:2.5rem; color:var(--text-muted);">
-        <div style="font-size:1.8rem; margin-bottom:.5rem;">🔍</div>
-        Ninguna tarea coincide con el filtro.
-      </div>
-    </div>
-
-    <!-- Paginación -->
-    {% if total_pages > 1 %}
-    {%- set base = "?estado=" ~ filtro_estado ~ "&cat=" ~ (filtro_cat|urlencode) ~ "&q=" ~ (filtro_q|urlencode) ~ "&prio=" ~ filtro_prio ~ "&fav=" ~ filtro_fav ~ "&user=" ~ (filtro_user|default('')|urlencode) -%}
-    <div class="py-3 border-top" style="border-color:var(--border)!important;">
-      <ul class="gpagination">
-        <li class="{{ 'disabled' if page<=1 else '' }}">
-          <a class="gpage-link" href="{{ base }}&page={{ page-1 }}">← Ant</a>
-        </li>
-        {% for p in range(1, total_pages+1) %}
-        <li class="{{ 'active' if p==page else '' }}">
-          <a class="gpage-link" href="{{ base }}&page={{ p }}">{{ p }}</a>
-        </li>
+      {% endif %}
+      {% if session.get('es_admin', 0) >= 1 and usuarios_lista %}
+      <select id="user-select" class="filter-select {{ 'active' if filtro_user else '' }}">
+        <option value="">👤 Usuario</option>
+        {% for uname in usuarios_lista %}
+        <option value="{{ uname }}" {{ 'selected' if filtro_user==uname else '' }}>{{ uname }}</option>
         {% endfor %}
-        <li class="{{ 'disabled' if page>=total_pages else '' }}">
-          <a class="gpage-link" href="{{ base }}&page={{ page+1 }}">Sig →</a>
-        </li>
-      </ul>
+      </select>
+      {% endif %}
     </div>
-    {% endif %}
-
-  </div>
+  </form>
 </div>
-  <!-- Export button (footer) -->
-  <div class="text-end mt-4">
-    <a href="/exportar" class="btn btn-g-export">⬇ Exportar Excel</a>
+
+<!-- ══════════════════════════════════════════════════════════
+     REJILLA DE TARJETAS
+═══════════════════════════════════════════════════════════ -->
+<div id="tasks-grid">
+  {% for t in tareas %}
+  {% set tid    = t[0] %}
+  {% set tdesc  = t[1] %}
+  {% set tcat   = t[2] or 'General' %}
+  {% set tfecha = t[3] %}
+  {% set tcomp  = t[4] %}
+  {% set tcod   = t[5] %}
+  {% set tprio  = t[7] or 2 %}
+  {% set tfav   = t[8] or 0 %}
+  {% set tnotas = t[9] or '' %}
+  {% set tsubs  = subtareas_map.get(tid, []) %}
+  {% set n_hechas = tsubs | selectattr('hecha', 'equalto', 1) | list | length %}
+
+  <div class="tcard prio-{{ tprio }} {{ 'tcard-done' if tcomp==1 else '' }}"
+       data-st="{{ 'done' if tcomp==1 else 'pending' }}"
+       data-prio="{{ tprio }}" data-fav="{{ tfav }}" data-tid="{{ tid }}">
+
+    <div class="tcard-stripe"></div>
+
+    <div class="tcard-head">
+      <div class="tcard-head-left">
+        {% if tcod %}<span class="tcard-code">{{ tcod }}</span>{% endif %}
+        <span class="tcat-pill" onclick="setCat('{{ tcat }}')">{{ tcat }}</span>
+      </div>
+      <div class="tcard-head-right">
+        <a href="/favorita/{{ tid }}" class="fav-btn {{ 'active' if tfav==1 else '' }}">{{ '⭐' if tfav==1 else '☆' }}</a>
+        {% if tcomp==1 %}
+          <span class="status-badge done">✔ Hecha</span>
+        {% else %}
+          <span class="status-badge pending">● Pendiente</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="tcard-body">
+      {% if tnotas or tsubs %}
+      <details class="tdesc-details">
+        <summary class="tdesc-summary">
+          <span class="tdesc-text">{{ tdesc }}</span>
+          <span class="tdesc-chips">
+            {% if tsubs %}
+            <span class="chip-sub {{ 'chip-sub-done' if n_hechas==tsubs|length else '' }}">✓ {{ n_hechas }}/{{ tsubs|length }}</span>
+            {% endif %}
+            {% if tnotas %}<span class="chip-note">📝</span>{% endif %}
+          </span>
+        </summary>
+        <div class="tdesc-extra">
+          {% if tnotas %}
+          <div class="extra-block">
+            <div class="extra-title">📝 Notas</div>
+            <form method="POST" action="/editar/{{ tid }}" class="notes-form">
+              <input type="hidden" name="codigo"      value="{{ tcod or '' }}">
+              <input type="hidden" name="descripcion" value="{{ tdesc }}">
+              <input type="hidden" name="categoria"   value="{{ tcat }}">
+              <input type="hidden" name="fecha"       value="{{ tfecha or '' }}">
+              <input type="hidden" name="completada"  value="{{ tcomp }}">
+              <input type="hidden" name="prioridad"   value="{{ tprio }}">
+              <textarea name="notas" class="notes-ta" rows="2">{{ tnotas }}</textarea>
+              <button type="submit" class="notes-save">💾</button>
+            </form>
+          </div>
+          {% endif %}
+          {% if tsubs %}
+          <div class="extra-block">
+            <div class="extra-title">☑ Subtareas &nbsp;<span style="font-weight:400;color:var(--text-muted);">{{ n_hechas }}/{{ tsubs|length }}</span></div>
+            <ul class="sub-list">
+              {% for s in tsubs %}
+              <li class="sub-item {{ 'sub-done' if s.hecha else '' }}">
+                <a href="/subtarea/toggle/{{ s.id }}" class="sub-toggle">{{ '☑' if s.hecha else '☐' }}</a>
+                <span>{{ s.texto }}</span>
+                <a href="/subtarea/eliminar/{{ s.id }}" class="sub-del" onclick="return confirm('¿Eliminar?')">×</a>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+      </details>
+      {% else %}
+      <span class="tdesc-text">{{ tdesc }}</span>
+      {% endif %}
+    </div>
+
+    <div class="tcard-foot">
+      <div class="tcard-fecha">
+        {% if tfecha %}
+          {% set parts = tfecha.split('-') %}
+          📅 {{ parts[2] }}/{{ parts[1] }}/{{ parts[0] }}
+        {% else %}
+          <span style="opacity:.4;font-style:italic;">Sin fecha</span>
+        {% endif %}
+      </div>
+      <div class="tcard-actions">
+        {% if tcomp==0 %}
+          <a href="/completar/{{ tid }}" class="tact ok" title="Completar">✔</a>
+        {% else %}
+          <span class="tact disabled">✔</span>
+        {% endif %}
+        <a href="/editar/{{ tid }}"   class="tact edit" title="Editar">✏</a>
+        <a href="/duplicar/{{ tid }}" class="tact dup"  title="Duplicar">⧉</a>
+        <a href="/eliminar/{{ tid }}" class="tact del"  title="Eliminar"
+           onclick="return confirm('¿Eliminar esta tarea?')">🗑</a>
+      </div>
+    </div>
   </div>
+
+  {% else %}
+  <div class="empty-state">
+    <div style="font-size:2.5rem;margin-bottom:.75rem;">📋</div>
+    <div style="font-size:1rem;margin-bottom:1rem;color:var(--text-muted);">No hay tareas todavía.</div>
+    <button class="empty-cta" onclick="abrirPanel()">＋ Crear la primera tarea</button>
+  </div>
+  {% endfor %}
+</div>
+
+<div id="no-results" style="display:none;" class="empty-state">
+  <div style="font-size:2rem;margin-bottom:.5rem;">🔍</div>
+  <div style="color:var(--text-muted);">Ninguna tarea coincide con el filtro.</div>
+</div>
+
+{% if total_pages > 1 %}
+{%- set base = "?estado=" ~ filtro_estado ~ "&cat=" ~ (filtro_cat|urlencode) ~ "&q=" ~ (filtro_q|urlencode) ~ "&prio=" ~ filtro_prio ~ "&fav=" ~ filtro_fav ~ "&user=" ~ (filtro_user|default('')|urlencode) -%}
+<div style="margin:1.5rem 0;">
+  <ul class="gpagination">
+    <li class="{{ 'disabled' if page<=1 else '' }}"><a class="gpage-link" href="{{ base }}&page={{ page-1 }}">← Ant</a></li>
+    {% for p in range(1, total_pages+1) %}
+    <li class="{{ 'active' if p==page else '' }}"><a class="gpage-link" href="{{ base }}&page={{ p }}">{{ p }}</a></li>
+    {% endfor %}
+    <li class="{{ 'disabled' if page>=total_pages else '' }}"><a class="gpage-link" href="{{ base }}&page={{ page+1 }}">Sig →</a></li>
+  </ul>
+</div>
+{% endif %}
+
+<div style="text-align:right;margin-top:1.5rem;">
+  <a href="/exportar" class="btn btn-g-export">⬇ Exportar Excel</a>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <style>
-/* ── Descripción siempre visible ────────────────────────────────────── */
-.task-toggle, .desc-text {
-  filter: none !important;
-  cursor: pointer;
+/* ── Botón flotante ─────────────────────────────────────────── */
+#btn-nueva {
+  position: fixed; bottom: 2rem; right: 2rem; z-index: 900;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--accent); color: #fff; border: none;
+  font-size: 1.6rem; display: flex; align-items: center; justify-content: center;
+  cursor: pointer; box-shadow: 0 4px 20px rgba(0,0,0,.3);
+  transition: transform .15s, box-shadow .15s;
 }
+#btn-nueva:hover { transform: scale(1.1); box-shadow: 0 6px 30px rgba(0,0,0,.4); }
 
-/* ── Panel de detalle inline (details/summary) ──────────────────────── */
-.task-details { width: 100%; }
-.task-details > .desc-summary {
-  display: flex;
-  align-items: center;
-  gap: .45rem;
-  flex-wrap: wrap;
-  cursor: pointer;
-  list-style: none;
-  filter: none !important;
-  opacity: 1 !important;
+/* ── Panel lateral ──────────────────────────────────────────── */
+#panel-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.4); z-index: 1000; backdrop-filter: blur(2px);
 }
-.task-details > .desc-summary::-webkit-details-marker { display: none; }
-.task-details > .desc-summary::marker { display: none; }
-.task-inline-detail {
-  margin-top: .6rem;
-  padding: .75rem;
-  background: var(--bg3);
-  border-radius: 6px;
+#panel-nueva {
+  position: fixed; top: 0; right: -440px;
+  width: 420px; max-width: 100vw; height: 100vh;
+  background: var(--bg2); border-left: 1px solid var(--border);
+  z-index: 1001; display: flex; flex-direction: column;
+  transition: right .28s cubic-bezier(.4,0,.2,1);
+  box-shadow: -8px 0 40px rgba(0,0,0,.25);
+}
+#panel-nueva.open { right: 0; }
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1.2rem 1.4rem; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.panel-title { font-size: 1rem; font-weight: 700; color: var(--text); }
+.panel-close {
+  background: none; border: none; color: var(--text-muted);
+  font-size: 1rem; cursor: pointer; padding: .2rem .45rem; border-radius: 6px;
+  transition: background .15s;
+}
+.panel-close:hover { background: var(--bg3); }
+.panel-body { flex: 1; overflow-y: auto; padding: 1.2rem 1.4rem; }
+
+.field-group { margin-bottom: .95rem; }
+.field-label {
+  display: block; font-size: .73rem; font-weight: 700;
+  color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: .06em; margin-bottom: .35rem;
+}
+.field-input {
+  width: 100%; box-sizing: border-box;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text);
+  padding: .6rem .85rem; font-size: .9rem;
+  transition: border-color .15s, box-shadow .15s;
+}
+.field-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(99,102,241,.12); }
+.field-textarea { resize: vertical; min-height: 60px; line-height: 1.5; }
+.field-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; margin-bottom: .95rem; }
+.field-row-2 .field-group { margin-bottom: 0; }
+
+.prio-selector { display: flex; gap: .45rem; }
+.prio-opt { flex: 1; cursor: pointer; }
+.prio-opt input { display: none; }
+.prio-opt span {
+  display: block; text-align: center; padding: .45rem .3rem;
+  border-radius: 8px; border: 2px solid var(--border);
+  font-size: .78rem; font-weight: 700;
+  background: var(--bg3); color: var(--text-muted);
+  transition: all .15s; white-space: nowrap;
+}
+.prio-alta  input:checked + span { border-color: #ef4444; color: #ef4444; background: #fee2e2; }
+.prio-media input:checked + span { border-color: #eab308; color: #92400e; background: #fef3c7; }
+.prio-baja  input:checked + span { border-color: #22c55e; color: #065f46; background: #d1fae5; }
+
+.btn-submit {
+  width: 100%; padding: .8rem; background: var(--accent);
+  color: #fff; border: none; border-radius: 10px;
+  font-size: .95rem; font-weight: 700; cursor: pointer; margin-top: .25rem;
+  transition: opacity .15s, transform .1s;
+}
+.btn-submit:hover { opacity: .9; transform: translateY(-1px); }
+
+/* ── Cabecera tareas ────────────────────────────────────────── */
+.tasks-header { margin-bottom: 1.2rem; }
+.tasks-title-row { display: flex; align-items: center; gap: .75rem; margin-bottom: .9rem; }
+.tasks-title { font-size: 1.4rem; font-weight: 800; margin: 0; color: var(--text); }
+.cnt-badge {
+  font-size: .7rem; font-weight: 700; padding: .18rem .55rem;
+  border-radius: 20px; border: 1px solid var(--border);
+  background: var(--bg3); color: var(--text-muted);
+}
+.cnt-badge.pending { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+.cnt-badge.done    { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+
+/* ── Filtros ────────────────────────────────────────────────── */
+.filter-strip { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; }
+.search-box   { position: relative; flex: 1 1 180px; min-width: 140px; }
+.search-icon  { position: absolute; left: .65rem; top: 50%; transform: translateY(-50%); font-size: .8rem; pointer-events: none; }
+.search-input {
+  width: 100%; padding: .42rem .7rem .42rem 1.9rem; box-sizing: border-box;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 20px; color: var(--text); font-size: .82rem;
+}
+.search-input:focus { outline: none; border-color: var(--accent); }
+.pill-group { display: flex; gap: .3rem; flex-wrap: wrap; }
+.fpill {
+  padding: .32rem .7rem; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--bg3);
+  color: var(--text-muted); font-size: .76rem; font-weight: 600;
+  cursor: pointer; transition: all .13s; white-space: nowrap;
+}
+.fpill:hover { border-color: var(--accent); color: var(--text); }
+.fpill.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.fav-pill.on { background: #f59e0b; border-color: #f59e0b; }
+.filter-select {
+  padding: .32rem .75rem; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--bg3);
+  color: var(--text-muted); font-size: .76rem; font-weight: 600;
+  cursor: pointer; max-width: 170px; transition: all .13s;
+}
+.filter-select.active { border-color: var(--accent); color: var(--text); }
+.filter-select:focus { outline: none; border-color: var(--accent); }
+
+/* ── Category popover ───────────────────────────────────── */
+.cat-wrap { position: relative; display: inline-block; }
+.cat-trigger { display: inline-flex; align-items: center; gap: 5px; }
+.cat-badge {
+  background: var(--accent); color: #fff;
+  border-radius: 20px; font-size: .65rem; font-weight: 700;
+  padding: 1px 6px; min-width: 16px; text-align: center; line-height: 1.4;
+}
+.cat-popover {
+  position: absolute; top: calc(100% + 6px); left: 0;
+  width: 240px; z-index: 500;
+  background: var(--bg2);
   border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0,0,0,.18);
+}
+.cat-search-wrap {
+  padding: 7px;
+  border-bottom: 1px solid var(--border);
+}
+.cat-search-input {
+  width: 100%; box-sizing: border-box;
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 5px 10px; font-size: .8rem;
+  background: var(--bg3); color: var(--text);
+}
+.cat-search-input:focus { outline: none; border-color: var(--accent); }
+.cat-list {
+  padding: 5px; max-height: 210px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.cat-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: 6px;
+  font-size: .8rem; cursor: pointer; color: var(--text);
+  transition: background .1s;
+}
+.cat-item:hover { background: var(--bg3); }
+.cat-item.selected { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); font-weight: 600; }
+.cat-check {
+  width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0;
+  border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; line-height: 1;
+}
+.cat-item.selected .cat-check { background: var(--accent); border-color: var(--accent); color: #fff; }
+.cat-footer {
+  padding: 6px 8px; border-top: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.cat-clear-btn {
+  font-size: .75rem; color: var(--text-muted); cursor: pointer;
+  background: none; border: none; padding: 3px 6px; border-radius: 4px;
+}
+.cat-clear-btn:hover { background: var(--bg3); }
+.cat-apply-btn {
+  font-size: .75rem; font-weight: 700;
+  background: var(--accent); color: #fff; border: none;
+  padding: 4px 12px; border-radius: 6px; cursor: pointer;
+}
+.cat-apply-btn:hover { opacity: .88; }
+
+/* ── Rejilla de tarjetas ────────────────────────────────────── */
+#tasks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
-/* ── Privacidad ─────────────────────────────────────────────────────── */
-.priv-field {
-  filter: blur(4px);
-  transition: filter .2s ease;
-  cursor: pointer;
-  user-select: none;
+.tcard {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+  display: flex; flex-direction: column;
+  transition: box-shadow .18s, transform .18s;
 }
-.priv-field.revealed {
-  filter: none;
-  cursor: default;
+.tcard:hover { box-shadow: 0 6px 24px rgba(0,0,0,.15); transform: translateY(-2px); }
+.tcard-done { opacity: 1; }
+
+/* Franja color prioridad */
+.tcard-stripe { height: 4px; flex-shrink: 0; }
+.prio-1 .tcard-stripe { background: linear-gradient(90deg, #ef4444, #f87171); }
+.prio-2 .tcard-stripe { background: linear-gradient(90deg, #eab308, #fbbf24); }
+.prio-3 .tcard-stripe { background: linear-gradient(90deg, #22c55e, #4ade80); }
+
+/* Cabecera tarjeta */
+.tcard-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .6rem .85rem .25rem; gap: .4rem; flex-wrap: wrap;
 }
+.tcard-head-left  { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+.tcard-head-right { display: flex; align-items: center; gap: .35rem; flex-shrink: 0; }
 
-/* ── Stripe de prioridad (borde izquierdo de cada fila) ─────────────── */
-.task-row.row-prio-1 { border-left: 3px solid #ef4444; }
-.task-row.row-prio-2 { border-left: 3px solid #eab308; }
-.task-row.row-prio-3 { border-left: 3px solid #22c55e; }
-
-/* ── Dot de prioridad ───────────────────────────────────────────────── */
-.prio-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-  flex-shrink: 0;
+.tcard-code {
+  font-size: .63rem; font-family: monospace; letter-spacing: .03em;
+  color: var(--text-muted); background: var(--bg3);
+  border: 1px solid var(--border); border-radius: 4px; padding: .04rem .35rem;
 }
-.prio-dot-high { background: #ef4444; box-shadow: 0 0 5px #ef444466; }
-.prio-dot-med  { background: #eab308; box-shadow: 0 0 5px #eab30866; }
-.prio-dot-low  { background: #22c55e; box-shadow: 0 0 5px #22c55e66; }
-
-/* ── Etiqueta de prioridad (texto pequeño) ──────────────────────────── */
-.prio-label {
-  font-size: .65rem;
-  font-weight: 600;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  opacity: .7;
+.tcat-pill {
+  font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--accent); background: var(--bg3);
+  border: 1px solid var(--border); border-radius: 20px; padding: .08rem .5rem;
+  cursor: pointer; transition: background .13s, color .13s;
 }
-.prio-label-1 { color: #ef4444; }
-.prio-label-2 { color: #eab308; }
-.prio-label-3 { color: #22c55e; }
+.tcat-pill:hover { background: var(--accent); color: #fff; }
 
-/* ── Celda Estado ───────────────────────────────────────────────────── */
-.td-estado { padding: .55rem .75rem !important; }
-.estado-cell { display: flex; flex-direction: column; gap: .3rem; }
-.estado-top  { display: flex; align-items: center; gap: .4rem; }
-.estado-meta { display: flex; align-items: center; gap: .5rem; padding-left: .1rem; }
-
-/* ── Celda Descripción ──────────────────────────────────────────────── */
-.td-desc { padding: .55rem .75rem !important; }
-
-/* Código como pill compacta */
-.task-code-tag {
-  display: inline-block;
-  font-family: var(--mono, monospace);
-  font-size: .67rem;
-  color: var(--text-muted);
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: .05rem .4rem;
-  margin-bottom: .28rem;
-  letter-spacing: .03em;
+.status-badge {
+  font-size: .63rem; font-weight: 700; padding: .1rem .45rem;
+  border-radius: 20px; letter-spacing: .03em;
 }
+.status-badge.done    { background: #d1fae5; color: #065f46; }
+.status-badge.pending { background: #fef3c7; color: #92400e; }
 
-/* Fila de descripción + badges */
-.desc-row {
-  display: flex;
-  align-items: center;
-  gap: .45rem;
-  flex-wrap: wrap;
+.fav-btn { font-size: .85rem; text-decoration: none; color: var(--text-muted); transition: transform .13s; display: inline-block; }
+.fav-btn:hover { transform: scale(1.3); }
+.fav-btn.active { color: #f59e0b; }
+
+/* Cuerpo tarjeta */
+.tcard-body { padding: .45rem .85rem; flex: 1; }
+.tdesc-text { font-size: .88rem; color: var(--text); line-height: 1.5; display: block; }
+.tdesc-details { width: 100%; }
+.tdesc-summary {
+  cursor: pointer; list-style: none;
+  font-size: .88rem; line-height: 1.5; color: var(--text);
+  display: flex; flex-direction: column; gap: .25rem;
 }
-
-/* Badge subtareas */
-.subtask-badge {
-  font-size: .62rem;
-  background: var(--bg3);
-  border-color: var(--border);
-  color: var(--text-muted);
+.tdesc-summary::-webkit-details-marker, .tdesc-summary::marker { display: none; }
+.tdesc-chips { display: flex; gap: .3rem; flex-wrap: wrap; }
+.chip-sub {
+  font-size: .6rem; font-weight: 700;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 20px; padding: .04rem .4rem; color: var(--text-muted);
 }
-.subtask-badge.subtask-done { color: var(--accent); }
-
-/* Icono de notas */
-.notes-icon {
-  font-size: .82rem;
-  cursor: pointer;
-  color: var(--text-muted);
+.chip-sub-done { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+.chip-note { font-size: .75rem; }
+.tdesc-extra {
+  margin-top: .55rem; padding: .6rem .7rem;
+  background: var(--bg3); border-radius: 8px; border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: .55rem;
 }
-
-/* ── Celda Fecha ────────────────────────────────────────────────────── */
-.td-fecha { font-family: var(--mono, monospace); font-size: .78rem; white-space: nowrap; }
-.fecha-val { color: var(--text-muted); }
-
-/* ── Celda Acciones ─────────────────────────────────────────────────── */
-.td-acciones { white-space: nowrap; padding: .45rem .6rem !important; }
-.acciones-group {
-  display: flex;
-  align-items: center;
-  gap: .2rem;
+.extra-title {
+  font-size: .7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-muted); margin-bottom: .3rem;
 }
+.notes-form { display: flex; gap: .35rem; align-items: flex-start; }
+.notes-ta {
+  flex: 1; background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text);
+  padding: .38rem .55rem; font-size: .8rem; resize: vertical; min-height: 44px;
+}
+.notes-save {
+  background: var(--accent); color: #fff; border: none; border-radius: 6px;
+  padding: .38rem .6rem; font-size: .85rem; cursor: pointer; flex-shrink: 0;
+}
+.sub-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .22rem; }
+.sub-item { display: flex; align-items: center; gap: .35rem; font-size: .8rem; }
+.sub-done { text-decoration: line-through; color: var(--text-muted); }
+.sub-toggle { text-decoration: none; color: var(--accent); flex-shrink: 0; }
+.sub-del { margin-left: auto; text-decoration: none; color: var(--text-muted); opacity: .45; font-size: .9rem; flex-shrink: 0; }
+.sub-del:hover { color: #ef4444; opacity: 1; }
 
-/* ── Responsive: selects de categoría/usuario en móvil ─────────────── */
-@media (max-width: 576px) {
-  .filter-row { flex-wrap: wrap !important; }
+/* Footer tarjeta */
+.tcard-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .4rem .85rem .65rem; gap: .4rem;
+  border-top: 1px solid var(--border); margin-top: .4rem;
+}
+.tcard-fecha { font-size: .74rem; color: var(--text-muted); font-family: monospace; }
+.tcard-actions { display: flex; gap: .28rem; }
+.tact {
+  width: 28px; height: 28px; border-radius: 7px; display: inline-flex;
+  align-items: center; justify-content: center; font-size: .8rem;
+  text-decoration: none; border: 1px solid var(--border);
+  background: var(--bg3); color: var(--text-muted);
+  cursor: pointer; transition: all .12s;
+}
+.tact:hover { transform: scale(1.1); }
+.tact.ok:hover   { background: #d1fae5; border-color: #6ee7b7; color: #065f46; }
+.tact.edit:hover { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+.tact.dup:hover  { border-color: var(--accent); color: var(--accent); }
+.tact.del:hover  { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+.tact.disabled   { opacity: .25; cursor: default; pointer-events: none; }
 
-  .filter-row > .ms-auto {
-    flex: 0 0 100% !important;
-    width: 100% !important;
-    margin-left: 0 !important;
-    display: flex !important;
-    flex-wrap: wrap;
+/* Estado vacío */
+.empty-state { grid-column: 1 / -1; text-align: center; padding: 3.5rem 1rem; }
+.empty-cta {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: 8px; padding: .6rem 1.2rem; font-size: .9rem;
+  font-weight: 700; cursor: pointer; transition: opacity .15s;
+}
+.empty-cta:hover { opacity: .88; }
+
+/* Responsive */
+@media (max-width: 600px) {
+  #tasks-grid { grid-template-columns: 1fr; }
+  #panel-nueva { width: 100vw; }
+  #btn-nueva { bottom: 1.2rem; right: 1.2rem; width: 50px; height: 50px; font-size: 1.4rem; }
+
+  /* Header */
+  .tasks-title-row { flex-wrap: wrap; gap: .4rem; }
+  .tasks-title { font-size: 1.15rem; }
+
+  /* Filtros en móvil */
+  .filter-strip {
+    flex-direction: column;
+    align-items: stretch;
     gap: .5rem;
   }
-
-  .filter-row > .ms-auto .cat-select-wrap {
-    flex: 1 1 140px !important;
-    min-width: 0;
+  .search-box { flex: none; width: 100%; }
+  .pill-group { flex-wrap: wrap; gap: .3rem; }
+  .fpill { font-size: .72rem; padding: .28rem .6rem; }
+  .filter-select {
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
   }
 
-  .filter-row > .ms-auto .cat-select {
-    width: 100% !important;
-    max-width: none !important;
-  }
+  /* Tarjetas en móvil */
+  .tcard-head { flex-wrap: nowrap; }
+  .tcard-head-left { flex-wrap: wrap; flex: 1; min-width: 0; }
+  .tcard-head-right { flex-shrink: 0; }
+  .tcard-foot { flex-wrap: wrap; gap: .35rem; }
+  .tcard-actions { flex-wrap: wrap; }
+
+  /* Panel lateral */
+  .panel-body { padding: 1rem; }
+  .field-row-2 { grid-template-columns: 1fr; }
+
+  /* Paginación */
+  .gpagination { flex-wrap: wrap; gap: .3rem; }
 }
 </style>
 
 <script>
 (function () {
+  /* Panel */
+  window.abrirPanel = function () {
+    document.getElementById('panel-nueva').classList.add('open');
+    document.getElementById('panel-overlay').style.display = 'block';
+    setTimeout(() => document.getElementById('np-desc').focus(), 300);
+  };
+  window.cerrarPanel = function () {
+    document.getElementById('panel-nueva').classList.remove('open');
+    document.getElementById('panel-overlay').style.display = 'none';
+  };
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarPanel(); });
+
+  /* Badge */
+  const badge = document.getElementById('cnt-badge');
+  if (badge) {
+    const cards   = document.querySelectorAll('.tcard');
+    const pending = Array.from(cards).filter(c => c.dataset.st === 'pending').length;
+    if (cards.length) {
+      if (pending > 0) { badge.textContent = `${pending} pendiente${pending!==1?'s':''}`; badge.className = 'cnt-badge pending'; }
+      else             { badge.textContent = '✔ Todo completado'; badge.className = 'cnt-badge done'; }
+    }
+  }
+
+  /* Filtros */
   const form      = document.getElementById('filter-form');
   const hidEstado = document.getElementById('hid-estado');
   const hidCat    = document.getElementById('hid-cat');
   const hidPrio   = document.getElementById('hid-prio');
   const hidFav    = document.getElementById('hid-fav');
   const hidUser   = document.getElementById('hid-user');
-  const badge     = document.getElementById('cnt-badge');
 
-  // ── Badge ─────────────────────────────────────────────────────────────
-  (function () {
-    if (!badge) return;
-    const rows    = document.querySelectorAll('#task-tbody tr.task-row');
-    const pending = Array.from(rows).filter(r => r.dataset.st === 'pending').length;
-    if (!rows.length) { badge.textContent = ''; return; }
-    if (pending > 0) {
-      badge.textContent = `${pending} pendiente${pending !== 1 ? 's' : ''}`;
-      badge.className   = 'badge-g badge-pending ms-auto';
-    } else {
-      badge.textContent = '✔ Todo completado';
-      badge.className   = 'badge-g badge-done ms-auto';
-    }
-    badge.style.fontSize = '.68rem';
-  })();
+  document.querySelectorAll('.fpill[data-st]').forEach(p => p.addEventListener('click', () => {
+    document.querySelectorAll('.fpill[data-st]').forEach(x => x.classList.remove('on'));
+    p.classList.add('on'); hidEstado.value = p.dataset.st; form.submit();
+  }));
 
-  // ── Pills estado ──────────────────────────────────────────────────────
-  const stPills = document.querySelectorAll('.fpill[data-st]');
-  stPills.forEach(p => {
-    p.addEventListener('click', () => {
-      stPills.forEach(x => x.classList.remove('on'));
-      p.classList.add('on');
-      hidEstado.value = p.dataset.st;
-      form.submit();
+  document.querySelectorAll('.fpill[data-prio]').forEach(p => p.addEventListener('click', () => {
+    document.querySelectorAll('.fpill[data-prio]').forEach(x => x.classList.remove('on'));
+    p.classList.add('on'); hidPrio.value = p.dataset.prio; form.submit();
+  }));
+
+  document.querySelectorAll('.fpill[data-fav]').forEach(p => p.addEventListener('click', () => {
+    hidFav.value = hidFav.value === '1' ? '' : '1'; form.submit();
+  }));
+
+  /* Category popover */
+  let _catSelected = hidCat.value || '';
+
+  window.toggleCatPopover = function () {
+    const pop = document.getElementById('cat-popover');
+    const open = pop.style.display !== 'none';
+    pop.style.display = open ? 'none' : 'block';
+    if (!open) { setTimeout(() => document.getElementById('cat-search').focus(), 50); }
+  };
+
+  window.filterCatList = function () {
+    const q = document.getElementById('cat-search').value.toLowerCase();
+    document.querySelectorAll('.cat-item').forEach(el => {
+      el.style.display = el.dataset.val.toLowerCase().includes(q) ? '' : 'none';
     });
-  });
+  };
 
-  // ── Pills prioridad ───────────────────────────────────────────────────
-  const prioPills = document.querySelectorAll('.fpill[data-prio]');
-  prioPills.forEach(p => {
-    p.addEventListener('click', () => {
-      prioPills.forEach(x => x.classList.remove('on'));
-      p.classList.add('on');
-      hidPrio.value = p.dataset.prio;
-      form.submit();
+  window.selectCat = function (val) {
+    _catSelected = (_catSelected === val) ? '' : val;
+    document.querySelectorAll('.cat-item').forEach(el => {
+      const sel = el.dataset.val === _catSelected;
+      el.classList.toggle('selected', sel);
+      el.querySelector('.cat-check').textContent = sel ? '✓' : '';
     });
-  });
+    const badge = document.getElementById('cat-badge');
+    const btn   = document.getElementById('cat-trigger-btn');
+    if (_catSelected) { badge.style.display = ''; btn.classList.add('on'); }
+    else              { badge.style.display = 'none'; btn.classList.remove('on'); }
+  };
 
-  // ── Pill favoritas ────────────────────────────────────────────────────
-  document.querySelectorAll('.fpill[data-fav]').forEach(p => {
-    p.addEventListener('click', () => {
-      hidFav.value = hidFav.value === '1' ? '' : '1';
-      form.submit();
+  window.clearCat = function () {
+    _catSelected = '';
+    document.querySelectorAll('.cat-item').forEach(el => {
+      el.classList.remove('selected');
+      el.querySelector('.cat-check').textContent = '';
     });
-  });
+    document.getElementById('cat-badge').style.display = 'none';
+    document.getElementById('cat-trigger-btn').classList.remove('on');
+  };
 
-  // ── Select usuario ───────────────────────────────────────────────────────
-  const userSelect = document.getElementById('user-select');
-  if (userSelect) {
-    userSelect.classList.toggle('active', userSelect.value !== '');
-    userSelect.addEventListener('change', () => {
-      if (hidUser) hidUser.value = userSelect.value;
-      userSelect.classList.toggle('active', userSelect.value !== '');
-      form.submit();
-    });
-  }
+  window.applyCat = function () {
+    hidCat.value = _catSelected;
+    document.getElementById('cat-popover').style.display = 'none';
+    form.submit();
+  };
 
-  // ── Select categoría ──────────────────────────────────────────────────
-  const catSelect = document.getElementById('cat-select');
-  if (catSelect) {
-    catSelect.classList.toggle('active', catSelect.value !== '');
-    catSelect.addEventListener('change', () => {
-      hidCat.value = catSelect.value;
-      catSelect.classList.toggle('active', catSelect.value !== '');
-      form.submit();
-    });
-  }
   window.setCat = function (cat) {
-    if (catSelect) { catSelect.value = cat; catSelect.classList.toggle('active', cat !== ''); }
-    hidCat.value = cat; form.submit();
+    selectCat(cat);
+    hidCat.value = _catSelected;
+    form.submit();
   };
 
-  // ── Búsqueda texto ────────────────────────────────────────────────────
-  const input = document.getElementById('filtro-texto');
-  let timer;
-  if (input) {
-    input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => form.submit(), 450); });
-    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); form.submit(); } });
-  }
-
-  // ── Privacidad: revelar campo enmascarado ────────────────────────────
-  window.revealPriv = function (e, el) {
-    e.stopPropagation();
-    if (el.classList.contains('revealed')) return;
-
-    // Mostrar contenido real
-    const real = el.dataset.real || '';
-    if (real && real !== '📝') el.textContent = real;
-    el.classList.add('revealed');
-    el.title = '';
-
-    // Auto-ocultar tras 10 segundos
-    setTimeout(() => {
-      el.classList.remove('revealed');
-      if (real && real !== '📝') el.textContent = el.dataset.real;
-      if (el.textContent === el.dataset.real && el.dataset.real !== '📝') {
-        // volver al estado inicial — el blur volverá por CSS
-      } else {
-        el.textContent = '📝';
-      }
-      el.title = 'Clic para revelar';
-    }, 10000);
-  };
-
-  // Aplicar blur inicial a todos los campos privados
-  document.querySelectorAll('.priv-field').forEach(el => {
-    el.title = 'Clic para revelar';
+  document.addEventListener('click', function (e) {
+    const wrap = document.getElementById('cat-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+      document.getElementById('cat-popover').style.display = 'none';
+    }
   });
 
-  // ── Toggle panel detalle ──────────────────────────────────────────────
-  // Se redefine con setTimeout para sobreescribir cualquier versión del base.html
-  setTimeout(function () {
-    window.toggleDetail = function (id) {
-      const row = document.getElementById('detail-' + id);
-      if (!row) return;
-      row.classList.toggle('detail-hidden');
-      row.classList.toggle('detail-open');
-    };
-    // Adjuntar listeners directamente a los spans de descripción
-    document.querySelectorAll('[data-toggle-id]').forEach(function (el) {
-      el.addEventListener('click', function () {
-        window.toggleDetail(el.dataset.toggleId);
-      });
-    });
-  }, 0);
-  // ── Ordenar por más reciente cuando no hay categoría filtrada ─────────
+  const userSel = document.getElementById('user-select');
+  if (userSel) userSel.addEventListener('change', () => {
+    hidUser.value = userSel.value;
+    userSel.classList.toggle('active', userSel.value !== '');
+    form.submit();
+  });
+
+  /* Búsqueda */
+  const searchIn = document.getElementById('filtro-texto');
+  let timer;
+  if (searchIn) {
+    searchIn.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => form.submit(), 450); });
+    searchIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(timer); form.submit(); } });
+  }
+
+  /* Ordenar por más reciente */
   (function () {
-    const catActiva = document.getElementById('hid-cat').value;
-    if (catActiva !== '') return; // solo actúa en "Todas las categorías"
-
-    const tbody = document.getElementById('task-tbody');
-    if (!tbody) return;
-
-    // Recoge pares [tr-principal, tr-detalle] y ordena por tid desc
-    const pairs = [];
-    const rows  = Array.from(tbody.children);
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      if (!row.classList.contains('task-row')) continue;
-      const tid    = parseInt(row.dataset.tid || '0', 10);
-      // el siguiente hermano puede ser la fila de detalle (detail-row) — no existe ya,
-      // pero lo dejamos preparado por si vuelve
-      pairs.push({ tid, row });
-    }
-
-    pairs.sort((a, b) => b.tid - a.tid);
-
-    // Re-insertar en orden
-    pairs.forEach(({ row }) => tbody.appendChild(row));
+    if (document.getElementById('hid-cat').value !== '') return;
+    const grid = document.getElementById('tasks-grid');
+    if (!grid) return;
+    const cards = Array.from(grid.querySelectorAll('.tcard'));
+    cards.sort((a, b) => parseInt(b.dataset.tid||0) - parseInt(a.dataset.tid||0));
+    cards.forEach(c => grid.appendChild(c));
   })();
+
 })();
 </script>
-
 {% endblock %}
