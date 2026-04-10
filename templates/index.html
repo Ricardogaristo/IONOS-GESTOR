@@ -120,6 +120,7 @@
     <input type="hidden" id="hid-prio"   name="prio"   value="{{ filtro_prio }}">
     <input type="hidden" id="hid-fav"    name="fav"    value="{{ filtro_fav }}">
     <input type="hidden" id="hid-user"   name="user"   value="{{ filtro_user|default('') }}">
+    <input type="hidden" id="hid-orden"  name="orden"  value="{{ filtro_orden|default('desc') }}">
 
     <div class="filter-strip">
       <div class="search-box">
@@ -171,6 +172,30 @@
         {% endfor %}
       </select>
       {% endif %}
+
+      <!-- Orden -->
+      <select id="orden-select" class="filter-select">
+        <option value="desc">🕐 Más reciente</option>
+        <option value="asc">🕐 Más antigua</option>
+      </select>
+
+      <!-- Año -->
+      <select id="anyo-select" class="filter-select">
+        <option value="">📅 Año</option>
+        {% for y in range(2026, 2031) %}
+        <option value="{{ y }}">{{ y }}</option>
+        {% endfor %}
+      </select>
+
+      <!-- Mes -->
+      <select id="mes-select" class="filter-select">
+        <option value="">🗓 Mes</option>
+        {% set meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'] %}
+        {% for i in range(1,13) %}
+        <option value="{{ '%02d'|format(i) }}">{{ meses[i-1] }}</option>
+        {% endfor %}
+      </select>
+
     </div>
   </form>
 </div>
@@ -194,7 +219,7 @@
 
   <div class="tcard prio-{{ tprio }} {{ 'tcard-done' if tcomp==1 else '' }}"
        data-st="{{ 'done' if tcomp==1 else 'pending' }}"
-       data-prio="{{ tprio }}" data-fav="{{ tfav }}" data-tid="{{ tid }}">
+       data-prio="{{ tprio }}" data-fav="{{ tfav }}" data-tid="{{ tid }}" data-fecha="{{ tfecha or '' }}">
 
     <div class="tcard-stripe"></div>
 
@@ -475,7 +500,7 @@
 .cnt-badge.done    { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
 
 /* ── Filtros ────────────────────────────────────────────────── */
-.filter-strip { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; isolation: isolate; }
+.filter-strip { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; }
 .search-box   { position: relative; flex: 1 1 180px; min-width: 140px; }
 .search-icon  { position: absolute; left: .65rem; top: 50%; transform: translateY(-50%); font-size: .8rem; pointer-events: none; }
 .search-input {
@@ -503,8 +528,30 @@
 .filter-select.active { border-color: var(--accent); color: var(--text); }
 .filter-select:focus { outline: none; border-color: var(--accent); }
 
+/* ── Selectores orden / año / mes ──────────────────────── */
+#orden-select, #anyo-select, #mes-select {
+  padding: .32rem 1.6rem .32rem .7rem;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text-muted);
+  font-size: .76rem; font-weight: 600;
+  cursor: pointer; transition: all .13s;
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right .6rem center;
+}
+#orden-select:hover, #anyo-select:hover, #mes-select:hover {
+  border-color: var(--accent); color: var(--text);
+}
+#orden-select.active, #anyo-select.active, #mes-select.active {
+  border-color: var(--accent); color: var(--text);
+  background-color: color-mix(in srgb, var(--accent) 12%, var(--bg3));
+}
+
 /* ── Category popover ───────────────────────────────────── */
-.cat-wrap { position: relative; display: inline-block; z-index: 9999; }
+.cat-wrap { position: relative; display: inline-block; }
 .cat-trigger { display: inline-flex; align-items: center; gap: 5px; }
 .cat-badge {
   background: var(--accent); color: #fff;
@@ -572,7 +619,6 @@
   grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
   gap: 1rem;
   margin-bottom: 1.5rem;
-  position: relative; z-index: 1;
 }
 
 .tcard {
@@ -732,6 +778,19 @@
   /* Panel lateral */
   .panel-body { padding: 1rem; }
   .field-row-2 { grid-template-columns: 1fr; }
+
+  /* Botón cerrar — más visible en móvil */
+  .panel-close {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 1.1rem;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,.18);
+  }
+  .panel-close:active { background: #ef444422; border-color: #ef4444; color: #ef4444; }
 
   /* Paginación */
   .gpagination { flex-wrap: wrap; gap: .3rem; }
@@ -928,14 +987,79 @@
     });
   })();
 
-  /* Ordenar por más reciente */
+  /* ── Orden, año y mes ─────────────────────────────────────── */
   (function () {
-    if (document.getElementById('hid-cat').value !== '') return;
-    const grid = document.getElementById('tasks-grid');
+    const grid     = document.getElementById('tasks-grid');
     if (!grid) return;
-    const cards = Array.from(grid.querySelectorAll('.tcard'));
-    cards.sort((a, b) => parseInt(b.dataset.tid||0) - parseInt(a.dataset.tid||0));
-    cards.forEach(c => grid.appendChild(c));
+
+    const ordenSel = document.getElementById('orden-select');
+    const anyoSel  = document.getElementById('anyo-select');
+    const mesSel   = document.getElementById('mes-select');
+
+    // Leer valores guardados en URL (por si se recargó la página)
+    const params   = new URLSearchParams(window.location.search);
+    const initOrden = params.get('orden') || 'desc';
+    const initAnyo  = params.get('anyo')  || '';
+    const initMes   = params.get('mes')   || '';
+
+    if (ordenSel) ordenSel.value = initOrden;
+    if (anyoSel && initAnyo)  anyoSel.value  = initAnyo;
+    if (mesSel  && initMes)   mesSel.value   = initMes;
+
+    function aplicar() {
+      const orden = ordenSel ? ordenSel.value : 'desc';
+      const anyo  = anyoSel  ? anyoSel.value  : '';
+      const mes   = mesSel   ? mesSel.value   : '';
+
+      // Actualizar URL sin recargar (para que persista al paginar)
+      const url = new URL(window.location.href);
+      url.searchParams.set('orden', orden);
+      if (anyo) url.searchParams.set('anyo', anyo); else url.searchParams.delete('anyo');
+      if (mes)  url.searchParams.set('mes',  mes);  else url.searchParams.delete('mes');
+      window.history.replaceState({}, '', url);
+
+      // Marcar activos visualmente
+      if (ordenSel) ordenSel.classList.toggle('active', orden === 'asc');
+      if (anyoSel)  anyoSel.classList.toggle('active',  anyo !== '');
+      if (mesSel)   mesSel.classList.toggle('active',   mes  !== '');
+
+      let cards = Array.from(grid.querySelectorAll('.tcard'));
+
+      // Filtrar por año y mes
+      cards.forEach(c => {
+        const f  = (c.dataset.fecha || '').trim();  // "YYYY-MM-DD" o ""
+        if (!anyo && !mes) { c.style.display = ''; return; }
+        if (!f)            { c.style.display = 'none'; return; }
+        const [fy, fm] = f.split('-');
+        const okAnyo = !anyo || fy === anyo;
+        const okMes  = !mes  || fm === mes;
+        c.style.display = (okAnyo && okMes) ? '' : 'none';
+      });
+
+      // Ordenar solo los visibles
+      const visibles = cards.filter(c => c.style.display !== 'none');
+      visibles.sort((a, b) => {
+        const fa = (a.dataset.fecha || '').trim();
+        const fb = (b.dataset.fecha || '').trim();
+        // Tareas sin fecha van al final siempre
+        if (!fa && !fb) return parseInt(b.dataset.tid||0) - parseInt(a.dataset.tid||0);
+        if (!fa) return 1;
+        if (!fb) return -1;
+        return orden === 'asc' ? fa.localeCompare(fb) : fb.localeCompare(fa);
+      });
+      visibles.forEach(c => grid.appendChild(c));
+
+      // Mensaje sin resultados
+      const noRes = document.getElementById('no-results');
+      if (noRes) noRes.style.display = (anyo || mes) && visibles.length === 0 ? '' : 'none';
+    }
+
+    if (ordenSel) ordenSel.addEventListener('change', aplicar);
+    if (anyoSel)  anyoSel.addEventListener('change', aplicar);
+    if (mesSel)   mesSel.addEventListener('change', aplicar);
+
+    // Aplicar al cargar
+    aplicar();
   })();
 
 })();
