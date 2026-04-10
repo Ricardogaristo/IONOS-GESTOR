@@ -173,28 +173,26 @@
       </select>
       {% endif %}
 
-      <!-- Orden -->
-      <select id="orden-select" class="filter-select">
-        <option value="desc">🕐 Más reciente</option>
-        <option value="asc">🕐 Más antigua</option>
-      </select>
-
-      <!-- Año -->
-      <select id="anyo-select" class="filter-select">
-        <option value="">📅 Año</option>
-        {% for y in range(2026, 2031) %}
-        <option value="{{ y }}">{{ y }}</option>
-        {% endfor %}
-      </select>
-
-      <!-- Mes -->
-      <select id="mes-select" class="filter-select">
-        <option value="">🗓 Mes</option>
-        {% set meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'] %}
-        {% for i in range(1,13) %}
-        <option value="{{ '%02d'|format(i) }}">{{ meses[i-1] }}</option>
-        {% endfor %}
-      </select>
+      <!-- Orden + Año + Mes agrupados -->
+      <div class="pill-group">
+        <select id="orden-select" class="filter-select">
+          <option value="desc">🕐 Más reciente</option>
+          <option value="asc">🕐 Más antigua</option>
+        </select>
+        <select id="anyo-select" class="filter-select">
+          <option value="">📅 Año</option>
+          {% for y in range(2026, 2031) %}
+          <option value="{{ y }}">{{ y }}</option>
+          {% endfor %}
+        </select>
+        <select id="mes-select" class="filter-select">
+          <option value="">🗓 Mes</option>
+          {% set meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'] %}
+          {% for i in range(1,13) %}
+          <option value="{{ '%02d'|format(i) }}">{{ meses[i-1] }}</option>
+          {% endfor %}
+        </select>
+      </div>
 
     </div>
   </form>
@@ -211,6 +209,7 @@
   {% set tfecha = t[3] %}
   {% set tcomp  = t[4] %}
   {% set tcod   = t[5] %}
+  {% set tfecha_inicio = t[13] if t[13] is string else '' %}
   {% set tprio  = t[7] or 2 %}
   {% set tfav   = t[8] or 0 %}
   {% set tnotas = t[9] or '' %}
@@ -289,8 +288,17 @@
 
     <div class="tcard-foot">
       <div class="tcard-fecha">
-        {% if tfecha %}
-          {% set parts = tfecha.split('-') %}
+        {% set tfecha_inicio_str = tfecha_inicio if tfecha_inicio is string else '' %}
+        {% set tfecha_str        = tfecha        if tfecha        is string else '' %}
+        {% if tfecha_inicio_str and tfecha_str %}
+          {% set pi = tfecha_inicio_str.split('-') %}
+          {% set pf = tfecha_str.split('-') %}
+          📅 {{ pi[2] }}/{{ pi[1] }}/{{ pi[0] }} → {{ pf[2] }}/{{ pf[1] }}/{{ pf[0] }}
+        {% elif tfecha_str %}
+          {% set parts = tfecha_str.split('-') %}
+          📅 {{ parts[2] }}/{{ parts[1] }}/{{ parts[0] }}
+        {% elif tfecha_inicio_str %}
+          {% set parts = tfecha_inicio_str.split('-') %}
           📅 {{ parts[2] }}/{{ parts[1] }}/{{ parts[0] }}
         {% else %}
           <span style="opacity:.4;font-style:italic;">Sin fecha</span>
@@ -501,7 +509,7 @@
 
 /* ── Filtros ────────────────────────────────────────────────── */
 .filter-strip { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; }
-.search-box   { position: relative; flex: 1 1 180px; min-width: 140px; }
+.search-box   { position: relative; flex: 0 1 200px; min-width: 130px; }
 .search-icon  { position: absolute; left: .65rem; top: 50%; transform: translateY(-50%); font-size: .8rem; pointer-events: none; }
 .search-input {
   width: 100%; padding: .42rem .7rem .42rem 1.9rem; box-sizing: border-box;
@@ -523,8 +531,9 @@
   padding: .32rem .75rem; border-radius: 20px;
   border: 1px solid var(--border); background: var(--bg3);
   color: var(--text-muted); font-size: .76rem; font-weight: 600;
-  cursor: pointer; max-width: 170px; transition: all .13s;
+  cursor: pointer; transition: all .13s;
 }
+.pill-group .filter-select { max-width: none; }
 .filter-select.active { border-color: var(--accent); color: var(--text); }
 .filter-select:focus { outline: none; border-color: var(--accent); }
 
@@ -715,11 +724,12 @@
 /* Footer tarjeta */
 .tcard-foot {
   display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap;
   padding: .4rem .85rem .65rem; gap: .4rem;
   border-top: 1px solid var(--border); margin-top: .4rem;
 }
-.tcard-fecha { font-size: .74rem; color: var(--text-muted); font-family: monospace; }
-.tcard-actions { display: flex; gap: .28rem; }
+.tcard-fecha { font-size: .72rem; color: var(--text-muted); font-family: monospace; flex: 1; min-width: 0; }
+.tcard-actions { display: flex; gap: .28rem; flex-shrink: 0; margin-left: auto; }
 .tact {
   width: 28px; height: 28px; border-radius: 7px; display: inline-flex;
   align-items: center; justify-content: center; font-size: .8rem;
@@ -762,11 +772,9 @@
   .search-box { flex: none; width: 100%; }
   .pill-group { flex-wrap: wrap; gap: .3rem; }
   .fpill { font-size: .72rem; padding: .28rem .6rem; }
-  .filter-select {
-    max-width: 100%;
-    width: 100%;
-    box-sizing: border-box;
-  }
+  /* selects sueltos (usuario) → ancho completo; los del pill-group → automático */
+  #user-select { max-width: 100%; width: 100%; box-sizing: border-box; }
+  .pill-group .filter-select { width: auto; }
 
   /* Tarjetas en móvil */
   .tcard-head { flex-wrap: nowrap; }
