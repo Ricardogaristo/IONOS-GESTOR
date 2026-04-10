@@ -206,10 +206,10 @@
   {% set tid    = t[0] %}
   {% set tdesc  = t[1] %}
   {% set tcat   = t[2] or 'General' %}
-  {% set tfecha = t[3] %}
+  {% set tfecha = (t[3] | string)[:10] if t[3] is string else '' %}
   {% set tcomp  = t[4] %}
   {% set tcod   = t[5] %}
-  {% set tfecha_inicio = t[13] if t[13] is string else '' %}
+  {% set tfecha_inicio = (t[13] | string)[:10] if t[13] is string else '' %}
   {% set tprio  = t[7] or 2 %}
   {% set tfav   = t[8] or 0 %}
   {% set tnotas = t[9] or '' %}
