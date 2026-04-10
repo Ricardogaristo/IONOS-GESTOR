@@ -1068,53 +1068,78 @@ def _hoja_resumen(wb,todas,hoy_str,admin_usr,username):
     for i,w in enumerate([28,10,14,12,16,32],start=1): ws.column_dimensions[get_column_letter(i)].width=w
     ws.freeze_panes="A9"
 
+def _fmt_fecha(val):
+    if not val: return "—"
+    s = str(val)[:10]
+    if len(s) == 10 and s[4] == "-":
+        parts = s.split("-")
+        return f"{parts[2]}/{parts[1]}/{parts[0]}"
+    return s
+
 def _hoja_categoria(wb,cat_nombre,tareas_cat,color_idx):
     bg_fill,fg_col=_CAT_COLS[color_idx%len(_CAT_COLS)]; titulo=cat_nombre[:28]+"..." if len(cat_nombre)>31 else cat_nombre
     ws=wb.create_sheet(title=titulo); ws.sheet_properties.tabColor=fg_col; ws.sheet_view.showGridLines=False
-    ws.merge_cells("A1:G1"); c=ws["A1"]; c.value=f"  {cat_nombre.upper()}"
+    ws.merge_cells("A1:H1"); c=ws["A1"]; c.value=f"  {cat_nombre.upper()}"
     c.fill=_xf(bg_fill); c.font=_xfn(bold=True,size=13,color=fg_col); c.alignment=_xal(h="left"); c.border=_xb(); ws.row_dimensions[1].height=32
     tc=len(tareas_cat); cc=sum(1 for t in tareas_cat if t["completada"]==1); pc=tc-cc; ptc=round(cc/tc*100,1) if tc else 0
-    ws.merge_cells("A2:G2"); c=ws["A2"]
+    ws.merge_cells("A2:H2"); c=ws["A2"]
     c.value=f"  Total: {tc}  ·  Completadas: {cc}  ·  Pendientes: {pc}  ·  Progreso: {ptc}%"
     c.fill=_xf(_DARK2); c.font=_xfn(color=_TXT_M,size=9,italic=True); c.alignment=_xal(h="left"); c.border=_xb(); ws.row_dimensions[2].height=18
-    for ci,h in enumerate(["ID","Código","Descripción","Fecha","Estado","Usuario","Notas"],start=1):
+    for ci,h in enumerate(["ID","Código","Descripción","Fecha Inicio","Fecha Fin","Estado","Usuario","Notas"],start=1):
         _xhdr(ws.cell(row=3,column=ci,value=h),bg=bg_fill,fg=fg_col)
     ws.row_dimensions[3].height=20
     for ri,t in enumerate(tareas_cat,start=4):
         done=t["completada"]==1; est="✔  Completada" if done else "●  Pendiente"; ec="217346" if done else "C55A11"; rbg="E2EFDA" if done else "FCE4D6"
-        vals=[t["id"],t["codigo"] or "—",t["descripcion"],t["fecha"] or "—",est,t.get("username") or "—",""]
+        fi=_fmt_fecha(t.get("fecha_inicio")); ff=_fmt_fecha(t.get("fecha"))
+        notas=t.get("notas") or ""
+        vals=[t["id"],t["codigo"] or "—",t["descripcion"],fi,ff,est,t.get("username") or "—",notas]
         for ci,val in enumerate(vals,start=1):
-            c=ws.cell(row=ri,column=ci,value=val); c.fill=_xf(rbg if ci==5 else _DARK2)
-            c.font=_xfn(bold=(ci==5),color=ec if ci==5 else _TXT_M,size=9 if ci in(1,4,6) else 10)
-            c.alignment=_xal(h="center" if ci in(1,4,5) else "left",wrap=(ci==3)); c.border=_xb()
-        ws.row_dimensions[ri].height=16
-    _xaw(ws); ws.column_dimensions["C"].width=45; ws.column_dimensions["G"].width=20; ws.freeze_panes="A4"; ws.auto_filter.ref=ws.dimensions
+            c=ws.cell(row=ri,column=ci,value=val); c.fill=_xf(rbg if ci==6 else _DARK2)
+            c.font=_xfn(bold=(ci==6),color=ec if ci==6 else _TXT_M,size=9 if ci in(1,4,5,7) else 10)
+            c.alignment=_xal(h="center" if ci in(1,4,5,6) else "left",wrap=(ci in(3,8))); c.border=_xb()
+        # altura dinámica según longitud de descripción
+        desc_len = len(str(t["descripcion"] or ""))
+        ws.row_dimensions[ri].height = max(20, min(60, 20 + (desc_len // 45) * 15))
+    _xaw(ws)
+    ws.column_dimensions["C"].width=48
+    ws.column_dimensions["D"].width=14
+    ws.column_dimensions["E"].width=14
+    ws.column_dimensions["H"].width=25
+    ws.freeze_panes="A4"; ws.auto_filter.ref=ws.dimensions
 
 def _hoja_hoy(wb,tareas_hoy,hoy_str):
     ws=wb.create_sheet(title="Hoy"); ws.sheet_properties.tabColor=_BLUE; ws.sheet_view.showGridLines=False
-    ws.merge_cells("A1:G1"); c=ws["A1"]
+    ws.merge_cells("A1:I1"); c=ws["A1"]
     c.value=f"  TAREAS DEL DÍA — {datetime.strptime(hoy_str,'%Y-%m-%d').strftime('%d / %m / %Y')}"
     c.fill=_xf(_BLUE); c.font=_xfn(bold=True,size=13,color=_TXT_W); c.alignment=_xal(h="left"); c.border=_xb(); ws.row_dimensions[1].height=32
     th=len(tareas_hoy); ch=sum(1 for t in tareas_hoy if t["completada"]==1)
-    ws.merge_cells("A2:G2"); c=ws["A2"]
+    ws.merge_cells("A2:I2"); c=ws["A2"]
     c.value=f"  {th} tarea{'s' if th!=1 else ''} programadas hoy  ·  {ch} completadas  ·  {th-ch} pendientes"
     c.fill=_xf(_DARK2); c.font=_xfn(color=_TXT_M,size=9,italic=True); c.alignment=_xal(h="left"); c.border=_xb(); ws.row_dimensions[2].height=18
-    for ci,h in enumerate(["ID","Código","Descripción","Categoría","Estado","Usuario","Notas"],start=1):
+    for ci,h in enumerate(["ID","Código","Descripción","Categoría","Fecha Inicio","Fecha Fin","Estado","Usuario","Notas"],start=1):
         _xhdr(ws.cell(row=3,column=ci,value=h),bg=_BLUE,fg=_TXT_W)
     ws.row_dimensions[3].height=20
     if not tareas_hoy:
-        ws.merge_cells("A4:G4"); e=ws["A4"]; e.value="No hay tareas programadas para hoy."
+        ws.merge_cells("A4:I4"); e=ws["A4"]; e.value="No hay tareas programadas para hoy."
         e.fill=_xf(_DARK2); e.font=_xfn(color=_TXT_M,italic=True); e.alignment=_xal(); e.border=_xb()
     else:
         for ri,t in enumerate(tareas_hoy,start=4):
             done=t["completada"]==1; est="✔  Completada" if done else "●  Pendiente"; ec="217346" if done else "C55A11"; rbg="E2EFDA" if done else "FCE4D6"
-            vals=[t["id"],t["codigo"] or "—",t["descripcion"],t["categoria"] or "General",est,t.get("username") or "—",""]
+            fi=_fmt_fecha(t.get("fecha_inicio")); ff=_fmt_fecha(t.get("fecha"))
+            notas=t.get("notas") or ""
+            vals=[t["id"],t["codigo"] or "—",t["descripcion"],t["categoria"] or "General",fi,ff,est,t.get("username") or "—",notas]
             for ci,val in enumerate(vals,start=1):
-                c=ws.cell(row=ri,column=ci,value=val); c.fill=_xf(rbg if ci==5 else _DARK2)
-                c.font=_xfn(bold=(ci==5),color=ec if ci==5 else _TXT_M,size=9 if ci in(1,6) else 10)
-                c.alignment=_xal(h="center" if ci in(1,5) else "left",wrap=(ci==3)); c.border=_xb()
-            ws.row_dimensions[ri].height=16
-    _xaw(ws); ws.column_dimensions["C"].width=45; ws.column_dimensions["G"].width=20; ws.freeze_panes="A4"; ws.auto_filter.ref=ws.dimensions
+                c=ws.cell(row=ri,column=ci,value=val); c.fill=_xf(rbg if ci==7 else _DARK2)
+                c.font=_xfn(bold=(ci==7),color=ec if ci==7 else _TXT_M,size=9 if ci in(1,5,6,8) else 10)
+                c.alignment=_xal(h="center" if ci in(1,5,6,7) else "left",wrap=(ci in(3,9))); c.border=_xb()
+            desc_len=len(str(t["descripcion"] or ""))
+            ws.row_dimensions[ri].height=max(20,min(60,20+(desc_len//45)*15))
+    _xaw(ws)
+    ws.column_dimensions["C"].width=48
+    ws.column_dimensions["E"].width=14
+    ws.column_dimensions["F"].width=14
+    ws.column_dimensions["I"].width=25
+    ws.freeze_panes="A4"; ws.auto_filter.ref=ws.dimensions
 
 @app.route("/exportar")
 @login_required
@@ -1124,7 +1149,7 @@ def exportar():
     es_admin = session.get("es_admin", 0) >= 2  # Solo SuperAdmin exporta todo
     username = session.get("user", "sistema")
     conn     = get_connection()
-    base_q   = "SELECT t.id,t.descripcion,t.categoria,t.fecha,t.completada,t.codigo,t.usuario_id,u.username FROM tareas t INNER JOIN usuarios u ON t.usuario_id=u.id "
+    base_q   = "SELECT t.id,t.descripcion,t.categoria,t.fecha,t.completada,t.codigo,t.usuario_id,u.username,t.notas,t.fecha_inicio FROM tareas t INNER JOIN usuarios u ON t.usuario_id=u.id "
     if es_admin:
         todas      = conn.execute(base_q+"WHERE COALESCE(u.tipo,'A')='A' ORDER BY t.categoria,t.id").fetchall()
         tareas_hoy = conn.execute(base_q+"WHERE COALESCE(u.tipo,'A')='A' AND t.fecha=%s ORDER BY t.id",(hoy,)).fetchall()

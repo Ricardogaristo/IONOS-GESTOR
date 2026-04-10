@@ -206,10 +206,10 @@
   {% set tid    = t[0] %}
   {% set tdesc  = t[1] %}
   {% set tcat   = t[2] or 'General' %}
-  {% set tfecha = (t[3] | string)[:10] if t[3] is string else '' %}
+  {% set tfecha = (t[3] | string)[:10] if t[3] is not none and t[3] is not undefined else '' %}
   {% set tcomp  = t[4] %}
   {% set tcod   = t[5] %}
-  {% set tfecha_inicio = (t[13] | string)[:10] if t[13] is string else '' %}
+  {% set tfecha_inicio = (t[13] | string)[:10] if t[13] is not none and t[13] is not undefined else '' %}
   {% set tprio  = t[7] or 2 %}
   {% set tfav   = t[8] or 0 %}
   {% set tnotas = t[9] or '' %}
@@ -288,18 +288,17 @@
 
     <div class="tcard-foot">
       <div class="tcard-fecha">
-        {% set tfecha_inicio_str = tfecha_inicio if tfecha_inicio is string else '' %}
-        {% set tfecha_str        = tfecha        if tfecha        is string else '' %}
-        {% if tfecha_inicio_str and tfecha_str %}
-          {% set pi = tfecha_inicio_str.split('-') %}
-          {% set pf = tfecha_str.split('-') %}
+        {% set fi = tfecha_inicio[:10] if tfecha_inicio and tfecha_inicio|length >= 10 else '' %}
+        {% set ff = tfecha[:10]        if tfecha        and tfecha|length >= 10        else '' %}
+        {% if fi and ff and fi != ff %}
+          {% set pi = fi.split('-') %}{% set pf = ff.split('-') %}
           📅 {{ pi[2] }}/{{ pi[1] }}/{{ pi[0] }} → {{ pf[2] }}/{{ pf[1] }}/{{ pf[0] }}
-        {% elif tfecha_str %}
-          {% set parts = tfecha_str.split('-') %}
-          📅 {{ parts[2] }}/{{ parts[1] }}/{{ parts[0] }}
-        {% elif tfecha_inicio_str %}
-          {% set parts = tfecha_inicio_str.split('-') %}
-          📅 {{ parts[2] }}/{{ parts[1] }}/{{ parts[0] }}
+        {% elif ff %}
+          {% set pf = ff.split('-') %}
+          📅 {{ pf[2] }}/{{ pf[1] }}/{{ pf[0] }}
+        {% elif fi %}
+          {% set pi = fi.split('-') %}
+          📅 {{ pi[2] }}/{{ pi[1] }}/{{ pi[0] }}
         {% else %}
           <span style="opacity:.4;font-style:italic;">Sin fecha</span>
         {% endif %}
@@ -1016,10 +1015,10 @@
 
     function aplicar() {
       const orden = ordenSel ? ordenSel.value : 'desc';
-      const anyo  = anyoSel  ? anyoSel.value  : '';
-      const mes   = mesSel   ? mesSel.value   : '';
+      const anyo  = anyoSel  ? anyoSel.value.trim()  : '';
+      const mes   = mesSel   ? mesSel.value.trim()   : '';
 
-      // Actualizar URL sin recargar (para que persista al paginar)
+      // Actualizar URL sin recargar
       const url = new URL(window.location.href);
       url.searchParams.set('orden', orden);
       if (anyo) url.searchParams.set('anyo', anyo); else url.searchParams.delete('anyo');
@@ -1031,31 +1030,36 @@
       if (anyoSel)  anyoSel.classList.toggle('active',  anyo !== '');
       if (mesSel)   mesSel.classList.toggle('active',   mes  !== '');
 
-      let cards = Array.from(grid.querySelectorAll('.tcard'));
+      const cards = Array.from(grid.querySelectorAll('.tcard'));
 
-      // Filtrar por año y mes
+      // Filtrar por año y mes usando data-fecha (YYYY-MM-DD)
       cards.forEach(c => {
-        const f  = (c.dataset.fecha || '').trim();  // "YYYY-MM-DD" o ""
         if (!anyo && !mes) { c.style.display = ''; return; }
-        if (!f)            { c.style.display = 'none'; return; }
-        const [fy, fm] = f.split('-');
-        const okAnyo = !anyo || fy === anyo;
-        const okMes  = !mes  || fm === mes;
+        const f = (c.dataset.fecha || '').trim();
+        if (!f || f.length < 7) { c.style.display = 'none'; return; }
+        const parts = f.split('-');
+        const fy = parts[0] || '';
+        const fm = parts[1] || '';
+        const okAnyo = !anyo || fy === String(anyo);
+        const okMes  = !mes  || fm === String(mes);
         c.style.display = (okAnyo && okMes) ? '' : 'none';
       });
 
-      // Ordenar solo los visibles
-      const visibles = cards.filter(c => c.style.display !== 'none');
+      // Ordenar todos (visibles primero, luego ocultos al final)
+      const all = Array.from(grid.querySelectorAll('.tcard'));
+      const visibles  = all.filter(c => c.style.display !== 'none');
+      const ocultas   = all.filter(c => c.style.display === 'none');
+
       visibles.sort((a, b) => {
         const fa = (a.dataset.fecha || '').trim();
         const fb = (b.dataset.fecha || '').trim();
-        // Tareas sin fecha van al final siempre
         if (!fa && !fb) return parseInt(b.dataset.tid||0) - parseInt(a.dataset.tid||0);
         if (!fa) return 1;
         if (!fb) return -1;
         return orden === 'asc' ? fa.localeCompare(fb) : fb.localeCompare(fa);
       });
-      visibles.forEach(c => grid.appendChild(c));
+
+      [...visibles, ...ocultas].forEach(c => grid.appendChild(c));
 
       // Mensaje sin resultados
       const noRes = document.getElementById('no-results');
