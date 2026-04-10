@@ -121,6 +121,8 @@
     <input type="hidden" id="hid-fav"    name="fav"    value="{{ filtro_fav }}">
     <input type="hidden" id="hid-user"   name="user"   value="{{ filtro_user|default('') }}">
     <input type="hidden" id="hid-orden"  name="orden"  value="{{ filtro_orden|default('desc') }}">
+    <input type="hidden" id="hid-anyo"   name="anyo"   value="{{ filtro_anyo|default('') }}">
+    <input type="hidden" id="hid-mes"    name="mes"    value="{{ filtro_mes|default('') }}">
 
     <div class="filter-strip">
       <div class="search-box">
@@ -173,23 +175,23 @@
       </select>
       {% endif %}
 
-      <!-- Orden + Año + Mes agrupados -->
+      <!-- Orden + Año + Mes agrupados — submit al servidor -->
       <div class="pill-group">
         <select id="orden-select" class="filter-select">
-          <option value="desc">🕐 Más reciente</option>
-          <option value="asc">🕐 Más antigua</option>
+          <option value="desc" {{ 'selected' if filtro_orden|default('desc')=='desc' }}>🕐 Más reciente</option>
+          <option value="asc"  {{ 'selected' if filtro_orden|default('desc')=='asc'  }}>🕐 Más antigua</option>
         </select>
         <select id="anyo-select" class="filter-select">
           <option value="">📅 Año</option>
           {% for y in range(2026, 2031) %}
-          <option value="{{ y }}">{{ y }}</option>
+          <option value="{{ y }}" {{ 'selected' if filtro_anyo|default('')==y|string }}>{{ y }}</option>
           {% endfor %}
         </select>
         <select id="mes-select" class="filter-select">
           <option value="">🗓 Mes</option>
           {% set meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'] %}
           {% for i in range(1,13) %}
-          <option value="{{ '%02d'|format(i) }}">{{ meses[i-1] }}</option>
+          <option value="{{ '%02d'|format(i) }}" {{ 'selected' if filtro_mes|default('')==('%02d'|format(i)) }}>{{ meses[i-1] }}</option>
           {% endfor %}
         </select>
       </div>
@@ -332,7 +334,7 @@
 </div>
 
 {% if total_pages > 1 %}
-{%- set base = "?estado=" ~ filtro_estado ~ "&cat=" ~ (filtro_cat|urlencode) ~ "&q=" ~ (filtro_q|urlencode) ~ "&prio=" ~ filtro_prio ~ "&fav=" ~ filtro_fav ~ "&user=" ~ (filtro_user|default('')|urlencode) -%}
+{%- set base = "?estado=" ~ filtro_estado ~ "&cat=" ~ (filtro_cat|urlencode) ~ "&q=" ~ (filtro_q|urlencode) ~ "&prio=" ~ filtro_prio ~ "&fav=" ~ filtro_fav ~ "&user=" ~ (filtro_user|default('')|urlencode) ~ "&orden=" ~ (filtro_orden|default('desc')) ~ "&anyo=" ~ (filtro_anyo|default('')) ~ "&mes=" ~ (filtro_mes|default('')) -%}
 <div style="margin:1.5rem 0;">
   <ul class="gpagination">
     <li class="{{ 'disabled' if page<=1 else '' }}"><a class="gpage-link" href="{{ base }}&page={{ page-1 }}">← Ant</a></li>
@@ -994,84 +996,33 @@
     });
   })();
 
-  /* ── Orden, año y mes ─────────────────────────────────────── */
+  /* ── Orden, año y mes → submit al servidor ──────────────── */
   (function () {
-    const grid     = document.getElementById('tasks-grid');
-    if (!grid) return;
-
+    const hidOrden = document.getElementById('hid-orden');
+    const hidAnyo  = document.getElementById('hid-anyo');
+    const hidMes   = document.getElementById('hid-mes');
     const ordenSel = document.getElementById('orden-select');
     const anyoSel  = document.getElementById('anyo-select');
     const mesSel   = document.getElementById('mes-select');
 
-    // Leer valores guardados en URL (por si se recargó la página)
-    const params   = new URLSearchParams(window.location.search);
-    const initOrden = params.get('orden') || 'desc';
-    const initAnyo  = params.get('anyo')  || '';
-    const initMes   = params.get('mes')   || '';
-
-    if (ordenSel) ordenSel.value = initOrden;
-    if (anyoSel && initAnyo)  anyoSel.value  = initAnyo;
-    if (mesSel  && initMes)   mesSel.value   = initMes;
-
-    function aplicar() {
-      const orden = ordenSel ? ordenSel.value : 'desc';
-      const anyo  = anyoSel  ? anyoSel.value.trim()  : '';
-      const mes   = mesSel   ? mesSel.value.trim()   : '';
-
-      // Actualizar URL sin recargar
-      const url = new URL(window.location.href);
-      url.searchParams.set('orden', orden);
-      if (anyo) url.searchParams.set('anyo', anyo); else url.searchParams.delete('anyo');
-      if (mes)  url.searchParams.set('mes',  mes);  else url.searchParams.delete('mes');
-      window.history.replaceState({}, '', url);
-
-      // Marcar activos visualmente
-      if (ordenSel) ordenSel.classList.toggle('active', orden === 'asc');
-      if (anyoSel)  anyoSel.classList.toggle('active',  anyo !== '');
-      if (mesSel)   mesSel.classList.toggle('active',   mes  !== '');
-
-      const cards = Array.from(grid.querySelectorAll('.tcard'));
-
-      // Filtrar por año y mes usando data-fecha (YYYY-MM-DD)
-      cards.forEach(c => {
-        if (!anyo && !mes) { c.style.display = ''; return; }
-        const f = (c.dataset.fecha || '').trim();
-        if (!f || f.length < 7) { c.style.display = 'none'; return; }
-        const parts = f.split('-');
-        const fy = parts[0] || '';
-        const fm = parts[1] || '';
-        const okAnyo = !anyo || fy === String(anyo);
-        const okMes  = !mes  || fm === String(mes);
-        c.style.display = (okAnyo && okMes) ? '' : 'none';
-      });
-
-      // Ordenar todos (visibles primero, luego ocultos al final)
-      const all = Array.from(grid.querySelectorAll('.tcard'));
-      const visibles  = all.filter(c => c.style.display !== 'none');
-      const ocultas   = all.filter(c => c.style.display === 'none');
-
-      visibles.sort((a, b) => {
-        const fa = (a.dataset.fecha || '').trim();
-        const fb = (b.dataset.fecha || '').trim();
-        if (!fa && !fb) return parseInt(b.dataset.tid||0) - parseInt(a.dataset.tid||0);
-        if (!fa) return 1;
-        if (!fb) return -1;
-        return orden === 'asc' ? fa.localeCompare(fb) : fb.localeCompare(fa);
-      });
-
-      [...visibles, ...ocultas].forEach(c => grid.appendChild(c));
-
-      // Mensaje sin resultados
-      const noRes = document.getElementById('no-results');
-      if (noRes) noRes.style.display = (anyo || mes) && visibles.length === 0 ? '' : 'none';
+    function submitFiltro() {
+      if (hidOrden) hidOrden.value = ordenSel ? ordenSel.value : 'desc';
+      if (hidAnyo)  hidAnyo.value  = anyoSel  ? anyoSel.value  : '';
+      if (hidMes)   hidMes.value   = mesSel   ? mesSel.value   : '';
+      // Reset página a 1 al cambiar filtro
+      const hidPage = document.querySelector('input[name="page"]');
+      if (hidPage) hidPage.value = '1';
+      document.getElementById('filter-form').submit();
     }
 
-    if (ordenSel) ordenSel.addEventListener('change', aplicar);
-    if (anyoSel)  anyoSel.addEventListener('change', aplicar);
-    if (mesSel)   mesSel.addEventListener('change', aplicar);
+    // Marcar activos visualmente al cargar
+    if (ordenSel) ordenSel.classList.toggle('active', ordenSel.value === 'asc');
+    if (anyoSel)  anyoSel.classList.toggle('active',  anyoSel.value  !== '');
+    if (mesSel)   mesSel.classList.toggle('active',   mesSel.value   !== '');
 
-    // Aplicar al cargar
-    aplicar();
+    if (ordenSel) ordenSel.addEventListener('change', submitFiltro);
+    if (anyoSel)  anyoSel.addEventListener('change', submitFiltro);
+    if (mesSel)   mesSel.addEventListener('change', submitFiltro);
   })();
 
 })();

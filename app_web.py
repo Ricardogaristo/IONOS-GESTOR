@@ -249,6 +249,9 @@ def index():
     filtro_prio   = request.args.get("prio",   "").strip()
     filtro_fav    = request.args.get("fav",    "").strip()
     filtro_user   = request.args.get("user",   "").strip()
+    filtro_anyo   = request.args.get("anyo",  "").strip()
+    filtro_mes    = request.args.get("mes",   "").strip()
+    filtro_orden  = request.args.get("orden", "desc").strip()
     page     = max(request.args.get("page", 1, type=int), 1)
     per_page = 10
 
@@ -274,6 +277,10 @@ def index():
     if filtro_q:
         filtros.append("(LOWER(descripcion) LIKE %s OR LOWER(COALESCE(codigo,'')) LIKE %s OR LOWER(COALESCE(categoria,'')) LIKE %s)")
         like = f"%{filtro_q.lower()}%"; params.extend([like, like, like])
+    if filtro_anyo:
+        filtros.append("YEAR(COALESCE(fecha, fecha_inicio)) = %s"); params.append(int(filtro_anyo))
+    if filtro_mes:
+        filtros.append("MONTH(COALESCE(fecha, fecha_inicio)) = %s"); params.append(int(filtro_mes))
 
     where = ("WHERE " + " AND ".join(filtros)) if filtros else ""
     conn  = get_connection()
@@ -284,8 +291,9 @@ def index():
     page   = min(page, total_pages)
     offset = (page - 1) * per_page
 
+    orden_sql = "ASC" if filtro_orden == "asc" else "DESC"
     tareas = conn.execute(
-        f"SELECT * FROM tareas {where} ORDER BY favorita DESC, prioridad ASC, id DESC LIMIT %s OFFSET %s",
+        f"SELECT * FROM tareas {where} ORDER BY favorita DESC, prioridad ASC, COALESCE(fecha, fecha_inicio) {orden_sql}, id {orden_sql} LIMIT %s OFFSET %s",
         params + [per_page, offset]
     ).fetchall()
 
@@ -317,6 +325,7 @@ def index():
     return render_template("index.html", tareas=tareas, page=page, total_pages=total_pages,
                            filtro_estado=filtro_estado, filtro_cat=filtro_cat, filtro_q=filtro_q,
                            filtro_prio=filtro_prio, filtro_fav=filtro_fav, filtro_user=filtro_user,
+                           filtro_anyo=filtro_anyo, filtro_mes=filtro_mes, filtro_orden=filtro_orden,
                            categorias_lista=categorias_lista, subtareas_map=subtareas_map,
                            usuarios_lista=usuarios_lista)
 
