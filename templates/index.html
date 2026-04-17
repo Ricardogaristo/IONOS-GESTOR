@@ -224,14 +224,14 @@
   {% set tfecha = (t[3] | string)[:10] if t[3] is not none and t[3] is not undefined else '' %}
   {% set tcomp  = t[4] %}
   {% set tcod   = t[5] %}
-  {% set tfecha_inicio = (t[13] | string)[:10] if t[13] is not none and t[13] is not undefined else '' %}
+  {% set tfecha_inicio = (t[11] | string)[:10] if t[11] is not none and t[11] is not undefined else '' %}
   {% set tprio  = t[7] or 2 %}
   {% set tfav   = t[8] or 0 %}
   {% set tnotas = t[9] or '' %}
   {% set tsubs  = subtareas_map.get(tid, []) %}
   {% set n_hechas = tsubs | selectattr('hecha', 'equalto', 1) | list | length %}
 
-  {% set tmin   = t[14] if t|length > 14 and t[14] is not none else '' %}
+  {% set tmin   = t[15] if t|length > 15 and t[15] is not none else '' %}
 
   <div class="tcard prio-{{ tprio }} {{ 'tcard-done' if tcomp==1 else '' }}"
        data-st="{{ 'done' if tcomp==1 else 'pending' }}"
