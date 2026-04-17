@@ -188,7 +188,7 @@
 }
 .modal-add-box {
   background:var(--bg2); border:1px solid var(--border-soft);
-  border-radius:16px; width:100%; max-width:480px;
+  border-radius:16px; width:100%; max-width:520px;
   box-shadow:0 24px 60px rgba(0,0,0,.6);
   animation:slideUpCal .2s cubic-bezier(.22,1,.36,1) both;
 }
@@ -442,17 +442,33 @@ select.field-input { cursor:pointer; }
     <form action="/calendario/agregar" method="POST">
       <div class="modal-add-body">
 
-        <div>
-          <div class="field-label">Descripción *</div>
-          <input type="text" name="descripcion" class="field-input"
-                 placeholder="¿Qué hay que hacer?" required autocomplete="off">
+        {# ── Código + Descripción ── #}
+        <div style="display:grid; grid-template-columns:130px 1fr; gap:.75rem;">
+          <div>
+            <div class="field-label">Código</div>
+            <input type="text" name="codigo" class="field-input"
+                   placeholder="Ej: OT-001" autocomplete="off">
+          </div>
+          <div>
+            <div class="field-label">Descripción *</div>
+            <input type="text" name="descripcion" class="field-input"
+                   placeholder="¿Qué hay que hacer?" required autocomplete="off">
+          </div>
         </div>
 
-        <div>
-          <div class="field-label">Fecha *</div>
-          <input type="date" name="fecha" id="add-fecha" class="field-input" required>
+        {# ── Fecha inicio + Fecha fin ── #}
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:.75rem;">
+          <div>
+            <div class="field-label">Fecha inicio</div>
+            <input type="date" name="fecha_inicio" id="add-fecha-inicio" class="field-input">
+          </div>
+          <div>
+            <div class="field-label">Fecha fin *</div>
+            <input type="date" name="fecha" id="add-fecha" class="field-input" required>
+          </div>
         </div>
 
+        {# ── Categoría + Prioridad ── #}
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:.75rem;">
           <div>
             <div class="field-label">Categoría</div>
@@ -473,6 +489,20 @@ select.field-input { cursor:pointer; }
           </div>
         </div>
 
+        {# ── Tiempo estimado ── #}
+        <div>
+          <div class="field-label">Tiempo estimado (minutos)</div>
+          <div style="display:flex; align-items:center; gap:.7rem;">
+            <input type="number" name="minutos" id="add-minutos" class="field-input"
+                   min="0" step="5" placeholder="0"
+                   oninput="actualizarLabelMinutos(this.value)"
+                   style="max-width:120px;">
+            <span id="add-minutos-label"
+                  style="font-family:var(--mono); font-size:.8rem; color:var(--accent); white-space:nowrap; min-width:80px;"></span>
+          </div>
+        </div>
+
+        {# ── Notas ── #}
         <div>
           <div class="field-label">Notas</div>
           <textarea name="notas" class="field-input" rows="2"
@@ -671,16 +701,34 @@ function actualizarCelda(fecha) {
 }
 
 // ── Modal agregar tarea ──────────────────────────────────────────────────────
+// ── Convierte minutos a "Xh Ym" para mostrar junto al input ─────────────────
+function actualizarLabelMinutos(val) {
+  const m   = parseInt(val, 10);
+  const lbl = document.getElementById('add-minutos-label');
+  if (!lbl) return;
+  if (!val || isNaN(m) || m <= 0) { lbl.textContent = ''; return; }
+  const h   = Math.floor(m / 60);
+  const min = m % 60;
+  lbl.textContent = h > 0 ? (min > 0 ? `= ${h}h ${min}m` : `= ${h}h`) : `= ${min}m`;
+}
+
 function abrirModalAdd(fechaPreseleccionada) {
-  // Precarga la fecha
-  const fechaInput = document.getElementById('add-fecha');
-  if (fechaPreseleccionada) {
-    fechaInput.value = fechaPreseleccionada;
-  } else {
-    fechaInput.value = HOY;
-  }
+  // Precarga fecha fin (y fecha inicio si se abre desde un día concreto)
+  const fechaFin    = document.getElementById('add-fecha');
+  const fechaInicio = document.getElementById('add-fecha-inicio');
+  const minInput    = document.getElementById('add-minutos');
+  const minLabel    = document.getElementById('add-minutos-label');
+
+  const fecha = fechaPreseleccionada || HOY;
+  fechaFin.value    = fecha;
+  fechaInicio.value = fecha;   // preseleccionar la misma fecha como inicio
+  if (minInput)  minInput.value  = '';
+  if (minLabel)  minLabel.textContent = '';
+
   document.getElementById('modal-add').style.display = 'flex';
   document.body.style.overflow = 'hidden';
+  // Foco en descripción
+  setTimeout(() => document.querySelector('#modal-add [name="descripcion"]')?.focus(), 80);
 }
 
 function cerrarModalAdd() {

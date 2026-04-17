@@ -3,6 +3,58 @@
 
 {% block content %}
 
+<style>
+/* ── Botones del header: color uniforme en modo claro ─────────────────────── */
+@media (prefers-color-scheme: light) {
+  .header-btns .btn {
+    background: #f0f0f0;
+    color: #333;
+    border-color: #d0d0d0;
+  }
+  .header-btns .btn:hover,
+  .header-btns .btn:focus {
+    background: #e0e0e0;
+    color: #111;
+    border-color: #bbb;
+  }
+  .header-btns .btn.btn-g-primary {
+    background: #2d6a4f;
+    color: #fff;
+    border-color: #2d6a4f;
+  }
+  .header-btns .btn.btn-g-primary:hover {
+    background: #245a42;
+    border-color: #245a42;
+    color: #fff;
+  }
+}
+/* Si el tema claro se activa por clase .light en el body o html */
+body.light .header-btns .btn,
+html.light .header-btns .btn {
+  background: #f0f0f0;
+  color: #333;
+  border-color: #d0d0d0;
+}
+body.light .header-btns .btn:hover,
+html.light .header-btns .btn:hover {
+  background: #ffdcdc;
+  color: #111;
+  border-color: #bbb;
+}
+body.light .header-btns .btn.btn-g-primary,
+html.light .header-btns .btn.btn-g-primary {
+  background: #2d6a4f;
+  color: #fff;
+  border-color: #2d6a4f;
+}
+body.light .header-btns .btn.btn-g-primary:hover,
+html.light .header-btns .btn.btn-g-primary:hover {
+  background: #245a42;
+  border-color: #245a42;
+  color: #fff;
+}
+</style>
+
 <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
   <div>
     <h4 style="font-weight:700; margin:0;">🎓 Formación</h4>
@@ -12,7 +64,7 @@
   </div>
 
   
-  <div class="d-flex gap-2 flex-wrap">
+  <div class="d-flex gap-2 flex-wrap header-btns">
 
     <button onclick="exportarCursoExcel()" class="btn btn-g-primary" id="btn-exportar-curso"
       title="Exportar curso seleccionado en el filtro"
@@ -2368,10 +2420,39 @@ function renderAnalisisIA(d) {
            '<span style="color:var(--accent);">&#8594;</span>' + r + '</div>';
   }).join('');
   var tel   = d.alumno && d.alumno.telefono ? d.alumno.telefono : '';
-  var waMsg = d.mensaje_wa || '';
+
+  // Construir mensaje con emojis reales usando los datos del alumno
+  var nombreAlumno = d.alumno && d.alumno.nombre ? d.alumno.nombre : 'alumno/a';
+  var curso        = d.alumno && d.alumno.curso   ? d.alumno.curso   : '';
+  var periodo      = (d.alumno && d.alumno.fecha_inicio && d.alumno.fecha_fin)
+                       ? 'del ' + d.alumno.fecha_inicio + ' al ' + d.alumno.fecha_fin
+                       : '';
+  var progreso     = d.alumno && d.alumno.progreso != null ? d.alumno.progreso.toFixed(0) + '%' : '—';
+  var examenes     = d.alumno && d.alumno.examenes ? d.alumno.examenes : '';
+
+  // Parsear exámenes (formato R/S/T o R/T o T)
+  var exPartes = examenes ? examenes.split('/') : [];
+  var exLine = '';
+  if (exPartes.length === 3) {
+    exLine = '\n✅ Exámenes: ' + exPartes[0] + ' realizados · ' + exPartes[1] + ' superados · ' + exPartes[2] + ' totales';
+  } else if (exPartes.length === 2) {
+    exLine = '\n✅ Exámenes: ' + exPartes[0] + ' realizados · ' + exPartes[1] + ' totales';
+  } else if (exPartes.length === 1 && exPartes[0]) {
+    exLine = '\n✅ Exámenes: ' + exPartes[0] + ' totales';
+  }
+
+  var waMsg =
+    'Hola ' + nombreAlumno + ', quería escribirte para compartirte los resultados de tu formación y felicitarte por tu esfuerzo.' +
+    '\n\n📚 Curso: ' + curso +
+    (periodo ? '\n📅 Periodo: ' + periodo : '') +
+    '\n📊 Progreso actual: *' + progreso + '*' +
+    exLine +
+    '\n\nEstás haciendo un trabajo excelente. ¡Sigue así hasta completarlo al 100%! 💪' +
+    '\n\nUn saludo,\nRicardo';
+
   var waBtn = tel
     ? '<a href="https://wa.me/' + tel.replace(/[^0-9]/g,'') + '?text=' + encodeURIComponent(waMsg) +
-      '" target="_blank" class="btn btn-g-success btn-sm" style="font-size:.75rem;">&#128242; Enviar</a>'
+      '" target="_blank" class="btn btn-g-success btn-sm" style="font-size:.75rem;">📱 Enviar</a>'
     : '';
   var dias  = (d.alumno && d.alumno.dias_restantes != null) ? d.alumno.dias_restantes + ' días' : 'Sin fecha fin';
   document.getElementById('modal-ia-body').innerHTML =
@@ -2385,7 +2466,7 @@ function renderAnalisisIA(d) {
     recs +
     '<div style="background:var(--bg3);border-radius:10px;padding:1rem;margin-top:1rem;">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;">' +
-        '<div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">&#128172; MENSAJE WHATSAPP</div>' +
+        '<div style="font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;">💬 MENSAJE WHATSAPP</div>' +
         '<div style="display:flex;gap:.4rem;" id="wa-btn-zone">' +
           '<button id="btn-copiar-wa" class="btn btn-g-ghost btn-sm" style="font-size:.72rem;">&#128203; Copiar</button>' +
           waBtn +

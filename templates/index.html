@@ -6,7 +6,7 @@
 <!-- ══════════════════════════════════════════════════════════
      BOTÓN FLOTANTE — abrir panel nueva tarea
 ═══════════════════════════════════════════════════════════ -->
-<button id="btn-nueva" onclick="abrirPanel()" title="Nueva tarea">＋</button>
+<button id="btn-nueva"    onclick="abrirPanel()"      title="Nueva tarea">＋</button>
 
 <!-- ══════════════════════════════════════════════════════════
      OVERLAY + PANEL LATERAL — Nueva tarea
@@ -99,10 +99,23 @@
                   placeholder="Información adicional…" rows="2"></textarea>
       </div>
 
+      <div class="field-group">
+        <label class="field-label" for="np-min">
+          ⏱ Tiempo estimado (min)
+          <button type="button" class="np-min-help" onclick="toggleMinHelp()" title="¿Qué es esto?">?</button>
+        </label>
+        <div id="np-min-tooltip" class="np-min-tooltip" style="display:none;">
+          Indica cuántos minutos dedicarás a esta tarea. El total diario se muestra en el Dashboard para controlar tu jornada de 7h 30min.
+        </div>
+        <input name="minutos" id="np-min" type="number" min="0" max="999" step="5"
+               class="field-input" placeholder="Ej: 30">
+      </div>
+
       <button type="submit" class="btn-submit">＋ Agregar tarea</button>
     </form>
   </div>
 </aside>
+
 
 <!-- ══════════════════════════════════════════════════════════
      CABECERA + FILTROS
@@ -218,6 +231,8 @@
   {% set tsubs  = subtareas_map.get(tid, []) %}
   {% set n_hechas = tsubs | selectattr('hecha', 'equalto', 1) | list | length %}
 
+  {% set tmin   = t[14] if t|length > 14 and t[14] is not none else '' %}
+
   <div class="tcard prio-{{ tprio }} {{ 'tcard-done' if tcomp==1 else '' }}"
        data-st="{{ 'done' if tcomp==1 else 'pending' }}"
        data-prio="{{ tprio }}" data-fav="{{ tfav }}" data-tid="{{ tid }}" data-fecha="{{ tfecha or '' }}">
@@ -311,6 +326,11 @@
         {% else %}
           <span class="tact disabled">✔</span>
         {% endif %}
+        <button type="button" class="tact tact-min {{ 'tact-min-set' if tmin else '' }}"
+                title="Registrar tiempo dedicado"
+                onclick="abrirMinPopup({{ tid }}, {{ tmin if tmin else 0 }}, this)">
+          ⏱{% if tmin %}<span class="tact-min-badge">{{ tmin }}m</span>{% endif %}
+        </button>
         <a href="/editar/{{ tid }}"   class="tact edit" title="Editar">✏</a>
         <a href="/duplicar/{{ tid }}" class="tact dup"  title="Duplicar">⧉</a>
         <a href="/eliminar/{{ tid }}" class="tact del"  title="Eliminar"
@@ -501,12 +521,21 @@
 .tasks-title-row { display: flex; align-items: center; gap: .75rem; margin-bottom: .9rem; }
 .tasks-title { font-size: 1.4rem; font-weight: 800; margin: 0; color: var(--text); }
 .cnt-badge {
-  font-size: .7rem; font-weight: 700; padding: .18rem .55rem;
-  border-radius: 20px; border: 1px solid var(--border);
+  font-size: .72rem; font-weight: 700; padding: .2rem .65rem;
+  border-radius: 20px; border: 1.5px solid var(--border);
   background: var(--bg3); color: var(--text-muted);
 }
-.cnt-badge.pending { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
-.cnt-badge.done    { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+.cnt-badge.pending {
+  background: color-mix(in srgb, #f59e0b 15%, transparent);
+  color: var(--amber);
+  border-color: color-mix(in srgb, #f59e0b 45%, transparent);
+}
+.cnt-badge.done {
+  background: color-mix(in srgb, #22c55e 15%, transparent);
+  color: #16a34a;
+  border-color: color-mix(in srgb, #22c55e 40%, transparent);
+}
+body:not(.light) .cnt-badge.done { color: #4ade80; }
 
 /* ── Filtros ────────────────────────────────────────────────── */
 .filter-strip { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; }
@@ -626,79 +655,121 @@
 /* ── Rejilla de tarjetas ────────────────────────────────────── */
 #tasks-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.1rem;
   margin-bottom: 1.5rem;
+}
+@media (max-width: 1100px) {
+  #tasks-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 .tcard {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 12px; overflow: hidden;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
   display: flex; flex-direction: column;
-  transition: box-shadow .18s, transform .18s;
+  box-shadow: var(--shadow-card, 0 2px 8px rgba(0,0,0,.25));
+  transition: box-shadow .18s, transform .18s, border-color .18s;
 }
-.tcard:hover { box-shadow: 0 6px 24px rgba(0,0,0,.22); }
-.tcard-done { opacity: 1; }
+.tcard:hover {
+  box-shadow: 0 8px 28px rgba(0,0,0,.30), 0 2px 6px rgba(0,0,0,.15);
+  transform: translateY(-1px);
+  border-color: var(--border);
+}
+.tcard-done { opacity: .75; }
+.tcard-done:hover { opacity: 1; }
 
-/* Franja color prioridad */
-.tcard-stripe { height: 4px; flex-shrink: 0; }
-.prio-1 .tcard-stripe { background: linear-gradient(90deg, #ef4444, #f87171); }
-.prio-2 .tcard-stripe { background: linear-gradient(90deg, #eab308, #fbbf24); }
-.prio-3 .tcard-stripe { background: linear-gradient(90deg, #22c55e, #4ade80); }
+/* Franja color prioridad — más visible */
+.tcard-stripe { height: 5px; flex-shrink: 0; }
+.prio-1 .tcard-stripe { background: linear-gradient(90deg, #dc2626, #f87171); }
+.prio-2 .tcard-stripe { background: linear-gradient(90deg, #4bff00, #ff3d00); }
+.prio-3 .tcard-stripe { background: linear-gradient(90deg, #16a34a, #4ade80); }
+
+/* Borde lateral sutil según prioridad */
+.prio-1 { border-left: 1px solid #dc2626; }
+.prio-2 { border-left: 0px solid #fcddba; }
+.prio-3 { border-left: 1px solid #16a34a; }
 
 /* Cabecera tarjeta */
 .tcard-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: .6rem .85rem .25rem; gap: .4rem; flex-wrap: wrap;
+  padding: .7rem 1rem .3rem; gap: .4rem; flex-wrap: wrap;
 }
 .tcard-head-left  { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
-.tcard-head-right { display: flex; align-items: center; gap: .35rem; flex-shrink: 0; }
+.tcard-head-right { display: flex; align-items: center; gap: .4rem; flex-shrink: 0; }
 
 .tcard-code {
-  font-size: .63rem; font-family: monospace; letter-spacing: .03em;
-  color: var(--text-muted); background: var(--bg3);
-  border: 1px solid var(--border); border-radius: 4px; padding: .04rem .35rem;
+  font-size: .64rem; letter-spacing: .04em;
+  color: #ffffff; background: #346d1c;
+  border: 1px solid var(--border); border-radius: 4px; padding: .05rem .4rem;
 }
 .tcat-pill {
-  font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
-  color: var(--accent); background: var(--bg3);
-  border: 1px solid var(--border); border-radius: 20px; padding: .08rem .5rem;
+  font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 20px; padding: .1rem .55rem;
   cursor: pointer; transition: background .13s, color .13s;
 }
 .tcat-pill:hover { background: var(--accent); color: #fff; }
 
 .status-badge {
-  font-size: .63rem; font-weight: 700; padding: .1rem .45rem;
-  border-radius: 20px; letter-spacing: .03em;
+  font-size: .67rem; font-weight: 700; padding: .15rem .55rem;
+  border-radius: 20px; letter-spacing: .02em; display: inline-flex; align-items: center; gap: .25rem;
 }
-.status-badge.done    { background: #d1fae5; color: #065f46; }
-.status-badge.pending { background: #fef3c7; color: #92400e; }
+.status-badge.done    {
+  background: color-mix(in srgb, #22c55e 18%, transparent);
+  color: #16a34a;
+  border: 1.5px solid color-mix(in srgb, #22c55e 40%, transparent);
+}
+.status-badge.pending {
+  background: color-mix(in srgb, #f59e0b 15%, transparent);
+  color: var(--amber);
+  border: 1.5px solid color-mix(in srgb, #f59e0b 40%, transparent);
+}
 
-.fav-btn { font-size: .85rem; text-decoration: none; color: var(--text-muted); transition: transform .13s; display: inline-block; }
-.fav-btn:hover { transform: scale(1.3); }
-.fav-btn.active { color: #f59e0b; }
+/* Dark mode: status badges más visibles */
+body:not(.light) .status-badge.done    { color: #4ade80; }
+body:not(.light) .status-badge.pending { color: #fbbf24; }
+
+.fav-btn { font-size: .9rem; text-decoration: none; color: var(--text-dim); transition: transform .13s, color .13s; display: inline-block; }
+.fav-btn:hover { transform: scale(1.3); color: #f59e0b; }
+.fav-btn.active { color: #f59e0b; filter: drop-shadow(0 0 3px rgba(245,158,11,.5)); }
 
 /* Cuerpo tarjeta */
-.tcard-body { padding: .45rem .85rem; flex: 1; }
-.tdesc-text { font-size: .88rem; color: var(--text); line-height: 1.5; display: block; }
+.tcard-body { padding: .5rem 1rem .6rem; flex: 1; }
+.tdesc-text {
+  font-size: .93rem; color: #eef2ff; line-height: 1.55; display: block;
+  font-weight: 600;
+}
+.tcard-done .tdesc-text { color: #ffffff;; font-weight: 400; }
 .tdesc-details { width: 100%; }
 .tdesc-summary {
   cursor: pointer; list-style: none;
-  font-size: .88rem; line-height: 1.5; color: var(--text);
-  display: flex; flex-direction: column; gap: .25rem;
+  font-size: .93rem; line-height: 1.55; color: #eef2ff;
+  display: flex; flex-direction: column; gap: .3rem; font-weight: 600;
 }
+/* Light mode — títulos de tarea siempre negros */
+body.light .tdesc-text    { color: #000000 !important; font-weight: 700; }
+body.light .tdesc-summary { color: #000000 !important; font-weight: 700; }
+body.light .tcard-done .tdesc-text { color: #000000 !important; font-weight: 500; }
 .tdesc-summary::-webkit-details-marker, .tdesc-summary::marker { display: none; }
 .tdesc-chips { display: flex; gap: .3rem; flex-wrap: wrap; }
 .chip-sub {
-  font-size: .6rem; font-weight: 700;
+  font-size: .63rem; font-weight: 700;
   background: var(--bg3); border: 1px solid var(--border);
-  border-radius: 20px; padding: .04rem .4rem; color: var(--text-muted);
+  border-radius: 20px; padding: .05rem .45rem; color: var(--text-muted);
 }
-.chip-sub-done { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
-.chip-note { font-size: .75rem; }
+.chip-sub-done {
+  background: color-mix(in srgb, #22c55e 15%, transparent);
+  color: #16a34a; border-color: color-mix(in srgb, #22c55e 40%, transparent);
+}
+body:not(.light) .chip-sub-done { color: #4ade80; }
+.chip-note { font-size: .78rem; }
 .tdesc-extra {
-  margin-top: .55rem; padding: .6rem .7rem;
-  background: var(--bg3); border-radius: 8px; border: 1px solid var(--border);
+  margin-top: .6rem; padding: .65rem .75rem;
+  background: color-mix(in srgb, var(--bg3) 60%, transparent);
+  border-radius: 9px; border: 1px solid var(--border-soft);
   display: flex; flex-direction: column; gap: .55rem;
 }
 .extra-title {
@@ -708,42 +779,281 @@
 .notes-form { display: flex; gap: .35rem; align-items: flex-start; }
 .notes-ta {
   flex: 1; background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 6px; color: var(--text);
-  padding: .38rem .55rem; font-size: .8rem; resize: vertical; min-height: 44px;
+  border-radius: 7px; color: var(--text);
+  padding: .4rem .6rem; font-size: .82rem; resize: vertical; min-height: 46px;
+  line-height: 1.45;
 }
+.notes-ta:focus { outline: none; border-color: var(--accent); }
 .notes-save {
-  background: var(--accent); color: #fff; border: none; border-radius: 6px;
-  padding: .38rem .6rem; font-size: .85rem; cursor: pointer; flex-shrink: 0;
+  background: var(--accent); color: #fff; border: none; border-radius: 7px;
+  padding: .4rem .65rem; font-size: .88rem; cursor: pointer; flex-shrink: 0;
+  transition: opacity .13s;
 }
-.sub-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .22rem; }
-.sub-item { display: flex; align-items: center; gap: .35rem; font-size: .8rem; }
+.notes-save:hover { opacity: .85; }
+.sub-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: .25rem; }
+.sub-item {
+  display: flex; align-items: center; gap: .38rem; font-size: .82rem;
+  padding: .2rem .3rem; border-radius: 5px; transition: background .1s;
+}
+.sub-item:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .sub-done { text-decoration: line-through; color: var(--text-muted); }
-.sub-toggle { text-decoration: none; color: var(--accent); flex-shrink: 0; }
-.sub-del { margin-left: auto; text-decoration: none; color: var(--text-muted); opacity: .45; font-size: .9rem; flex-shrink: 0; }
-.sub-del:hover { color: #ef4444; opacity: 1; }
+.sub-toggle { text-decoration: none; color: var(--accent); flex-shrink: 0; font-size: .95rem; }
+.sub-del { margin-left: auto; text-decoration: none; color: var(--text-dim); font-size: .95rem; flex-shrink: 0; transition: color .12s; }
+.sub-del:hover { color: var(--red); }
 
 /* Footer tarjeta */
 .tcard-foot {
   display: flex; align-items: center; justify-content: space-between;
   flex-wrap: wrap;
-  padding: .4rem .85rem .65rem; gap: .4rem;
-  border-top: 1px solid var(--border); margin-top: .4rem;
+  padding: .45rem 1rem .6rem; gap: .4rem;
+  border-top: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--bg3) 40%, transparent);
 }
-.tcard-fecha { font-size: .72rem; color: var(--text-muted); font-family: monospace; flex: 1; min-width: 0; }
-.tcard-actions { display: flex; gap: .28rem; flex-shrink: 0; margin-left: auto; }
+.tcard-fecha {
+  font-size: .73rem; color: var(--text-muted); font-family: monospace;
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: .2rem;
+}
+.tcard-actions { display: flex; gap: .3rem; flex-shrink: 0; margin-left: auto; }
 .tact {
-  width: 28px; height: 28px; border-radius: 7px; display: inline-flex;
-  align-items: center; justify-content: center; font-size: .8rem;
+  width: 30px; height: 30px; border-radius: 7px; display: inline-flex;
+  align-items: center; justify-content: center; font-size: .82rem;
   text-decoration: none; border: 1px solid var(--border);
-  background: var(--bg3); color: var(--text-muted);
-  cursor: pointer; transition: all .12s;
+  background: transparent; color: var(--text-muted);
+  cursor: pointer; transition: all .13s;
 }
-.tact:hover { box-shadow: 0 2px 8px rgba(0,0,0,.18); color: var(--text); }
-.tact.ok:hover   { background: rgba(34,197,94,.18);  border-color: #6ee7b7; }
-.tact.edit:hover { background: rgba(234,179,8,.18);  border-color: #fcd34d; }
-.tact.dup:hover  { background: rgba(99,102,241,.15); border-color: var(--accent); }
-.tact.del:hover  { background: rgba(239,68,68,.18);  border-color: #fca5a5; }
-.tact.disabled   { opacity: .25; cursor: default; pointer-events: none; }
+.tact:hover { border-color: transparent; color: var(--text); transform: scale(1.08); }
+.tact.ok:hover   { background: rgba(34,197,94,.18);  border-color: #4ade80; color: #4ade80; }
+.tact.edit:hover { background: rgba(251,191,36,.18);  border-color: #fbbf24; color: #fbbf24; }
+.tact.dup:hover  { background: rgba(125,211,252,.15); border-color: #7dd3fc; color: #7dd3fc; }
+.tact.del:hover  { background: rgba(248,113,113,.18);  border-color: #f87171; color: #f87171; }
+.tact.disabled   { opacity: .2; cursor: default; pointer-events: none; }
+.tact-min        { position: relative; font-size: .78rem; min-width: 30px; width: auto; padding: 0 6px; gap: 3px; }
+.tact-min:hover  { background: rgba(139,92,246,.18); border-color: #a78bfa; color: #a78bfa; }
+.tact-min-set    { border-color: rgba(139,92,246,.5); color: #a78bfa; background: rgba(139,92,246,.1); }
+.tact-min-badge  { font-size: .62rem; font-weight: 700; font-family: monospace; }
+
+/* ── Popup minutos ── */
+#min-popup {
+  position: fixed; z-index: 5000;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.4);
+  padding: 1rem 1.1rem; width: 220px;
+  animation: minPopIn .15s cubic-bezier(.22,1,.36,1);
+}
+@keyframes minPopIn { from{opacity:0;transform:scale(.92) translateY(6px)} to{opacity:1;transform:none} }
+#min-popup .mp-title {
+  font-size: .78rem; font-weight: 700; color: var(--text);
+  margin-bottom: .15rem;
+}
+#min-popup .mp-hint {
+  font-size: .7rem; color: var(--text-muted); margin-bottom: .7rem; line-height: 1.4;
+}
+#min-popup .mp-row { display: flex; gap: .4rem; align-items: center; margin-bottom: .65rem; }
+#min-popup .mp-input {
+  flex: 1; background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 7px; color: var(--text);
+  padding: .45rem .6rem; font-size: .92rem; font-family: monospace;
+  text-align: center;
+}
+#min-popup .mp-input:focus { outline: none; border-color: #a78bfa; box-shadow: 0 0 0 3px rgba(139,92,246,.15); }
+#min-popup .mp-presets { display: flex; flex-wrap: wrap; gap: .3rem; margin-bottom: .7rem; }
+#min-popup .mp-pre {
+  font-size: .7rem; padding: .2rem .55rem; border-radius: 20px;
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text-muted); cursor: pointer; transition: all .12s;
+}
+#min-popup .mp-pre:hover { background: rgba(139,92,246,.18); border-color: #a78bfa; color: #a78bfa; }
+#min-popup .mp-actions { display: flex; gap: .4rem; justify-content: flex-end; }
+#min-popup .mp-save {
+  background: #7c3aed; color: #fff; border: none;
+  border-radius: 7px; padding: .38rem .85rem;
+  font-size: .82rem; font-weight: 700; cursor: pointer;
+  transition: opacity .13s;
+}
+#min-popup .mp-save:hover { opacity: .88; }
+#min-popup .mp-cancel {
+  background: none; border: 1px solid var(--border);
+  color: var(--text-muted); border-radius: 7px;
+  padding: .38rem .7rem; font-size: .82rem; cursor: pointer;
+}
+#min-popup .mp-cancel:hover { background: var(--bg3); }
+#min-popup .mp-clear {
+  background: none; border: none; color: var(--text-dim);
+  font-size: .72rem; cursor: pointer; padding: .2rem .4rem;
+  border-radius: 5px; text-decoration: underline;
+}
+#min-popup .mp-clear:hover { color: #f87171; }
+
+/* ── Tooltip ayuda campo minutos panel nueva tarea ── */
+.np-min-help {
+  background: none; border: 1px solid var(--border); border-radius: 50%;
+  color: var(--text-muted); width: 16px; height: 16px;
+  font-size: .62rem; font-weight: 700; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-left: .35rem; transition: all .13s; vertical-align: middle;
+}
+.np-min-help:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.np-min-tooltip {
+  font-size: .75rem; color: var(--text-muted); line-height: 1.5;
+  background: color-mix(in srgb, var(--bg3) 80%, transparent);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: .5rem .7rem; margin-bottom: .5rem;
+}
+
+/* Light mode overrides para acciones */
+body.light .tact.ok:hover   { background: rgba(21,128,61,.12);  border-color: #15803d; color: #15803d; }
+body.light .tact.edit:hover { background: rgba(180,83,9,.12);   border-color: #b45309; color: #b45309; }
+body.light .tact.dup:hover  { background: rgba(29,78,216,.12);  border-color: #1d4ed8; color: #1d4ed8; }
+body.light .tact.del:hover  { background: rgba(220,38,38,.12);  border-color: #dc2626; color: #dc2626; }
+
+/* Light mode — tarjeta base */
+body.light .tcard {
+  background: var(--bg2);
+  border-color: var(--border);
+  box-shadow: 0 2px 6px rgba(0,0,0,.13), 0 6px 20px rgba(0,0,0,.10);
+}
+body.light .tcard:hover { border-color: #6b7a96; box-shadow: 0 4px 20px rgba(0,0,0,.18); }
+body.light .tcard-done { opacity: .7; }
+
+/* Light mode — cabecera tarjeta */
+body.light .tcard-code {
+  background: #ffffff; border-color: var(--border); color: #000000;
+}
+body.light .tcat-pill {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+body.light .tcat-pill:hover { background: #166534; color: #fff; }
+
+/* Light mode — status badges */
+body.light .status-badge.done {
+  background: #dcfce7; color: #166534; border-color: #86efac;
+}
+body.light .status-badge.pending {
+  background: #fef3c7; color: #92400e; border-color: #fcd34d;
+}
+
+/* Light mode — descripción */
+body.light .tcard-done .tdesc-text { color: #000000 !important; }
+
+/* Light mode — chip subtareas */
+body.light .chip-sub {
+  background: var(--bg3); border-color: var(--border); color: var(--text-muted);
+}
+body.light .chip-sub-done {
+  background: #dcfce7; color: #166534; border-color: #86efac;
+}
+
+/* Light mode — extra block */
+body.light .tdesc-extra {
+  background: var(--bg2); border-color: var(--border-soft);
+}
+body.light .extra-title { color: #64748b; }
+body.light .notes-ta {
+  background: var(--bg2); border-color: var(--border); color: #0f1623;
+}
+
+/* Light mode — subtareas */
+body.light .sub-toggle { color: #15803d; }
+body.light .sub-del:hover { color: #dc2626; }
+
+/* Light mode — footer tarjeta */
+body.light .tcard-foot {
+  background: var(--bg2);
+  border-top-color: #e2e8f0;
+}
+body.light .tcard-fecha { color: var(--text-muted); }
+body.light .tact {
+  border-color: var(--border); color: var(--text-muted); background: var(--bg2);
+}
+body.light .tact:hover { color: #0f1623; border-color: var(--text-dim); background: var(--bg3); }
+body.light .tact.disabled { opacity: .3; }
+body.light .tact-min-set { border-color: #7c3aed; color: #6d28d9; background: #ede9fe; }
+body.light .tact-min:hover { background: #ede9fe; border-color: #7c3aed; color: #6d28d9; }
+
+/* Light mode — estrella favorita */
+body.light .fav-btn { color: var(--text-dim); }
+body.light .fav-btn.active { color: #d97706; }
+
+/* Light mode — franja prioridad (borde lateral) */
+body.light .prio-1 { border-left-color: #dc2626; }
+body.light .prio-2 { border-left-color: #ff3d00;}
+body.light .prio-3 { border-left-color: #15803d; }
+
+/* Light mode — empty state */
+body.light .empty-state { color: var(--text-muted); }
+
+/* Light mode — buscador */
+body.light .search-input {
+  background: var(--bg2); border-color: var(--border); color: #0f1623;
+}
+body.light .search-input::placeholder { color: var(--text-dim); }
+
+/* Light mode — filter-select (orden, año, mes) */
+body.light .filter-select,
+body.light #orden-select,
+body.light #anyo-select,
+body.light #mes-select {
+  background-color: #ffffff;
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+body.light #orden-select:hover,
+body.light #anyo-select:hover,
+body.light #mes-select:hover { border-color: #15803d; color: #0f1623; }
+body.light #orden-select.active,
+body.light #anyo-select.active,
+body.light #mes-select.active { border-color: #15803d; color: #166534; background-color: #dcfce7; }
+
+/* Light mode — panel nueva tarea */
+body.light #panel-nueva { background: var(--bg2); border-left-color: #c8d0e0; }
+body.light .panel-title { color: #0f1623; }
+body.light .field-label { color: var(--text-muted); }
+body.light .field-input {
+  background: var(--bg2); border-color: var(--border); color: #0f1623;
+}
+body.light .field-input::placeholder { color: var(--text-dim); }
+body.light .field-input:focus { border-color: #15803d; box-shadow: 0 0 0 3px rgba(21,128,61,.12); }
+body.light .prio-opt span { background: var(--bg3); border-color: var(--border); color: var(--text-muted); }
+body.light .btn-submit { background: #166534; color: #ffffff; }
+body.light .btn-submit:hover { background: #15803d; }
+
+/* Light mode — np-cat picker */
+body.light .np-cat-trigger { background: var(--bg2); border-color: var(--border); color: var(--text-muted); }
+body.light .np-cat-popover { background: var(--bg2); border-color: var(--border); }
+body.light .np-cat-search  { background: var(--bg2); border-color: var(--border); color: #0f1623; }
+body.light .np-cat-item    { color: #0f1623; }
+body.light .np-cat-item:hover { background: var(--bg3); }
+body.light .np-cat-clear-btn { color: var(--text-muted); }
+
+/* Light mode — cat popover filtros */
+body.light .cat-popover { background: var(--bg2); border-color: var(--border); }
+body.light .cat-search-input { background: var(--bg2); border-color: var(--border); color: #0f1623; }
+body.light .cat-item   { color: #0f1623; }
+body.light .cat-item:hover { background: var(--bg3); }
+body.light .cat-footer { border-top-color: #e2e8f0; }
+body.light .cat-clear-btn { color: var(--text-muted); }
+
+/* Light mode — cnt-badge */
+body.light .cnt-badge { background: var(--bg3); border-color: var(--border); color: var(--text-muted); }
+body.light .cnt-badge.pending { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+body.light .cnt-badge.done    { background: #dcfce7; color: #166534; border-color: #86efac; }
+
+/* Light mode — popup minutos */
+body.light #min-popup {
+  background: var(--bg2); border-color: var(--border);
+  box-shadow: 0 8px 30px rgba(0,0,0,.12);
+}
+body.light #min-popup .mp-title { color: #0f1623; }
+body.light #min-popup .mp-hint  { color: var(--text-muted); }
+body.light #min-popup .mp-input { background: var(--bg2); border-color: var(--border); color: #0f1623; }
+body.light #min-popup .mp-pre   { background: var(--bg3); border-color: var(--border); color: var(--text-muted); }
+body.light #min-popup .mp-pre:hover { background: #ede9fe; border-color: #7c3aed; color: #6d28d9; }
+body.light #min-popup .mp-cancel { border-color: var(--border); color: var(--text-muted); }
+body.light #min-popup .mp-cancel:hover { background: var(--bg3); }
+body.light #min-popup .mp-clear { color: var(--text-dim); }
+body.light #min-popup .mp-clear:hover { color: #dc2626; }
 
 /* Estado vacío */
 .empty-state { grid-column: 1 / -1; text-align: center; padding: 3.5rem 1rem; }
@@ -804,6 +1114,10 @@
   /* Paginación */
   .gpagination { flex-wrap: wrap; gap: .3rem; }
 }
+
+
+
+
 </style>
 
 <script>
@@ -1026,5 +1340,118 @@
   })();
 
 })();
+
+
+</script>
+
+<!-- ── Popup registro de minutos ── -->
+<div id="min-popup" style="display:none;">
+  <div class="mp-title">⏱ Tiempo dedicado</div>
+  <div class="mp-hint">Indica cuántos minutos has dedicado o dedicarás a esta tarea. Se sumará al total del día en el Dashboard.</div>
+  <div class="mp-row">
+    <input id="mp-input" class="mp-input" type="number" min="0" max="999" step="5" placeholder="0">
+    <span style="font-size:.78rem;color:var(--text-muted);">min</span>
+  </div>
+  <div class="mp-presets">
+    <button class="mp-pre" onclick="mpPreset(15)">15m</button>
+    <button class="mp-pre" onclick="mpPreset(30)">30m</button>
+    <button class="mp-pre" onclick="mpPreset(45)">45m</button>
+    <button class="mp-pre" onclick="mpPreset(60)">1h</button>
+    <button class="mp-pre" onclick="mpPreset(90)">1h30</button>
+    <button class="mp-pre" onclick="mpPreset(120)">2h</button>
+  </div>
+  <div class="mp-actions">
+    <button class="mp-clear" onclick="mpClear()">Quitar tiempo</button>
+    <button class="mp-cancel" onclick="mpClose()">Cancelar</button>
+    <button class="mp-save" onclick="mpSave()">Guardar</button>
+  </div>
+</div>
+
+<script>
+/* ── Popup minutos ─────────────────────────────────────────── */
+(function () {
+  let _mpTid = null, _mpBtn = null;
+
+  window.abrirMinPopup = function (tid, minActual, btn) {
+    _mpTid = tid;
+    _mpBtn = btn;
+    document.getElementById('mp-input').value = minActual || '';
+    const popup = document.getElementById('min-popup');
+    popup.style.display = 'block';
+
+    // Posicionar popup cerca del botón
+    const rect = btn.getBoundingClientRect();
+    const pw = 220, ph = 260;
+    let top  = rect.bottom + 6 + window.scrollY;
+    let left = rect.left   + window.scrollX;
+    if (left + pw > window.innerWidth - 10) left = window.innerWidth - pw - 10;
+    if (rect.bottom + ph > window.innerHeight) top = rect.top - ph - 6 + window.scrollY;
+    popup.style.top  = top  + 'px';
+    popup.style.left = left + 'px';
+    setTimeout(() => document.getElementById('mp-input').focus(), 40);
+  };
+
+  window.mpPreset = function (v) { document.getElementById('mp-input').value = v; };
+
+  window.mpClose = function () {
+    document.getElementById('min-popup').style.display = 'none';
+    _mpTid = null; _mpBtn = null;
+  };
+
+  window.mpClear = async function () {
+    if (!_mpTid) return;
+    await _mpGuardar(null);
+  };
+
+  window.mpSave = async function () {
+    if (!_mpTid) return;
+    const val = parseInt(document.getElementById('mp-input').value) || 0;
+    await _mpGuardar(val);
+  };
+
+  async function _mpGuardar(minutos) {
+    const tid = _mpTid, btn = _mpBtn;
+    mpClose();
+    try {
+      const res  = await fetch(`/tarea/minutos/${tid}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ minutos })
+      });
+      const data = await res.json();
+      if (data.ok && btn) {
+        // Actualizar badge en el botón sin recargar
+        const badge = btn.querySelector('.tact-min-badge');
+        if (minutos && minutos > 0) {
+          btn.classList.add('tact-min-set');
+          if (badge) { badge.textContent = minutos + 'm'; }
+          else { btn.insertAdjacentHTML('beforeend', `<span class="tact-min-badge">${minutos}m</span>`); }
+        } else {
+          btn.classList.remove('tact-min-set');
+          if (badge) badge.remove();
+        }
+      }
+    } catch (e) { console.error('Error guardando minutos:', e); }
+  }
+
+  // Cerrar al hacer clic fuera
+  document.addEventListener('click', function (e) {
+    const popup = document.getElementById('min-popup');
+    if (popup.style.display !== 'none' && !popup.contains(e.target) && !e.target.closest('.tact-min')) {
+      mpClose();
+    }
+  });
+
+  // Cerrar con Escape
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') mpClose();
+  });
+})();
+
+/* ── Tooltip ayuda campo minutos (panel nueva tarea) ── */
+window.toggleMinHelp = function () {
+  const t = document.getElementById('np-min-tooltip');
+  t.style.display = t.style.display === 'none' ? 'block' : 'none';
+};
 </script>
 {% endblock %}

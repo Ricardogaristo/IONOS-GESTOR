@@ -58,13 +58,69 @@
   <div class="gcard-body">
     <div style="height:10px; background:var(--bg3); border-radius:99px; overflow:hidden;">
       <div style="height:100%; width:{{ porcentaje }}%;
-                  background:linear-gradient(90deg,var(--accent),#4dc663);
+                  background:linear-gradient(90deg, rgb(124, 58, 237), rgb(167, 139, 250));
                   border-radius:99px; transition:width 1s ease;"></div>
     </div>
     <div class="d-flex justify-content-between mt-2"
          style="font-family:var(--mono); font-size:.72rem; color:var(--text-muted);">
       <span>0%</span><span>50%</span><span>100%</span>
     </div>
+  </div>
+</div>
+
+<!-- ── Jornada laboral — control de tiempo diario ──────────── -->
+<div class="gcard mb-4" id="card-jornada">
+  <div class="gcard-header">
+    <span style="color:#a78bfa">⏱</span>
+    <span class="gcard-title">Control de jornada — Hoy</span>
+    <span id="jornada-fecha" style="font-family:var(--mono); font-size:.72rem; color:var(--text-muted);"></span>
+    <button id="btn-exportar-jornada" onclick="exportarJornada()" title="Exportar control de jornada por día"
+      style="margin-left:auto; display:flex; align-items:center; gap:.35rem;
+             background:none; border:1px solid rgba(167,139,250,.35); border-radius:7px;
+             color:#a78bfa; font-size:.72rem; font-family:var(--mono); font-weight:600;
+             padding:.28rem .65rem; cursor:pointer; transition:all .17s; flex-shrink:0;"
+      onmouseover="this.style.background='rgba(167,139,250,.12)';this.style.borderColor='#a78bfa'"
+      onmouseout="this.style.background='none';this.style.borderColor='rgba(167,139,250,.35)'">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="flex-shrink:0;">
+        <path d="M6 1v7M3 5.5l3 3 3-3M1 9.5v1a.5.5 0 0 0 .5.5h9a.5.5 0 0 0 .5-.5v-1"
+              stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Exportar
+    </button>
+  </div>
+  <div class="gcard-body" style="padding:.65rem 1rem;">
+    <!-- KPI fila -->
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:.5rem; margin-bottom:.65rem;">
+      <div style="text-align:center; padding:.4rem; background:var(--bg3); border-radius:8px; border:1px solid var(--border-soft);">
+        <div style="font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:.1rem;">Dedicado hoy</div>
+        <div id="jornada-dedicado" style="font-size:1rem; font-weight:800; font-family:var(--mono); color:#a78bfa;">—</div>
+      </div>
+      <div style="text-align:center; padding:.4rem; background:var(--bg3); border-radius:8px; border:1px solid var(--border-soft);">
+        <div style="font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:.1rem;">Restante</div>
+        <div id="jornada-restante" style="font-size:1rem; font-weight:800; font-family:var(--mono); color:#4ade80;">—</div>
+      </div>
+      <div style="text-align:center; padding:.4rem; background:var(--bg3); border-radius:8px; border:1px solid var(--border-soft);">
+        <div style="font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:.1rem;">Jornada</div>
+        <div style="font-size:1rem; font-weight:800; font-family:var(--mono); color:var(--text-muted);">7h 30m</div>
+      </div>
+    </div>
+    <!-- Barra de progreso de jornada -->
+    <div style="margin-bottom:.3rem;">
+      <div style="height:8px; background:var(--bg3); border-radius:99px; overflow:hidden;">
+        <div id="jornada-bar" style="height:100%; width:0%; border-radius:99px;
+             background:linear-gradient(90deg,#7c3aed,#a78bfa); transition:width .8s ease;"></div>
+      </div>
+      <div id="jornada-bar-label" style="text-align:right; font-size:.65rem; font-family:var(--mono); color:var(--text-muted); margin-top:.18rem;"></div>
+    </div>
+    <!-- Mini chart últimos 7 días -->
+    <div style="margin-top:.55rem;">
+      <div style="font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:.3rem;">Últimos 7 días</div>
+      <canvas id="chartJornada" style="max-height:145px; cursor:pointer;"></canvas>
+      <div style="font-size:.6rem; color:var(--text-muted); font-family:var(--mono); margin-top:.25rem; text-align:center; opacity:.6;">
+        Clic en una barra para ver las tareas del día
+      </div>
+    </div>
+    <div id="jornada-loading" style="text-align:center; padding:.75rem; color:var(--text-muted); font-size:.78rem; font-family:var(--mono);">⏳ Cargando datos de tiempo…</div>
   </div>
 </div>
 
@@ -289,10 +345,59 @@
 </div>
 
 
-<style>
-@keyframes slideUp  { from{opacity:0;transform:translateY(18px) scale(.97)} to{opacity:1;transform:none} }
-@keyframes slideUpQ { from{opacity:0;transform:translateY(-14px) scale(.97)} to{opacity:1;transform:none} }
+<!-- ── Modal Tareas Jornada ──────────────────────────────────────────────── -->
+<div id="modal-jornada-tareas" onclick="if(event.target===this) cerrarModalTareasJornada()" style="
+  display:none; position:fixed; inset:0; z-index:10002;
+  background:rgba(0,0,0,.72); backdrop-filter:blur(6px);
+  align-items:center; justify-content:center; padding:1rem;">
+  <div style="background:var(--bg2); border:1px solid var(--border-soft);
+    border-radius:14px; width:100%; max-width:520px; max-height:80vh;
+    display:flex; flex-direction:column;
+    box-shadow:0 28px 70px rgba(0,0,0,.55);
+    animation:slideUp .22s cubic-bezier(.22,1,.36,1) both;">
 
+    <!-- Header -->
+    <div style="display:flex; align-items:center; gap:.75rem;
+                padding:1rem 1.3rem; border-bottom:1px solid var(--border-soft); flex-shrink:0;">
+      <span style="font-size:1.25rem;">⏱</span>
+      <div style="flex:1; min-width:0;">
+        <div id="mjt-titulo" style="font-weight:700; font-size:.97rem;"></div>
+        <div id="mjt-sub" style="font-size:.72rem; color:#a78bfa; font-family:var(--mono); margin-top:.1rem;"></div>
+      </div>
+      <button onclick="cerrarModalTareasJornada()" style="
+        background:none; border:none; cursor:pointer; color:var(--text-muted);
+        font-size:1.1rem; padding:.25rem .45rem; border-radius:6px; transition:background .15s; flex-shrink:0;"
+        onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'">✕</button>
+    </div>
+
+    <!-- Progress bar del día -->
+    <div style="padding:.7rem 1.3rem .5rem; flex-shrink:0; border-bottom:1px solid var(--border-soft);">
+      <div style="height:6px; background:var(--bg3); border-radius:99px; overflow:hidden;">
+        <div id="mjt-bar" style="height:100%; border-radius:99px; transition:width .6s ease; width:0%;
+             background:linear-gradient(90deg,#7c3aed,#a78bfa);"></div>
+      </div>
+      <div id="mjt-bar-label" style="font-size:.68rem; font-family:var(--mono); color:var(--text-muted);
+                                      margin-top:.3rem; text-align:right;"></div>
+    </div>
+
+    <!-- Lista de tareas -->
+    <div id="mjt-lista" style="overflow-y:auto; flex:1; padding:.3rem 0;"></div>
+
+    <!-- Footer -->
+    <div style="padding:.75rem 1.3rem; border-top:1px solid var(--border-soft); flex-shrink:0;
+                display:flex; justify-content:flex-end;">
+      <button onclick="cerrarModalTareasJornada()" class="btn btn-g-ghost">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.mjt-item { padding:.65rem 1.3rem; border-bottom:1px solid var(--border-soft);
+  display:flex; align-items:flex-start; gap:.75rem; transition:background .12s; }
+.mjt-item:last-child { border-bottom:none; }
+.mjt-item:hover { background:var(--bg3); }
+</style>
+<style>
 .b-item { display:flex; align-items:flex-start; gap:.7rem; padding:.7rem 1.2rem;
   border-bottom:1px solid var(--border-soft); cursor:pointer; transition:background .12s; color:inherit; }
 .b-item:last-child { border-bottom:none; }
@@ -304,6 +409,7 @@
 .b-empty { padding:2.5rem; text-align:center; color:var(--text-muted); font-size:.88rem; }
 </style>
 
+
 {% endblock %}
 
 
@@ -312,17 +418,273 @@
 <style>
 .priv-field{filter:blur(4px);transition:filter .2s;cursor:pointer;user-select:none;}
 .priv-field.revealed{filter:none;cursor:default;}
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 <script>
-// ── Reveal privado ────────────────────────────────────────────────────────
-window.revealPriv = function(e, el) {
+// ── Jornada laboral — carga de datos ─────────────────────────────────────────
+(async function () {
+  function fmtMin(m) {
+    if (!m && m !== 0) return '—';
+    const h = Math.floor(m / 60), min = m % 60;
+    return h > 0 ? (min > 0 ? `${h}h ${min}m` : `${h}h`) : `${min}m`;
+  }
+
+  const hoy = new Date();
+  const diasSemana = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  document.getElementById('jornada-fecha').textContent =
+    hoy.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' });
+
+  let data;
+  try {
+    const res = await fetch('/dashboard/tiempo-hoy');
+    data = await res.json();
+  } catch(e) {
+    document.getElementById('jornada-loading').textContent = '⚠ No se pudo cargar la información de tiempo.';
+    return;
+  }
+
+  document.getElementById('jornada-loading').style.display = 'none';
+
+  const totalMin   = data.total_min_hoy || 0;
+  const jornadaMin = data.jornada_min   || 450;
+  const restantes  = data.restantes     || 0;
+  const exceso     = data.exceso        || 0;
+  const pct        = Math.min(100, Math.round((totalMin / jornadaMin) * 100));
+
+  document.getElementById('jornada-dedicado').textContent = fmtMin(totalMin);
+  document.getElementById('jornada-restante').textContent = exceso > 0 ? '+' + fmtMin(exceso) : fmtMin(restantes);
+
+  const restEl = document.getElementById('jornada-restante');
+  if (exceso > 0) {
+    restEl.style.color = '#f87171';
+    restEl.title = 'Has superado la jornada en ' + fmtMin(exceso);
+  } else if (restantes === 0) {
+    restEl.style.color = '#4ade80';
+  }
+
+  const bar = document.getElementById('jornada-bar');
+  if (pct >= 100) bar.style.background = 'linear-gradient(90deg,#dc2626,#f87171)';
+  else if (pct >= 80) bar.style.background = 'linear-gradient(90deg,#d97706,#fbbf24)';
+  requestAnimationFrame(() => { bar.style.width = pct + '%'; });
+  document.getElementById('jornada-bar-label').textContent = pct + '% de la jornada en tareas. El resto pertenecerá a Formación';
+
+  // Mini chart 7 días
+  const porDia    = data.por_dia || [];
+  const isLight   = document.body.classList.contains('light');
+  const gridColor = isLight ? 'rgba(0,0,0,.08)' : 'rgba(255,255,255,.06)';
+  const txtColor  = isLight ? '#636c76' : '#7d8590';
+
+  // Generar etiquetas para los últimos 5 días
+  const labels = [], valores = [], isoDates = [];
+  for (let i = 4; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    labels.push(diasSemana[d.getDay()]);
+    isoDates.push(iso);
+    const found = porDia.find(r => r.dia === iso);
+    valores.push(found ? found.total_min : 0);
+  }
+
+  const barColors = valores.map((v, i) => {
+    const isHoy = i === 4;
+    if (v >= jornadaMin) return isHoy ? '#f87171' : 'rgba(248,113,113,.5)';
+    if (v > 0)           return isHoy ? '#a78bfa' : 'rgba(167,139,250,.4)';
+    return 'rgba(167,139,250,.18)';
+  });
+
+  new Chart(document.getElementById('chartJornada'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Minutos',
+        data: valores,
+        backgroundColor: barColors,
+        borderRadius: 7,
+        borderSkipped: false,
+        barPercentage: 0.55,
+        categoryPercentage: 0.7
+      }, {
+        label: 'Jornada',
+        data: Array(5).fill(jornadaMin),
+        type: 'line',
+        borderColor: 'rgba(167,139,250,.35)',
+        borderWidth: 1.5,
+        borderDash: [5, 4],
+        pointRadius: 0,
+        fill: false
+      }]
+    },
+    options: {
+      responsive: true,
+      layout: { padding: { top: 4, bottom: 0, left: 2, right: 2 } },
+      onClick(e, els) {
+        if (els.length) {
+          const idx = els[0].index;
+          abrirModalTareasJornada(isoDates[idx], labels[idx], valores[idx], jornadaMin);
+        }
+      },
+      onHover(e, els) {
+        e.native.target.style.cursor = els.length ? 'pointer' : 'default';
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1a1f27',
+          borderColor: 'rgba(167,139,250,.25)',
+          borderWidth: 1,
+          titleColor: '#e6edf3',
+          bodyColor: '#a78bfa',
+          padding: 8,
+          callbacks: {
+            label: item => item.datasetIndex === 0
+              ? '⏱ ' + fmtMin(item.raw)
+              : 'Jornada: ' + fmtMin(item.raw)
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: Math.ceil(Math.max(...valores, jornadaMin) * 1.15 / 60) * 60,
+          ticks: {
+            color: txtColor,
+            font: { size: 10 },
+            maxTicksLimit: 4,
+            callback: v => fmtMin(v)
+          },
+          grid: { color: gridColor, drawBorder: false }
+        },
+        x: {
+          ticks: {
+            color: txtColor,
+            font: { size: 11, weight: '600' },
+            callback: function(val) {
+              const lbl = this.getLabelForValue(val);
+              const isLast = val === 4;
+              return isLast ? lbl + ' ◂' : lbl;
+            }
+          },
+          grid: { display: false }
+        }
+      }
+    }
+  });
+})();
+
+// ── Modal Tareas Jornada ──────────────────────────────────────────────────
+function cerrarModalTareasJornada() {
+  document.getElementById('modal-jornada-tareas').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+async function abrirModalTareasJornada(fecha, diaLabel, minutos, jornadaMin) {
+  const modal = document.getElementById('modal-jornada-tareas');
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+
+  function fmtMin(m) {
+    if (!m && m !== 0) return '—';
+    const h = Math.floor(m / 60), min = m % 60;
+    return h > 0 ? (min > 0 ? `${h}h ${min}m` : `${h}h`) : `${min}m`;
+  }
+
+  // Formatear fecha bonita
+  const fObj = new Date(fecha + 'T12:00:00');
+  const fechaLarga = fObj.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' });
+  document.getElementById('mjt-titulo').textContent = fechaLarga.charAt(0).toUpperCase() + fechaLarga.slice(1);
+  document.getElementById('mjt-sub').textContent = fmtMin(minutos) + ' trabajados';
+
+  // Barra de progreso del día
+  const pct = Math.min(100, Math.round((minutos / jornadaMin) * 100));
+  const bar = document.getElementById('mjt-bar');
+  bar.style.width = '0%';
+  if (pct >= 100) bar.style.background = 'linear-gradient(90deg,#dc2626,#f87171)';
+  else if (pct >= 80) bar.style.background = 'linear-gradient(90deg,#d97706,#fbbf24)';
+  else bar.style.background = 'linear-gradient(90deg,#7c3aed,#a78bfa)';
+  requestAnimationFrame(() => { bar.style.width = pct + '%'; });
+  document.getElementById('mjt-bar-label').textContent = pct + '% de la jornada (' + fmtMin(jornadaMin) + ')';
+
+  // Cargar tareas
+  const lista = document.getElementById('mjt-lista');
+  lista.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-muted);font-family:var(--mono);font-size:.8rem;">⏳ Cargando tareas…</div>';
+
+  try {
+    const res = await fetch('/dashboard/tareas-dia?fecha=' + fecha);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const tareas = await res.json();
+
+    if (!tareas.length) {
+      lista.innerHTML = '<div style="padding:2.5rem;text-align:center;color:var(--text-muted);font-size:.85rem;">Sin tareas registradas para este día.</div>';
+      return;
+    }
+
+    const PRIOR = { 1: '🔴', 2: '🟡', 3: '🟢' };
+    lista.innerHTML = tareas.map(t => {
+      const mins = t.minutos || t.tiempo_min || 0;
+      const estado = t.completada == 1
+        ? '<span class="badge-g badge-done" style="font-size:.62rem;flex-shrink:0;">✔</span>'
+        : '<span class="badge-g badge-pending" style="font-size:.62rem;flex-shrink:0;">●</span>';
+      return `<div class="mjt-item">
+        ${estado}
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.15rem;">
+            ${t.codigo ? `<span style="font-family:var(--mono);font-size:.67rem;color:var(--accent);background:var(--bg3);padding:.1rem .35rem;border-radius:3px;">${t.codigo}</span>` : ''}
+            <span style="font-size:.84rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${t.descripcion || t.nombre || '—'}</span>
+            <span style="flex-shrink:0;">${PRIOR[t.prioridad] || '🟡'}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+            ${t.categoria ? `<span style="font-size:.68rem;color:var(--text-muted);font-family:var(--mono);">📂 ${t.categoria}</span>` : ''}
+            ${mins ? `<span style="font-size:.68rem;font-family:var(--mono);color:#a78bfa;font-weight:700;">⏱ ${fmtMin(mins)}</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    lista.innerHTML = `<div style="padding:2rem;text-align:center;">
+      <div style="color:var(--red,#f87171);font-weight:700;margin-bottom:.4rem;">❌ Error al cargar</div>
+      <div style="font-family:var(--mono);font-size:.72rem;color:var(--text-muted);">${e.message}</div>
+    </div>`;
+  }
+}
+
+
+// ── Exportar jornada ─────────────────────────────────────────────────────────
+function exportarJornada() {
+  const btn = document.getElementById('btn-exportar-jornada');
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="flex-shrink:0;animation:spin .8s linear infinite;">
+      <circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.4" stroke-dasharray="14 8"/>
+    </svg>
+    Generando…`;
+  btn.style.opacity = '.7';
+
+  // Abrir descarga directa
+  const link = document.createElement('a');
+  link.href = '/dashboard/exportar-jornada';
+  link.download = '';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  // Restaurar botón tras un momento
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.innerHTML = originalHTML;
+    btn.style.opacity = '1';
+  }, 2500);
+}
+
+function revealPriv(e, el) {
   e.stopPropagation();
   if (el.classList.contains('revealed')) return;
   const real = el.dataset.real || '';
   if (real) el.textContent = real;
   el.classList.add('revealed'); el.title = '';
   setTimeout(() => { el.classList.remove('revealed'); if(real) el.textContent=real; el.title='Clic para revelar'; }, 10000);
-};
+}
 
 // ── Datos gráfico ─────────────────────────────────────────────────────────
 const cats  = {{ categorias | tojson }};

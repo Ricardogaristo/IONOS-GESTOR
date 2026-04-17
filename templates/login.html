@@ -32,22 +32,38 @@
     }
 
     body.light {
-      --bg:           #f2ebe0;
-      --surface:      #fdf8f0;
-      --surface2:     #e8e0d2;
-      --border:       #cec5b5;
-      --border2:      #b8ae9e;
-      --ink:          #1a1510;
-      --ink2:         #3d3328;
-      --ink3:         #6b5f52;
+      --bg:           #b8c4d8;
+      --surface:      #ffffff;
+      --surface2:     #eaeff7;
+      --border:       #7a8fa8;
+      --border2:      #98aabf;
+      --ink:          #000000;
+      --ink2:         #1a2640;
+      --ink3:         #3d4e6a;
       --accent:       #c8290a;   /* rojo de marca — fijo */
-      --accent-lt:    rgba(200,41,10,.08);
-      --accent-md:    rgba(200,41,10,.16);
-      --blue:         #1e40af;
-      --blue-lt:      rgba(30,64,175,.08);
+      --accent-lt:    rgba(200,41,10,.09);
+      --accent-md:    rgba(200,41,10,.18);
+      --blue:         #1e3a8a;
+      --blue-lt:      rgba(30,58,138,.09);
       --green:        #166534;
-      --green-lt:     rgba(22,101,52,.08);
+      --green-lt:     rgba(22,101,52,.09);
     }
+
+    /* Light mode — card con más sombra y bordes marcados */
+    body.light .card {
+      box-shadow:
+        0 2px 8px rgba(0,0,0,.14),
+        0 8px 32px rgba(0,0,0,.11),
+        0 20px 60px rgba(0,0,0,.08);
+      border-color: rgba(200,41,10,.35);
+    }
+
+    /* Light mode — títulos siempre negros */
+    body.light h1        { color: #000000; }
+    body.light h1 em     { color: var(--accent); }
+
+    /* Dark mode — títulos siempre blancos */
+    body:not(.light) h1  { color: #ffffff; }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

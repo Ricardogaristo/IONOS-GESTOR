@@ -397,7 +397,7 @@ def _generar_alarmas(tutor_id):
         if not telefono:
             return None
         tel = str(telefono).strip().replace(" ", "").replace("-", "").replace("+", "")
-        return f"https://wa.me/{tel}?text={urllib.parse.quote(mensaje)}"
+        return f"https://wa.me/{tel}?text={urllib.parse.quote(mensaje, safe='', encoding='utf-8')}"
 
     for a in alumnos:
         alumno_id   = a["id"]
@@ -1687,7 +1687,7 @@ def whatsapp_alumno(alumno_id):
     mensaje = "\n".join(l for l in lineas if l is not None)
 
     import urllib.parse
-    url = f"https://wa.me/{telefono}?text={urllib.parse.quote(mensaje)}"
+    url = f"https://wa.me/{telefono}?text={urllib.parse.quote(mensaje, safe='', encoding='utf-8')}"
     from flask import redirect as redir
     return redir(url)
 

@@ -153,6 +153,7 @@ def inicializar_todo():
         ("fecha_creacion",  "DATETIME DEFAULT CURRENT_TIMESTAMP"),
         ("fecha_completada","DATETIME DEFAULT NULL"),
         ("fecha_inicio",    "DATE DEFAULT NULL"),
+        ("minutos",         "INT DEFAULT NULL"),
     ]:
         if not column_exists(cursor, 'tareas', col):
             cursor.execute(f"ALTER TABLE tareas ADD COLUMN {col} {ddl}")
@@ -253,7 +254,7 @@ def index():
     filtro_mes    = request.args.get("mes",   "").strip()
     filtro_orden  = request.args.get("orden", "desc").strip()
     page     = max(request.args.get("page", 1, type=int), 1)
-    per_page = 10
+    per_page = 9
 
     filtros, params = [], []
     # Solo SuperAdmin (es_admin=2) ve tareas de todos. Admin ve solo las suyas.
@@ -293,7 +294,7 @@ def index():
 
     orden_sql = "ASC" if filtro_orden == "asc" else "DESC"
     tareas = conn.execute(
-        f"SELECT * FROM tareas {where} ORDER BY favorita DESC, prioridad ASC, COALESCE(fecha, fecha_inicio) {orden_sql}, id {orden_sql} LIMIT %s OFFSET %s",
+        f"SELECT * FROM tareas {where} ORDER BY favorita DESC, fecha_creacion {orden_sql}, id {orden_sql} LIMIT %s OFFSET %s",
         params + [per_page, offset]
     ).fetchall()
 
@@ -335,13 +336,14 @@ def index():
 def agregar():
     conn = get_connection()
     conn.execute("""
-        INSERT INTO tareas (codigo, descripcion, categoria, fecha, completada, usuario_id, prioridad, favorita, notas, fecha_inicio)
-        VALUES (%s,%s,%s,%s,0,%s,%s,0,%s,%s)
+        INSERT INTO tareas (codigo, descripcion, categoria, fecha, completada, usuario_id, prioridad, favorita, notas, fecha_inicio, minutos)
+        VALUES (%s,%s,%s,%s,0,%s,%s,0,%s,%s,%s)
     """, (request.form.get("codigo"), request.form.get("descripcion"),
           request.form.get("categoria"), request.form.get("fecha"),
           session["user_id"], int(request.form.get("prioridad", 2)),
           request.form.get("notas", ""),
-          request.form.get("fecha_inicio") or None))
+          request.form.get("fecha_inicio") or None,
+          int(request.form.get("minutos")) if request.form.get("minutos") else None))
     conn.commit(); conn.close()
     return redirect("/")
 
@@ -828,18 +830,439 @@ def editar(id):
     conn = get_connection()
     if request.method == "POST":
         conn.execute(
-            "UPDATE tareas SET codigo=%s,descripcion=%s,categoria=%s,fecha=%s,completada=%s,prioridad=%s,notas=%s,fecha_inicio=%s WHERE id=%s",
+            "UPDATE tareas SET codigo=%s,descripcion=%s,categoria=%s,fecha=%s,completada=%s,prioridad=%s,notas=%s,fecha_inicio=%s,minutos=%s WHERE id=%s",
             (request.form.get("codigo"), request.form.get("descripcion"),
              request.form.get("categoria"), request.form.get("fecha"),
              request.form.get("completada"), int(request.form.get("prioridad", 2)),
              request.form.get("notas",""),
-             request.form.get("fecha_inicio") or None, id)
+             request.form.get("fecha_inicio") or None,
+             int(request.form.get("minutos")) if request.form.get("minutos") else None,
+             id)
         )
         conn.commit(); conn.close()
         return redirect("/")
-    tarea = conn.execute("SELECT * FROM tareas WHERE id=%s", (id,)).fetchone()
+    tarea    = conn.execute("SELECT * FROM tareas WHERE id=%s", (id,)).fetchone()
+    user_id  = session.get("user_id")
+    es_admin = session.get("es_admin", 0)
+    if es_admin >= 2:
+        cats = conn.execute(
+            "SELECT DISTINCT COALESCE(NULLIF(TRIM(categoria),''),'General') AS cat "
+            "FROM tareas WHERE usuario_id IN (SELECT id FROM usuarios WHERE COALESCE(tipo,'A')='A') ORDER BY cat"
+        ).fetchall()
+    else:
+        cats = conn.execute(
+            "SELECT DISTINCT COALESCE(NULLIF(TRIM(categoria),''),'General') AS cat "
+            "FROM tareas WHERE usuario_id=%s ORDER BY cat", (user_id,)
+        ).fetchall()
     conn.close()
-    return render_template("editar.html", tarea=tarea)
+    categorias_lista = [r["cat"] for r in cats]
+    return render_template("editar.html", tarea=tarea, categorias_lista=categorias_lista)
+
+
+@app.route("/tarea/minutos/<int:tid>", methods=["POST"])
+@login_required
+def tarea_set_minutos(tid):
+    """Guarda los minutos dedicados a una tarea vía AJAX."""
+    data = request.get_json(force=True) or {}
+    try:
+        minutos = int(data.get("minutos", 0))
+        if minutos < 0: minutos = 0
+    except (TypeError, ValueError):
+        minutos = None
+    conn = get_connection()
+    if session.get("es_admin", 0) >= 2:
+        conn.execute("UPDATE tareas SET minutos=%s WHERE id=%s", (minutos, tid))
+    else:
+        conn.execute("UPDATE tareas SET minutos=%s WHERE id=%s AND usuario_id=%s", (minutos, tid, session["user_id"]))
+    conn.commit(); conn.close()
+    return jsonify({"ok": True, "minutos": minutos})
+
+
+@app.route("/dashboard/tiempo-hoy")
+@login_required
+def dashboard_tiempo_hoy():
+    """Devuelve el resumen de minutos por día para el usuario actual."""
+    user_id  = session.get("user_id")
+    es_admin = session.get("es_admin", 0)
+    conn     = get_connection()
+    hoy = datetime.now().strftime("%Y-%m-%d")
+
+    if es_admin >= 2:
+        row = conn.execute(
+            "SELECT COALESCE(SUM(minutos),0) AS total_min FROM tareas "
+            "WHERE usuario_id IN (SELECT id FROM usuarios WHERE COALESCE(tipo,'A')='A') "
+            "AND COALESCE(fecha, DATE(fecha_creacion)) = %s", (hoy,)
+        ).fetchone()
+        por_dia = conn.execute("""
+            SELECT COALESCE(fecha, DATE(fecha_creacion)) AS dia, COALESCE(SUM(minutos),0) AS total_min
+            FROM tareas
+            WHERE usuario_id IN (SELECT id FROM usuarios WHERE COALESCE(tipo,'A')='A')
+              AND COALESCE(fecha, DATE(fecha_creacion)) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+              AND minutos IS NOT NULL
+            GROUP BY COALESCE(fecha, DATE(fecha_creacion)) ORDER BY dia ASC
+        """).fetchall()
+    else:
+        row = conn.execute(
+            "SELECT COALESCE(SUM(minutos),0) AS total_min FROM tareas "
+            "WHERE usuario_id=%s AND COALESCE(fecha, DATE(fecha_creacion)) = %s", (user_id, hoy)
+        ).fetchone()
+        por_dia = conn.execute("""
+            SELECT COALESCE(fecha, DATE(fecha_creacion)) AS dia, COALESCE(SUM(minutos),0) AS total_min
+            FROM tareas
+            WHERE usuario_id = %s
+              AND COALESCE(fecha, DATE(fecha_creacion)) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+              AND minutos IS NOT NULL
+            GROUP BY COALESCE(fecha, DATE(fecha_creacion)) ORDER BY dia ASC
+        """, (user_id,)).fetchall()
+
+    conn.close()
+    total_min_hoy = int(row["total_min"]) if row else 0
+    jornada_min   = 450  # 7h30m
+    restantes     = max(0, jornada_min - total_min_hoy)
+    exceso        = max(0, total_min_hoy - jornada_min)
+    return jsonify({
+        "total_min_hoy": total_min_hoy,
+        "jornada_min": jornada_min,
+        "restantes": restantes,
+        "exceso": exceso,
+        "por_dia": [{"dia": str(r["dia"])[:10], "total_min": int(r["total_min"])} for r in por_dia]
+    })
+
+
+@app.route("/dashboard/tareas-dia")
+@login_required
+def dashboard_tareas_dia():
+    """Devuelve las tareas de un día concreto para el usuario actual (usado por el modal del gráfico de jornada)."""
+    fecha    = request.args.get("fecha", "").strip()
+    user_id  = session.get("user_id")
+    es_admin = session.get("es_admin", 0)
+
+    # Validar formato básico de la fecha
+    try:
+        datetime.strptime(fecha, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"error": "Fecha inválida"}), 400
+
+    conn = get_connection()
+
+    if es_admin >= 2:
+        tareas = conn.execute("""
+            SELECT t.id, t.descripcion, t.categoria, t.prioridad, t.completada,
+                   t.codigo, t.minutos, t.notas
+            FROM tareas t
+            WHERE usuario_id IN (SELECT id FROM usuarios WHERE COALESCE(tipo,'A')='A')
+              AND COALESCE(t.fecha, DATE(t.fecha_creacion)) = %s
+              AND t.minutos IS NOT NULL AND t.minutos > 0
+            ORDER BY t.completada ASC, t.prioridad ASC, t.id DESC
+        """, (fecha,)).fetchall()
+    else:
+        tareas = conn.execute("""
+            SELECT t.id, t.descripcion, t.categoria, t.prioridad, t.completada,
+                   t.codigo, t.minutos, t.notas
+            FROM tareas t
+            WHERE t.usuario_id = %s
+              AND COALESCE(t.fecha, DATE(t.fecha_creacion)) = %s
+              AND t.minutos IS NOT NULL AND t.minutos > 0
+            ORDER BY t.completada ASC, t.prioridad ASC, t.id DESC
+        """, (user_id, fecha)).fetchall()
+
+    conn.close()
+    return jsonify([dict(t) for t in tareas])
+
+
+@app.route("/dashboard/exportar-jornada")
+@login_required
+def dashboard_exportar_jornada():
+    """Exporta el control de jornada por día con sus tareas a un Excel."""
+    user_id  = session.get("user_id")
+    es_admin = session.get("es_admin", 0)
+    username = session.get("user", "usuario")
+    conn     = get_connection()
+
+    # ── Obtener todos los días con tiempo registrado ──────────────────────────
+    if es_admin >= 2:
+        dias = conn.execute("""
+            SELECT COALESCE(fecha, DATE(fecha_creacion)) AS dia,
+                   COALESCE(SUM(minutos), 0)             AS total_min
+            FROM tareas
+            WHERE usuario_id IN (SELECT id FROM usuarios WHERE COALESCE(tipo,'A')='A')
+              AND minutos IS NOT NULL AND minutos > 0
+            GROUP BY COALESCE(fecha, DATE(fecha_creacion))
+            ORDER BY dia DESC
+        """).fetchall()
+        tareas_all = conn.execute("""
+            SELECT t.id, t.descripcion, t.categoria, t.prioridad, t.completada,
+                   t.codigo, t.minutos, t.notas, u.username,
+                   COALESCE(t.fecha, DATE(t.fecha_creacion)) AS dia_tarea
+            FROM tareas t
+            JOIN usuarios u ON t.usuario_id = u.id
+            WHERE u.tipo IS NULL OR u.tipo = 'A'
+              AND t.minutos IS NOT NULL AND t.minutos > 0
+            ORDER BY dia_tarea DESC, t.completada ASC, t.prioridad ASC
+        """).fetchall()
+    else:
+        dias = conn.execute("""
+            SELECT COALESCE(fecha, DATE(fecha_creacion)) AS dia,
+                   COALESCE(SUM(minutos), 0)             AS total_min
+            FROM tareas
+            WHERE usuario_id = %s
+              AND minutos IS NOT NULL AND minutos > 0
+            GROUP BY COALESCE(fecha, DATE(fecha_creacion))
+            ORDER BY dia DESC
+        """, (user_id,)).fetchall()
+        tareas_all = conn.execute("""
+            SELECT t.id, t.descripcion, t.categoria, t.prioridad, t.completada,
+                   t.codigo, t.minutos, t.notas, u.username,
+                   COALESCE(t.fecha, DATE(t.fecha_creacion)) AS dia_tarea
+            FROM tareas t
+            JOIN usuarios u ON t.usuario_id = u.id
+            WHERE t.usuario_id = %s
+              AND t.minutos IS NOT NULL AND t.minutos > 0
+            ORDER BY dia_tarea DESC, t.completada ASC, t.prioridad ASC
+        """, (user_id,)).fetchall()
+    conn.close()
+
+    # Agrupar tareas por día
+    from collections import defaultdict
+    tareas_por_dia = defaultdict(list)
+    for t in tareas_all:
+        tareas_por_dia[str(t["dia_tarea"])[:10]].append(t)
+
+    # ── Helpers de estilo ─────────────────────────────────────────────────────
+    _JORN_MIN   = 450  # 7h 30m
+    _COL_PURP   = "7C3AED"; _COL_PURP_L = "EDE9FE"
+    _COL_GRN    = "059669"; _COL_GRN_L  = "D1FAE5"
+    _COL_AMB    = "D97706"; _COL_AMB_L  = "FEF3C7"
+    _COL_RED    = "DC2626"; _COL_RED_L  = "FEE2E2"
+    _COL_DARK   = "1E293B"; _COL_MID    = "334155"
+    _COL_BG     = "F8FAFC"; _COL_BG2    = "F1F5F9"
+    _TXT_W      = "FFFFFF"; _TXT_D      = "1E293B"; _TXT_M = "64748B"
+    _BDR        = "CBD5E1"
+
+    def xb():
+        s = Side(style="thin", color=_BDR)
+        return Border(left=s, right=s, top=s, bottom=s)
+    def xf(h): return PatternFill(start_color=h, end_color=h, fill_type="solid")
+    def xfn(bold=False, color="000000", size=10, italic=False):
+        return Font(bold=bold, color=color, size=size, italic=italic, name="Calibri")
+    def xal(h="center", v="center", wrap=False):
+        return Alignment(horizontal=h, vertical=v, wrap_text=wrap)
+
+    def fmt_min(m):
+        if not m: return "0m"
+        h, mn = divmod(int(m), 60)
+        return (f"{h}h {mn}m" if mn else f"{h}h") if h else f"{mn}m"
+
+    def fmt_fecha(iso):
+        if not iso: return "—"
+        s = str(iso)[:10]
+        try:
+            p = s.split("-")
+            return f"{p[2]}/{p[1]}/{p[0]}"
+        except Exception:
+            return s
+
+    # ── Crear workbook ────────────────────────────────────────────────────────
+    wb = Workbook()
+
+    # ════ Hoja 1: Resumen general ════════════════════════════════════════════
+    ws = wb.active
+    ws.title = "Resumen Jornada"
+    ws.sheet_view.showGridLines = False
+    ws.sheet_properties.tabColor = _COL_PURP
+
+    hoy_str = datetime.now().strftime("%d/%m/%Y %H:%M")
+    total_dias  = len(dias)
+    total_min_g = sum(int(d["total_min"]) for d in dias)
+    jornadas_completas = sum(1 for d in dias if int(d["total_min"]) >= _JORN_MIN)
+
+    # Cabecera
+    ws.merge_cells("A1:G1")
+    c = ws["A1"]
+    c.value = f"  CONTROL DE JORNADA — Exportado el {hoy_str}"
+    c.fill = xf(_COL_DARK); c.font = xfn(bold=True, size=13, color=_TXT_W)
+    c.alignment = xal(h="left"); c.border = xb()
+    ws.row_dimensions[1].height = 34
+
+    ws.merge_cells("A2:G2")
+    c = ws["A2"]
+    c.value = f"  Usuario: {username}   ·   {'Vista administrador' if es_admin >= 2 else 'Vista personal'}   ·   Jornada: 7h 30m"
+    c.fill = xf(_COL_BG2); c.font = xfn(color=_TXT_M, size=9, italic=True)
+    c.alignment = xal(h="left"); c.border = xb()
+    ws.row_dimensions[2].height = 18
+
+    # KPI row
+    kpis = [
+        ("DÍAS CON TIEMPO", total_dias, _COL_PURP),
+        ("TIEMPO TOTAL", fmt_min(total_min_g), _COL_MID),
+        ("JORNADAS COMPLETAS", jornadas_completas, _COL_GRN),
+    ]
+    ws.row_dimensions[3].height = 10
+    ws.row_dimensions[4].height = 20
+    ws.row_dimensions[5].height = 36
+    ws.row_dimensions[6].height = 16
+    ws.row_dimensions[7].height = 10
+    for ci, (label, valor, bg) in enumerate(kpis, start=1):
+        for rn, val, fsz in [(4, label, 8), (5, valor, 20), (6, "", 8)]:
+            c = ws.cell(row=rn, column=ci, value=val)
+            c.fill = xf(bg); c.font = xfn(bold=True, color=_TXT_W, size=fsz)
+            c.alignment = xal(); c.border = xb()
+        ws.column_dimensions[get_column_letter(ci)].width = 22
+
+    # Tabla de días
+    ws.row_dimensions[8].height = 22
+    hdrs = ["Fecha", "Día semana", "Tiempo dedicado", "% Jornada", "Tareas", "Completadas", "Pendientes"]
+    dias_semana_es = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
+    for ci, h in enumerate(hdrs, start=1):
+        cell = ws.cell(row=8, column=ci, value=h)
+        cell.fill = xf(_COL_DARK); cell.font = xfn(bold=True, color=_TXT_W, size=10)
+        cell.alignment = xal(); cell.border = xb()
+
+    for ri, d in enumerate(dias, start=9):
+        dia_str = str(d["dia"])[:10]
+        min_dia = int(d["total_min"])
+        pct_dia = min(100, round(min_dia / _JORN_MIN * 100, 1))
+        ts = tareas_por_dia.get(dia_str, [])
+        comp = sum(1 for t in ts if t["completada"] == 1)
+        pend = len(ts) - comp
+
+        # Color fila según % jornada
+        if pct_dia >= 100: rbg = _COL_GRN_L
+        elif pct_dia >= 80: rbg = _COL_AMB_L
+        elif pct_dia > 0:   rbg = _COL_PURP_L
+        else:               rbg = _COL_BG
+
+        try:
+            dt_obj = datetime.strptime(dia_str, "%Y-%m-%d")
+            dia_sem = dias_semana_es[dt_obj.weekday()]
+        except Exception:
+            dia_sem = "—"
+
+        vals = [fmt_fecha(dia_str), dia_sem, fmt_min(min_dia), f"{pct_dia}%", len(ts), comp, pend]
+        for ci, val in enumerate(vals, start=1):
+            c = ws.cell(row=ri, column=ci, value=val)
+            c.fill = xf(rbg); c.border = xb()
+            c.font = xfn(bold=(ci == 3), color=_COL_PURP if ci == 3 else _TXT_D, size=10)
+            c.alignment = xal(h="left" if ci in (1, 2) else "center")
+        ws.row_dimensions[ri].height = 18
+
+    # Anchos tabla resumen
+    for col, w in {"A": 14, "B": 14, "C": 16, "D": 12, "E": 10, "F": 14, "G": 12}.items():
+        ws.column_dimensions[col].width = w
+    ws.freeze_panes = "A9"
+    ws.auto_filter.ref = f"A8:G{8 + len(dias)}"
+
+    # ════ Hojas por día ═══════════════════════════════════════════════════════
+    for d in dias:
+        dia_str = str(d["dia"])[:10]
+        min_dia = int(d["total_min"])
+        ts      = tareas_por_dia.get(dia_str, [])
+
+        try:
+            dt_obj   = datetime.strptime(dia_str, "%Y-%m-%d")
+            titulo   = dt_obj.strftime("%d-%m-%Y")
+            dia_largo = dias_semana_es[dt_obj.weekday()] + " " + dt_obj.strftime("%d/%m/%Y")
+        except Exception:
+            titulo = dia_str; dia_largo = dia_str
+
+        ws2 = wb.create_sheet(title=titulo)
+        ws2.sheet_view.showGridLines = False
+        pct_dia = min(100, round(min_dia / _JORN_MIN * 100, 1))
+        tab_color = _COL_GRN if pct_dia >= 100 else (_COL_AMB if pct_dia >= 80 else _COL_PURP)
+        ws2.sheet_properties.tabColor = tab_color
+
+        # Cabecera día
+        ws2.merge_cells("A1:H1")
+        c = ws2["A1"]
+        c.value = f"  {dia_largo.upper()}"
+        c.fill = xf(tab_color); c.font = xfn(bold=True, size=13, color=_TXT_W)
+        c.alignment = xal(h="left"); c.border = xb()
+        ws2.row_dimensions[1].height = 32
+
+        ws2.merge_cells("A2:H2")
+        c = ws2["A2"]
+        comp2 = sum(1 for t in ts if t["completada"] == 1)
+        c.value = f"  Tiempo: {fmt_min(min_dia)}  ·  {pct_dia}% de jornada  ·  {len(ts)} tareas  ·  {comp2} completadas  ·  {len(ts)-comp2} pendientes"
+        c.fill = xf(_COL_BG2); c.font = xfn(color=_TXT_M, size=9, italic=True)
+        c.alignment = xal(h="left"); c.border = xb()
+        ws2.row_dimensions[2].height = 18
+
+        # Barra de progreso visual (texto)
+        ws2.merge_cells("A3:H3")
+        barra_n = int(pct_dia / 5)
+        barra   = "█" * barra_n + "░" * (20 - barra_n)
+        c = ws2["A3"]
+        c.value = f"  {barra}  {pct_dia}% de 7h 30m"
+        c.fill = xf(_COL_BG2); c.font = xfn(color=tab_color, size=9, bold=True, italic=False)
+        c.alignment = xal(h="left"); c.border = xb()
+        ws2.row_dimensions[3].height = 16
+
+        # Headers tabla
+        col_hdrs = ["ID", "Código", "Descripción", "Categoría", "Tiempo", "Estado", "Usuario", "Notas"]
+        for ci, h in enumerate(col_hdrs, start=1):
+            cell = ws2.cell(row=4, column=ci, value=h)
+            cell.fill = xf(tab_color); cell.font = xfn(bold=True, color=_TXT_W, size=10)
+            cell.alignment = xal(); cell.border = xb()
+        ws2.row_dimensions[4].height = 20
+
+        if not ts:
+            ws2.merge_cells("A5:H5")
+            c = ws2["A5"]
+            c.value = "Sin tareas con tiempo registrado para este día."
+            c.fill = xf(_COL_BG); c.font = xfn(color=_TXT_M, italic=True)
+            c.alignment = xal(); c.border = xb()
+        else:
+            for ri2, t in enumerate(ts, start=5):
+                done  = t["completada"] == 1
+                rbg2  = _COL_GRN_L if done else _COL_AMB_L
+                ec    = _COL_GRN   if done else _COL_AMB
+                est   = "✔  Completada" if done else "●  Pendiente"
+                vals2 = [
+                    t["id"], t["codigo"] or "—", t["descripcion"] or "—",
+                    t["categoria"] or "General", fmt_min(t["minutos"]),
+                    est, t.get("username") or username, t.get("notas") or ""
+                ]
+                for ci2, val in enumerate(vals2, start=1):
+                    c = ws2.cell(row=ri2, column=ci2, value=val)
+                    c.fill = xf(rbg2 if ci2 == 6 else _COL_BG)
+                    c.font = xfn(
+                        bold=(ci2 in (5, 6)),
+                        color=tab_color if ci2 == 5 else (ec if ci2 == 6 else _TXT_D),
+                        size=9 if ci2 in (1, 7) else 10
+                    )
+                    c.alignment = xal(
+                        h="center" if ci2 in (1, 5, 6) else "left",
+                        wrap=(ci2 in (3, 8))
+                    )
+                    c.border = xb()
+                desc_len = len(str(t["descripcion"] or ""))
+                ws2.row_dimensions[ri2].height = max(18, min(54, 18 + (desc_len // 50) * 14))
+
+        # Fila total al final
+        last_row = 5 + len(ts)
+        for ci2, val in enumerate(["", "", "TOTAL", "", fmt_min(min_dia), "", "", ""], start=1):
+            c = ws2.cell(row=last_row, column=ci2, value=val)
+            c.fill = xf(_COL_DARK); c.font = xfn(bold=True, color=_TXT_W, size=10)
+            c.alignment = xal(h="center" if ci2 in (1, 5, 6) else "left")
+            c.border = xb()
+        ws2.row_dimensions[last_row].height = 20
+
+        # Anchos columnas
+        for col, w in {"A": 7, "B": 13, "C": 46, "D": 18, "E": 13, "F": 16, "G": 13, "H": 28}.items():
+            ws2.column_dimensions[col].width = w
+        ws2.freeze_panes = "A5"
+
+    # ── Generar y devolver ────────────────────────────────────────────────────
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    fecha_archivo = datetime.now().strftime("%Y%m%d_%H%M")
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name=f"Jornada_{username}_{fecha_archivo}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 
 @app.route("/subtarea/agregar/<int:tarea_id>", methods=["POST"])
@@ -1031,12 +1454,25 @@ def _xal(h="center",v="center",wrap=False): return Alignment(horizontal=h,vertic
 def _xhdr(cell,bg=_DARK,fg=_TXT_W,size=10):
     cell.fill=_xf(bg); cell.font=_xfn(bold=True,color=fg,size=size)
     cell.alignment=_xal(); cell.border=_xb()
-def _xaw(ws,min_w=8,max_w=50):
-    for cc in ws.iter_cols():
-        f=cc[0]
-        if isinstance(f,MergedCell): continue
-        ln=max((len(str(c.value)) if c.value is not None and not isinstance(c,MergedCell) else 0) for c in cc)
-        ws.column_dimensions[f.column_letter].width=min(max(ln+3,min_w),max_w)
+def _xaw(ws, min_w=8, max_w=50):
+    """Auto-ajusta el ancho de columnas basándose en el contenido real de las celdas."""
+    col_widths = {}
+    for row in ws.iter_rows():
+        for cell in row:
+            if isinstance(cell, MergedCell) or cell.value is None:
+                continue
+            col_letter = cell.column_letter
+            # Calcular ancho estimado del contenido
+            content = str(cell.value)
+            # Para wrap_text, usar la primera línea o un máximo razonable
+            if cell.alignment and cell.alignment.wrap_text:
+                lines = content.split('\n')
+                cell_width = min(max(len(line) for line in lines) + 2, max_w)
+            else:
+                cell_width = len(content) + 2
+            col_widths[col_letter] = max(col_widths.get(col_letter, min_w), cell_width)
+    for col_letter, width in col_widths.items():
+        ws.column_dimensions[col_letter].width = min(max(width, min_w), max_w)
 
 def _hoja_resumen(wb,todas,hoy_str,admin_usr,username):
     ws=wb.active; ws.title="Resumen General"; ws.sheet_properties.tabColor=_ACCENT; ws.sheet_view.showGridLines=False
@@ -1109,11 +1545,9 @@ def _hoja_categoria(wb,cat_nombre,tareas_cat,color_idx):
         # altura dinámica según longitud de descripción
         desc_len = len(str(t["descripcion"] or ""))
         ws.row_dimensions[ri].height = max(20, min(60, 20 + (desc_len // 45) * 15))
-    _xaw(ws)
-    ws.column_dimensions["C"].width=48
-    ws.column_dimensions["D"].width=14
-    ws.column_dimensions["E"].width=14
-    ws.column_dimensions["H"].width=25
+    # Anchos explícitos para todas las columnas: ID, Código, Descripción, F.Inicio, F.Fin, Estado, Usuario, Notas
+    for col, w in {"A": 8, "B": 14, "C": 48, "D": 14, "E": 14, "F": 16, "G": 14, "H": 30}.items():
+        ws.column_dimensions[col].width = w
     ws.freeze_panes="A4"; ws.auto_filter.ref=ws.dimensions
 
 def _hoja_hoy(wb,tareas_hoy,hoy_str):
@@ -1143,11 +1577,9 @@ def _hoja_hoy(wb,tareas_hoy,hoy_str):
                 c.alignment=_xal(h="center" if ci in(1,5,6,7) else "left",wrap=(ci in(3,9))); c.border=_xb()
             desc_len=len(str(t["descripcion"] or ""))
             ws.row_dimensions[ri].height=max(20,min(60,20+(desc_len//45)*15))
-    _xaw(ws)
-    ws.column_dimensions["C"].width=48
-    ws.column_dimensions["E"].width=14
-    ws.column_dimensions["F"].width=14
-    ws.column_dimensions["I"].width=25
+    # Anchos explícitos: ID, Código, Descripción, Categoría, F.Inicio, F.Fin, Estado, Usuario, Notas
+    for col, w in {"A": 8, "B": 14, "C": 48, "D": 20, "E": 14, "F": 14, "G": 16, "H": 14, "I": 30}.items():
+        ws.column_dimensions[col].width = w
     ws.freeze_panes="A4"; ws.auto_filter.ref=ws.dimensions
 
 @app.route("/exportar")

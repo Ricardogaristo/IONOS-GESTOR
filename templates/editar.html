@@ -20,45 +20,86 @@
     {#
       tarea[0]=id  tarea[1]=descripcion  tarea[2]=categoria
       tarea[3]=fecha  tarea[4]=completada  tarea[5]=codigo
+      tarea[7]=prioridad  tarea[9]=notas  tarea[10]=fecha_inicio
     #}
     <form method="POST">
       <div class="row g-3">
 
+        <!-- ── Fila 1: Código + Descripción ── -->
         <div class="col-sm-6 col-md-4">
           <label class="form-label">Código</label>
           <input type="text" name="codigo" class="form-control"
-                 value="{{ tarea[5] if tarea[5] else '' }}"
+                 value="{{ tarea['codigo'] if tarea['codigo'] else '' }}"
                  placeholder="Ej: PRAC-001" autocomplete="off">
         </div>
 
-        <div class="col-sm-6 col-md-8">
+        <div class="col-12 col-md-8">
           <label class="form-label">Descripción <span style="color:var(--red)">*</span></label>
           <input type="text" name="descripcion" class="form-control"
-                 value="{{ tarea[1] }}" required autocomplete="off">
+                 value="{{ tarea['descripcion'] }}" required autocomplete="off">
         </div>
 
+        <!-- ── Fila 2: Categoría + Estado + Prioridad ── -->
         <div class="col-sm-6 col-md-4">
           <label class="form-label">Categoría</label>
           <input type="text" name="categoria" class="form-control"
-                 value="{{ tarea[2] if tarea[2] else '' }}"
-                 placeholder="Ej: Practicas" autocomplete="off">
-        </div>
-
-        <div class="col-sm-6 col-md-4">
-          <label class="form-label">Fecha</label>
-          <input type="date" name="fecha" class="form-control"
-                 value="{{ tarea[3] if tarea[3] else '' }}">
+                 value="{{ tarea['categoria'] if tarea['categoria'] else '' }}"
+                 list="cat-sugerencias"
+                 placeholder="Selecciona o escribe…"
+                 autocomplete="off">
+          <datalist id="cat-sugerencias">
+            {% for cat in categorias_lista %}
+              <option value="{{ cat }}">
+            {% endfor %}
+          </datalist>
         </div>
 
         <div class="col-sm-6 col-md-4">
           <label class="form-label">Estado</label>
           <select name="completada" class="form-select">
-            <option value="0" {% if tarea[4]==0 %}selected{% endif %}>● Pendiente</option>
-            <option value="1" {% if tarea[4]==1 %}selected{% endif %}>✔ Completada</option>
+            <option value="0" {% if tarea['completada']==0 %}selected{% endif %}>● Pendiente</option>
+            <option value="1" {% if tarea['completada']==1 %}selected{% endif %}>✔ Completada</option>
           </select>
         </div>
 
-      </div>
+        <div class="col-sm-6 col-md-4">
+          <label class="form-label">Prioridad</label>
+          <select name="prioridad" class="form-select">
+            <option value="1" {% if tarea['prioridad']==1 %}selected{% endif %}>🔴 Alta</option>
+            <option value="2" {% if (tarea['prioridad'] or 2)==2 %}selected{% endif %}>🟡 Media</option>
+            <option value="3" {% if tarea['prioridad']==3 %}selected{% endif %}>🟢 Baja</option>
+          </select>
+        </div>
+
+        <!-- ── Fila 3: Fecha inicio + Fecha fin ── -->
+        <div class="col-sm-6 col-md-4">
+          <label class="form-label">Fecha inicio</label>
+          <input type="date" name="fecha_inicio" class="form-control"
+                 value="{{ tarea['fecha_inicio']|string|truncate(10, True, '') if tarea['fecha_inicio'] else '' }}">
+        </div>
+
+        <div class="col-sm-6 col-md-4">
+          <label class="form-label">Fecha fin</label>
+          <input type="date" name="fecha" class="form-control"
+                 value="{{ tarea['fecha'] if tarea['fecha'] else '' }}">
+        </div>
+
+        <div class="col-sm-6 col-md-4">
+          <label class="form-label">Minutos dedicados</label>
+          <input type="number" name="minutos" class="form-control"
+                 value="{{ tarea['minutos'] if tarea['minutos'] else '' }}"
+                 min="0" placeholder="0">
+        </div>
+
+        <!-- ── Fila 4: Notas ── -->
+        <div class="col-12">
+          <label class="form-label">Notas</label>
+          <textarea name="notas" class="form-control" rows="4"
+                    placeholder="Observaciones, detalles, enlaces…"
+                    style="resize:vertical; min-height:90px;">{{ tarea['notas'] if tarea['notas'] else '' }}</textarea>
+        </div>
+
+      </div><!-- /row -->
 
       <div class="d-flex gap-2 mt-4 pt-3" style="border-top:1px solid var(--border);">
         <button type="submit" class="btn btn-g-primary">💾 Guardar cambios</button>
