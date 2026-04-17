@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, redirect, session, send_file, url_for, jsonify
+from werkzeug.middleware.proxy_fix import ProxyFix
 import mysql.connector.errors
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -60,7 +61,7 @@ app.secret_key = _load_or_create_secret_key()
 app.config.update(
     SESSION_COOKIE_HTTPONLY  = True,   # JS no puede leer la cookie de sesión
     SESSION_COOKIE_SAMESITE  = "Lax",  # Protección básica CSRF en cookies
-    SESSION_COOKIE_SECURE    = False,  # Cambiar a True cuando uses HTTPS en producción
+    SESSION_COOKIE_SECURE    = os.environ.get("FLASK_ENV", "") == "production",  # True en producción HTTPS
     PERMANENT_SESSION_LIFETIME = timedelta(hours=8),
     MAX_CONTENT_LENGTH       = 16 * 1024 * 1024,  # 16 MB máximo por subida
 )

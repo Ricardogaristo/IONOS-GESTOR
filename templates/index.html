@@ -1377,15 +1377,23 @@ body.light #min-popup .mp-clear:hover { color: #dc2626; }
     _mpBtn = btn;
     document.getElementById('mp-input').value = minActual || '';
     const popup = document.getElementById('min-popup');
+
+    // Mover el popup al body para evitar problemas de stacking context con proxies/transforms
+    if (popup.parentElement !== document.body) {
+      document.body.appendChild(popup);
+    }
+
     popup.style.display = 'block';
 
-    // Posicionar popup cerca del botón
+    // Posicionar popup cerca del botón usando coordenadas de ventana puras
     const rect = btn.getBoundingClientRect();
-    const pw = 220, ph = 260;
-    let top  = rect.bottom + 6 + window.scrollY;
-    let left = rect.left   + window.scrollX;
-    if (left + pw > window.innerWidth - 10) left = window.innerWidth - pw - 10;
-    if (rect.bottom + ph > window.innerHeight) top = rect.top - ph - 6 + window.scrollY;
+    const pw = 240, ph = 280;
+    let top  = rect.bottom + 8;
+    let left = rect.left;
+    if (left + pw > window.innerWidth - 12) left = window.innerWidth - pw - 12;
+    if (left < 8) left = 8;
+    if (rect.bottom + ph > window.innerHeight) top = rect.top - ph - 8;
+    if (top < 8) top = 8;
     popup.style.top  = top  + 'px';
     popup.style.left = left + 'px';
     setTimeout(() => document.getElementById('mp-input').focus(), 40);
@@ -1415,9 +1423,11 @@ body.light #min-popup .mp-clear:hover { color: #dc2626; }
     try {
       const res  = await fetch(`/tarea/minutos/${tid}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify({ minutos })
       });
+      if (!res.ok) { console.error('Error HTTP:', res.status); return; }
       const data = await res.json();
       if (data.ok && btn) {
         // Actualizar badge en el botón sin recargar
