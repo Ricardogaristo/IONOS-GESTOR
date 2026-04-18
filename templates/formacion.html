@@ -2401,9 +2401,9 @@ function abrirAnalisisAlumno(id, nombre, curso) {
   fetch('/formacion/ia/analizar/' + id, {credentials: 'same-origin'})
     .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
     .then(function(d){ renderAnalisisIA(d); })
-    .catch(function(err){
+    .catch(function(){
       document.getElementById('modal-ia-body').innerHTML =
-        '<div class="galert galert-danger">Error al conectar con la IA. (' + (err.message||'red') + ')</div>';
+        '<div class="galert galert-danger">Error al conectar con la IA.</div>';
     });
 }
 
@@ -2428,7 +2428,7 @@ function renderAnalisisIA(d) {
                        ? 'del ' + d.alumno.fecha_inicio + ' al ' + d.alumno.fecha_fin
                        : '';
   var progreso     = d.alumno && d.alumno.progreso != null ? d.alumno.progreso.toFixed(0) + '%' : '—';
-  var examenes     = d.alumno && d.alumno.examenes ? d.alumno.examenes : '';
+  var examenes     = d.alumno && d.alumno.examenes != null ? String(d.alumno.examenes) : '';
 
   // Parsear exámenes (formato R/S/T o R/T o T)
   var exPartes = examenes ? examenes.split('/') : [];
