@@ -2398,12 +2398,12 @@ function abrirAnalisisAlumno(id, nombre, curso) {
     '<div style="margin-top:.5rem;">Analizando con IA…</div></div>';
   document.getElementById('modal-ia').style.display = 'flex';
   document.body.style.overflow = 'hidden';
-  fetch('/formacion/ia/analizar/' + id)
-    .then(function(r){ return r.json(); })
+  fetch('/formacion/ia/analizar/' + id, {credentials: 'same-origin'})
+    .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
     .then(function(d){ renderAnalisisIA(d); })
-    .catch(function(){
+    .catch(function(err){
       document.getElementById('modal-ia-body').innerHTML =
-        '<div class="galert galert-danger">Error al conectar con la IA.</div>';
+        '<div class="galert galert-danger">Error al conectar con la IA. (' + (err.message||'red') + ')</div>';
     });
 }
 
