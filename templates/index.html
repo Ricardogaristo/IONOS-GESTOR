@@ -355,13 +355,17 @@
 
 {% if total_pages > 1 %}
 {%- set base = "?estado=" ~ filtro_estado ~ "&cat=" ~ (filtro_cat|urlencode) ~ "&q=" ~ (filtro_q|urlencode) ~ "&prio=" ~ filtro_prio ~ "&fav=" ~ filtro_fav ~ "&user=" ~ (filtro_user|default('')|urlencode) ~ "&orden=" ~ (filtro_orden|default('desc')) ~ "&anyo=" ~ (filtro_anyo|default('')) ~ "&mes=" ~ (filtro_mes|default('')) -%}
+{%- set win_start = [1, [page - 2, total_pages - 4] | min] | max -%}
+{%- set win_end   = [total_pages, win_start + 4] | min -%}
 <div style="margin:1.5rem 0;">
   <ul class="gpagination">
-    <li class="{{ 'disabled' if page<=1 else '' }}"><a class="gpage-link" href="{{ base }}&page={{ page-1 }}">← Ant</a></li>
-    {% for p in range(1, total_pages+1) %}
+    <li class="{{ 'disabled' if page<=1 else '' }}"><a class="gpage-link" href="{{ base }}&page=1">«</a></li>
+    <li class="{{ 'disabled' if page<=1 else '' }}"><a class="gpage-link" href="{{ base }}&page={{ page-1 }}">‹</a></li>
+    {% for p in range(win_start, win_end+1) %}
     <li class="{{ 'active' if p==page else '' }}"><a class="gpage-link" href="{{ base }}&page={{ p }}">{{ p }}</a></li>
     {% endfor %}
-    <li class="{{ 'disabled' if page>=total_pages else '' }}"><a class="gpage-link" href="{{ base }}&page={{ page+1 }}">Sig →</a></li>
+    <li class="{{ 'disabled' if page>=total_pages else '' }}"><a class="gpage-link" href="{{ base }}&page={{ page+1 }}">›</a></li>
+    <li class="{{ 'disabled' if page>=total_pages else '' }}"><a class="gpage-link" href="{{ base }}&page={{ total_pages }}">»</a></li>
   </ul>
 </div>
 {% endif %}
