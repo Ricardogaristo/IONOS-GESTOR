@@ -1618,6 +1618,10 @@ def whatsapp_alumno(alumno_id):
     if not telefono:
         return redirect(url_for("formacion.formacion"))
 
+    # Prefijo Espana (34) si el numero tiene 9 digitos y no tiene prefijo
+    if telefono and not telefono.startswith("34") and len(telefono) == 9:
+        telefono = "34" + telefono
+
     # Formatear nombre: solo nombre y apellido en title case
     partes = alumno["nombre"].strip().split()
     nombre_corto = " ".join(p.capitalize() for p in partes[:2]) if len(partes) >= 2 else partes[0].capitalize() if partes else alumno["nombre"]
