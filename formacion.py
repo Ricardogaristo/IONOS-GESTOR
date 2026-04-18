@@ -1653,33 +1653,33 @@ def whatsapp_alumno(alumno_id):
 
     if supera:
         intro    = f"Quería escribirte para compartirte los resultados de tu formación y felicitarte por tu esfuerzo."
-        cierre   = f"Estás haciendo un trabajo excelente. ¡Sigue así hasta completarlo al 100%! 💪"
+        cierre   = f"Estas haciendo un trabajo excelente. ¡Sigue asi hasta completarlo al 100%!"
     else:
         intro    = f"Me pongo en contacto contigo para hacerte un seguimiento de tu avance en el curso."
-        cierre   = f"Recuerda que el objetivo es alcanzar el 75% de progreso. Si necesitas ayuda, aquí estoy. ¡Tú puedes! 🙌"
+        cierre   = f"Recuerda que el objetivo es alcanzar el 75% de progreso. Si necesitas ayuda, aqui estoy. ¡Tu puedes!"
 
     periodo = ""
     if inicio_fmt and fin_fmt:
-        periodo = f"📆 Periodo: del {inicio_fmt} al {fin_fmt}"
+        periodo = f"- Periodo: del {inicio_fmt} al {fin_fmt}"
     elif fin_fmt:
-        periodo = f"📆 Fecha límite: {fin_fmt}"
+        periodo = f"- Fecha limite: {fin_fmt}"
     elif inicio_fmt:
-        periodo = f"📆 Inicio: {inicio_fmt}"
+        periodo = f"- Inicio: {inicio_fmt}"
 
     ex_linea = ""
     if ex_t > 0:
-        ex_linea = f"📝 Exámenes: {ex_r} realizados · {ex_s} superados · {ex_t} totales"
+        ex_linea = f"- Examenes: {ex_r} realizados, {ex_s} superados, {ex_t} totales"
     elif ex_r > 0:
-        ex_linea = f"📝 Exámenes realizados: {ex_r}"
+        ex_linea = f"- Examenes realizados: {ex_r}"
 
     lineas = [
         f"Hola {nombre_corto},",
         "",
         intro,
         "",
-        f"📚 Curso: {curso}" if curso else None,
+        f"- Curso: {curso}" if curso else None,
         periodo if periodo else None,
-        f"📊 Progreso actual: *{progreso:.0f}%* {'✅' if supera else '⚠️'}",
+        f"- Progreso actual: *{progreso:.0f}%*",
         ex_linea if ex_linea else None,
         "",
         cierre,
