@@ -124,6 +124,54 @@
   </div>
 </div>
 
+<!-- ── Tareas por período ─────────────────────────────────────────────────── -->
+<div class="gcard mb-4" id="card-periodo">
+  <div class="gcard-header">
+    <span style="color:#60a5fa">◈</span>
+    <span class="gcard-title">Tareas por período</span>
+    <!-- Filtro de período -->
+    <div style="margin-left:auto; display:flex; gap:.3rem; align-items:center;">
+      <button id="btn-periodo-semana" onclick="setPeriodo('semana')"
+        style="background:none; border:1px solid var(--border-soft); border-radius:6px;
+               color:var(--text-muted); font-size:.7rem; font-family:var(--mono); font-weight:600;
+               padding:.22rem .6rem; cursor:pointer; transition:all .17s;">
+        Semana
+      </button>
+      <button id="btn-periodo-mes" onclick="setPeriodo('mes')"
+        style="background:rgba(96,165,250,.18); border:1px solid rgba(96,165,250,.5); border-radius:6px;
+               color:#60a5fa; font-size:.7rem; font-family:var(--mono); font-weight:600;
+               padding:.22rem .6rem; cursor:pointer; transition:all .17s;">
+        Mes
+      </button>
+      <button id="btn-periodo-anio" onclick="setPeriodo('anio')"
+        style="background:none; border:1px solid var(--border-soft); border-radius:6px;
+               color:var(--text-muted); font-size:.7rem; font-family:var(--mono); font-weight:600;
+               padding:.22rem .6rem; cursor:pointer; transition:all .17s;">
+        Año
+      </button>
+    </div>
+  </div>
+  <div class="gcard-body">
+    <!-- KPI resumen del período -->
+    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:.5rem; margin-bottom:.85rem;">
+      <div style="text-align:center; padding:.45rem; background:var(--bg3); border-radius:8px; border:1px solid var(--border-soft);">
+        <div style="font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:.1rem;">Total período</div>
+        <div id="periodo-kpi-total" style="font-size:1.1rem; font-weight:800; font-family:var(--mono); color:#60a5fa;">—</div>
+      </div>
+      <div style="text-align:center; padding:.45rem; background:var(--bg3); border-radius:8px; border:1px solid var(--border-soft);">
+        <div style="font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:.1rem;">Completadas</div>
+        <div id="periodo-kpi-comp" style="font-size:1.1rem; font-weight:800; font-family:var(--mono); color:var(--accent);">—</div>
+      </div>
+      <div style="text-align:center; padding:.45rem; background:var(--bg3); border-radius:8px; border:1px solid var(--border-soft);">
+        <div style="font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:.1rem;">Pendientes</div>
+        <div id="periodo-kpi-pend" style="font-size:1.1rem; font-weight:800; font-family:var(--mono); color:var(--amber);">—</div>
+      </div>
+    </div>
+    <div id="periodo-loading" style="text-align:center; padding:.75rem; color:var(--text-muted); font-size:.78rem; font-family:var(--mono);">⏳ Cargando datos…</div>
+    <canvas id="chartPeriodo" style="max-height:320px; display:none;"></canvas>
+  </div>
+</div>
+
 <!-- ── Chart + Recent tasks ──────────────── -->
 <div class="row g-3">
   <div class="col-lg-7">
@@ -685,6 +733,163 @@ function revealPriv(e, el) {
   el.classList.add('revealed'); el.title = '';
   setTimeout(() => { el.classList.remove('revealed'); if(real) el.textContent=real; el.title='Clic para revelar'; }, 10000);
 }
+
+// ── Gráfico de tareas por período ─────────────────────────────────────────
+let _chartPeriodo = null;
+let _periodoActual = 'mes';
+
+async function cargarPeriodo(periodo) {
+  const loadEl   = document.getElementById('periodo-loading');
+  const canvasEl = document.getElementById('chartPeriodo');
+  loadEl.style.display   = 'block';
+  canvasEl.style.display = 'none';
+
+  try {
+    const res  = await fetch('/dashboard/tareas-por-periodo?periodo=' + periodo);
+    const data = await res.json();
+
+    const labels     = data.map(d => d.label);
+    const totales    = data.map(d => d.total);
+    const completadas= data.map(d => d.completadas);
+    const pendientes = data.map(d => d.pendientes);
+
+    // KPIs acumulados
+    const sumTotal = totales.reduce((a,b) => a+b, 0);
+    const sumComp  = completadas.reduce((a,b) => a+b, 0);
+    const sumPend  = pendientes.reduce((a,b) => a+b, 0);
+    document.getElementById('periodo-kpi-total').textContent = sumTotal;
+    document.getElementById('periodo-kpi-comp').textContent  = sumComp;
+    document.getElementById('periodo-kpi-pend').textContent  = sumPend;
+
+    loadEl.style.display   = 'none';
+    canvasEl.style.display = 'block';
+
+    const isLightP   = document.body.classList.contains('light');
+    const gridColorP = isLightP ? 'rgba(0,0,0,.08)' : 'rgba(255,255,255,.06)';
+    const txtColorP  = isLightP ? '#636c76' : '#7d8590';
+
+    if (_chartPeriodo) { _chartPeriodo.destroy(); _chartPeriodo = null; }
+
+    _chartPeriodo = new Chart(canvasEl, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Completadas',
+            data: completadas,
+            backgroundColor: isLightP ? 'rgba(52,211,153,.75)' : 'rgba(52,211,153,.6)',
+            hoverBackgroundColor: 'rgba(52,211,153,.95)',
+            borderRadius: { topLeft: 5, topRight: 5, bottomLeft: 0, bottomRight: 0 },
+            borderSkipped: false,
+            stack: 'stack0',
+            barPercentage: 0.6,
+            categoryPercentage: 0.7,
+          },
+          {
+            label: 'Pendientes',
+            data: pendientes,
+            backgroundColor: isLightP ? 'rgba(251,191,36,.65)' : 'rgba(251,191,36,.5)',
+            hoverBackgroundColor: 'rgba(251,191,36,.88)',
+            borderRadius: { topLeft: 5, topRight: 5, bottomLeft: 0, bottomRight: 0 },
+            borderSkipped: false,
+            stack: 'stack0',
+            barPercentage: 0.6,
+            categoryPercentage: 0.7,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        layout: { padding: { top: 4, bottom: 0, left: 2, right: 2 } },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            align: 'end',
+            labels: {
+              color: txtColorP,
+              font: { size: 11, family: 'var(--mono)' },
+              boxWidth: 12,
+              padding: 10
+            }
+          },
+          tooltip: {
+            backgroundColor: '#1a1f27',
+            borderColor: 'rgba(96,165,250,.25)',
+            borderWidth: 1,
+            titleColor: '#e6edf3',
+            titleFont: { size: 12, weight: '700', family: 'var(--mono)' },
+            bodyColor: '#94a3b8',
+            bodyFont: { size: 11, family: 'var(--mono)' },
+            padding: 12,
+            callbacks: {
+              title: (items) => items[0].label,
+              label: (item) => {
+                const val = item.raw;
+                const pct = totales[item.dataIndex] > 0
+                  ? Math.round(val / totales[item.dataIndex] * 100) : 0;
+                return `  ${item.dataset.label}: ${val}  (${pct}%)`;
+              },
+              afterBody: (items) => [`  ──────────────`, `  Total: ${totales[items[0].dataIndex]}`],
+            }
+          }
+        },
+        scales: {
+          x: {
+            stacked: true,
+            ticks: {
+              color: txtColorP,
+              font: { size: 11, weight: '600', family: 'var(--mono)' },
+              maxRotation: 0,
+              minRotation: 0,
+              autoSkip: true,
+              maxTicksLimit: 12
+            },
+            grid: { display: false },
+            border: { display: false }
+          },
+          y: {
+            stacked: true,
+            beginAtZero: true,
+            ticks: {
+              color: txtColorP,
+              font: { size: 11, family: 'var(--mono)' },
+              stepSize: 1,
+              precision: 0
+            },
+            grid: { color: gridColorP, drawBorder: false },
+            border: { display: false }
+          }
+        }
+      }
+    });
+  } catch(e) {
+    loadEl.textContent = '⚠ No se pudo cargar los datos.';
+  }
+}
+
+function setPeriodo(p) {
+  _periodoActual = p;
+  // Actualizar botones
+  ['semana','mes','anio'].forEach(k => {
+    const btn = document.getElementById('btn-periodo-' + k);
+    if (!btn) return;
+    if (k === p) {
+      btn.style.background   = 'rgba(96,165,250,.18)';
+      btn.style.borderColor  = 'rgba(96,165,250,.5)';
+      btn.style.color        = '#60a5fa';
+    } else {
+      btn.style.background  = 'none';
+      btn.style.borderColor = 'var(--border-soft)';
+      btn.style.color       = 'var(--text-muted)';
+    }
+  });
+  cargarPeriodo(p);
+}
+
+// Carga inicial
+cargarPeriodo('mes');
 
 // ── Datos gráfico ─────────────────────────────────────────────────────────
 const cats  = {{ categorias | tojson }};

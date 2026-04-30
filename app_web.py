@@ -1358,6 +1358,104 @@ def dashboard():
                            ultimas_tareas=ultimas_tareas, categorias=categorias, cantidades=cantidades,
                            todas_tareas=todas_tareas)
 
+@app.route("/dashboard/tareas-por-periodo")
+@login_required
+def dashboard_tareas_por_periodo():
+    """Devuelve el recuento de tareas agrupadas por semana, mes o año."""
+    user_id  = session.get("user_id")
+    es_admin = session.get("es_admin", 0)
+    periodo  = request.args.get("periodo", "mes").strip()  # semana | mes | anio
+
+    if es_admin >= 2:
+        base_filter = "usuario_id IN (SELECT id FROM usuarios WHERE COALESCE(tipo,'A')='A')"
+        params_base = []
+    else:
+        base_filter = "usuario_id = %s"
+        params_base = [user_id]
+
+    conn = get_connection()
+
+    if periodo == "semana":
+        # Últimas 12 semanas
+        query = f"""
+            SELECT
+                YEAR(COALESCE(fecha_creacion, NOW()))              AS anio,
+                WEEK(COALESCE(fecha_creacion, NOW()), 1)           AS semana,
+                MIN(DATE(COALESCE(fecha_creacion, NOW())))         AS fecha_inicio,
+                COUNT(*)                                           AS total,
+                SUM(CASE WHEN completada=1 THEN 1 ELSE 0 END)     AS completadas,
+                SUM(CASE WHEN completada=0 THEN 1 ELSE 0 END)     AS pendientes
+            FROM tareas
+            WHERE {base_filter}
+              AND fecha_creacion >= DATE_SUB(NOW(), INTERVAL 12 WEEK)
+            GROUP BY anio, semana
+            ORDER BY anio ASC, semana ASC
+        """
+    elif periodo == "anio":
+        # Últimos 5 años
+        query = f"""
+            SELECT
+                YEAR(COALESCE(fecha_creacion, NOW()))              AS periodo_label,
+                COUNT(*)                                           AS total,
+                SUM(CASE WHEN completada=1 THEN 1 ELSE 0 END)     AS completadas,
+                SUM(CASE WHEN completada=0 THEN 1 ELSE 0 END)     AS pendientes
+            FROM tareas
+            WHERE {base_filter}
+              AND fecha_creacion >= DATE_SUB(NOW(), INTERVAL 5 YEAR)
+            GROUP BY YEAR(COALESCE(fecha_creacion, NOW()))
+            ORDER BY periodo_label ASC
+        """
+    else:
+        # mes — por defecto: últimos 12 meses
+        query = f"""
+            SELECT
+                DATE_FORMAT(COALESCE(fecha_creacion, NOW()), '%Y-%m') AS periodo_label,
+                COUNT(*)                                               AS total,
+                SUM(CASE WHEN completada=1 THEN 1 ELSE 0 END)         AS completadas,
+                SUM(CASE WHEN completada=0 THEN 1 ELSE 0 END)         AS pendientes
+            FROM tareas
+            WHERE {base_filter}
+              AND fecha_creacion >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+            GROUP BY periodo_label
+            ORDER BY periodo_label ASC
+        """
+
+    rows = conn.execute(query, params_base).fetchall()
+    conn.close()
+
+    result = []
+    meses_es = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]
+    for r in rows:
+        d = dict(r)
+        if periodo == "semana":
+            # Formatear etiqueta como "S01 2025"
+            fi = str(d.get("fecha_inicio", ""))[:10]
+            try:
+                dt = datetime.strptime(fi, "%Y-%m-%d")
+                label = f"S{dt.isocalendar()[1]:02d} {dt.year}"
+            except Exception:
+                label = f"S{d['semana']} {d['anio']}"
+            d["label"] = label
+        elif periodo == "anio":
+            d["label"] = str(d["periodo_label"])
+        else:
+            # mes: "2025-04" → "Abr 25"
+            raw = str(d.get("periodo_label", ""))
+            try:
+                parts = raw.split("-")
+                d["label"] = f"{meses_es[int(parts[1])-1]} {parts[0][2:]}"
+            except Exception:
+                d["label"] = raw
+        result.append({
+            "label":      d["label"],
+            "total":      int(d["total"]),
+            "completadas": int(d["completadas"]),
+            "pendientes":  int(d["pendientes"]),
+        })
+
+    return jsonify(result)
+
+
 @app.route("/coordinador")
 @login_required
 def coordinador():
