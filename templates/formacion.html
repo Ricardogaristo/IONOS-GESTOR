@@ -104,8 +104,6 @@ html.light .header-btns .btn.btn-g-primary:hover {
 .seg-item-info { flex: 1; min-width: 0; }
 .seg-item-name { font-weight: 600; font-size: .84rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seg-item-meta { font-size: .71rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.seg-item-lastconn { font-size: .68rem; color: var(--text-muted); margin-top: .15rem; font-family: var(--mono); }
-.seg-lastconn-val { font-weight: 600; }
 .seg-dias--danger { color: var(--red); }
 .seg-dias--warn   { color: var(--amber); }
 .seg-btn-ver      { font-size: .7rem; }
@@ -2932,10 +2930,13 @@ function _recalcularSeguimiento() {
 
     var item = { id: id, nombre: nombre, curso: curso, progreso: progreso, dias: dias, waHref: waHref };
 
-    if (estado === 'supera') {
-      superados.push(item);
-    } else if (!noLlamar && (dias === null || dias <= DIAS_ALERTA_RIESGO)) {
+    // "En riesgo": progreso por debajo del 75%. Un alumno al 100% (o >=75%)
+    // nunca se considera en riesgo, aunque su estado de exámenes (supera_75)
+    // sea distinto.
+    if (progreso < 75 && !noLlamar && (dias === null || dias <= DIAS_ALERTA_RIESGO)) {
       enRiesgo.push(item);
+    } else if (estado === 'supera') {
+      superados.push(item);
     }
   });
 
@@ -2980,35 +2981,10 @@ function _filaSeguimiento(item, tipo) {
         _escSeg(item.curso) + ' · ' + item.progreso.toFixed(0) + '%' +
         (tipo === 'riesgo' ? ' · <span class="' + diasClass + '">' + diasTxt + '</span>' : '') +
       '</div>' +
-      '<div class="seg-item-lastconn" id="seg-lastconn-' + item.id + '">Última conexión: <span class="seg-lastconn-val">cargando…</span></div>' +
     '</div>' +
     '<button type="button" class="btn btn-g-ghost btn-sm seg-btn-ver" title="Ver en la tabla" onclick="_verEnTablaSeg(\'' + item.id + '\')">🔎</button>' +
     waBtn;
   return div;
-}
-
-function _cargarUltimasConexiones(items) {
-  items.forEach(function (item) {
-    fetch('/formacion/historial_alumno/' + item.id)
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        var el = document.getElementById('seg-lastconn-' + item.id);
-        if (!el) return;
-        var val = el.querySelector('.seg-lastconn-val');
-        if (!data || !data.length) {
-          if (val) val.textContent = 'sin registros';
-          return;
-        }
-        var ultima = data[data.length - 1];
-        var fechaTxt = ultima.fecha_import ? fmtFechaCorta(ultima.fecha_import) : 'sin registros';
-        if (val) val.textContent = fechaTxt;
-      })
-      .catch(function () {
-        var el = document.getElementById('seg-lastconn-' + item.id);
-        var val = el ? el.querySelector('.seg-lastconn-val') : null;
-        if (val) val.textContent = 'error al cargar';
-      });
-  });
 }
 
 function abrirPopupSeguimiento(tipo) {
@@ -3021,7 +2997,7 @@ function abrirPopupSeguimiento(tipo) {
   document.getElementById('ms-subtitulo').textContent =
     items.length + (items.length === 1 ? ' alumno' : ' alumnos') +
     (tipo === 'riesgo'
-      ? ' · no superan el 75% y su curso finaliza en ' + DIAS_ALERTA_RIESGO + ' días o menos (o ya finalizó)'
+      ? ' · progreso por debajo del 75% y su curso finaliza en ' + DIAS_ALERTA_RIESGO + ' días o menos (o ya finalizó)'
       : ' · ≥75% de exámenes superados');
 
   if (!items.length) {
@@ -3030,7 +3006,6 @@ function abrirPopupSeguimiento(tipo) {
       '</div>';
   } else {
     items.forEach(function (item) { lista.appendChild(_filaSeguimiento(item, tipo)); });
-    _cargarUltimasConexiones(items);
   }
 
   document.getElementById('modal-seguimiento').style.display = 'flex';
