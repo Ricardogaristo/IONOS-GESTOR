@@ -2181,6 +2181,9 @@ function render() {
   }
   // Actualizar leyenda de exámenes según el modo de las filas visibles
   actualizarLeyendaExamen(rows);
+
+  // Recalcular paneles de seguimiento (en riesgo / superados) según el filtro activo
+  if (typeof _recalcularSeguimiento === 'function') _recalcularSeguimiento();
 }
 
 // ── Construir controles de paginación ────────────────────────
@@ -2907,7 +2910,11 @@ function _escSeg(t) {
 }
 
 function _recalcularSeguimiento() {
-  var filas = document.querySelectorAll('#tbody-alumnos tr[data-id]');
+  // Usa las filas ya filtradas por los selectores de curso/estado/búsqueda
+  // para que los recuadros reflejen siempre el subconjunto visible.
+  var filas = (typeof filteredRows === 'function')
+    ? filteredRows()
+    : document.querySelectorAll('#tbody-alumnos tr[data-id]');
   var enRiesgo = [];
   var superados = [];
 
@@ -3039,12 +3046,17 @@ function _verEnTablaSeg(id) {
   cerrarPopupSeguimiento();
   var tr = document.querySelector('#tbody-alumnos tr[data-id="' + id + '"]');
   if (!tr) return;
-  // Quita filtros y muestra todas las filas para asegurar que la fila sea visible
-  if (typeof inputBuscar !== 'undefined') inputBuscar.value = '';
+  var nombreSpan = document.getElementById('nombre-span-' + id);
+  var nombre = nombreSpan ? nombreSpan.textContent.trim() : '';
+
+  // En vez de forzar "ver todos" (que descuadraba la tabla), filtramos
+  // por el nombre del alumno para que aparezca solo su fila.
   if (typeof selCurso !== 'undefined') selCurso.value = '';
   if (typeof selEstado !== 'undefined') selEstado.value = '';
-  if (typeof selPerPage !== 'undefined') selPerPage.value = '9999';
+  if (typeof inputBuscar !== 'undefined') inputBuscar.value = nombre;
+  if (typeof currentPage !== 'undefined') currentPage = 1;
   if (typeof render === 'function') render();
+
   setTimeout(function () {
     tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
     var prevBg = tr.style.background;
