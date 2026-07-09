@@ -104,6 +104,7 @@ html.light .header-btns .btn.btn-g-primary:hover {
 .seg-item-info { flex: 1; min-width: 0; }
 .seg-item-name { font-weight: 600; font-size: .84rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seg-item-meta { font-size: .71rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seg-item-dias { font-size: .71rem; color: var(--text-muted); margin-top: .1rem; font-family: var(--mono); }
 .seg-dias--danger { color: var(--red); }
 .seg-dias--warn   { color: var(--amber); }
 .seg-btn-ver      { font-size: .7rem; }
@@ -2977,10 +2978,8 @@ function _filaSeguimiento(item, tipo) {
   div.innerHTML =
     '<div class="seg-item-info">' +
       '<div class="seg-item-name">' + _escSeg(item.nombre) + '</div>' +
-      '<div class="seg-item-meta">' +
-        _escSeg(item.curso) + ' · ' + item.progreso.toFixed(0) + '%' +
-        (tipo === 'riesgo' ? ' · <span class="' + diasClass + '">' + diasTxt + '</span>' : '') +
-      '</div>' +
+      '<div class="seg-item-meta">' + _escSeg(item.curso) + ' · ' + item.progreso.toFixed(0) + '%</div>' +
+      (tipo === 'riesgo' ? '<div class="seg-item-dias ' + diasClass + '">' + diasTxt + '</div>' : '') +
     '</div>' +
     '<button type="button" class="btn btn-g-ghost btn-sm seg-btn-ver" title="Ver en la tabla" onclick="_verEnTablaSeg(\'' + item.id + '\')">🔎</button>' +
     waBtn;
