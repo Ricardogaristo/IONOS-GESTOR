@@ -53,6 +53,64 @@ html.light .header-btns .btn.btn-g-primary:hover {
   border-color: #245a42;
   color: #fff;
 }
+
+/* ── Paneles de seguimiento: alumnos en riesgo / alumnos que superaron ────── */
+.seg-boxes { margin-top: 1.5rem; }
+.seg-box {
+  cursor: pointer; flex: 1; min-width: 230px;
+  border-radius: 12px; padding: .9rem 1.2rem;
+  display: flex; align-items: center; gap: .9rem;
+  transition: transform .15s, box-shadow .15s;
+}
+.seg-box:hover { transform: translateY(-2px); }
+.seg-box--riesgo    { background: rgba(192,57,43,.08); border: 1px solid rgba(192,57,43,.35); }
+.seg-box--riesgo:hover    { box-shadow: 0 6px 18px rgba(192,57,43,.15); }
+.seg-box--superados { background: rgba(45,157,120,.08); border: 1px solid rgba(45,157,120,.35); }
+.seg-box--superados:hover { box-shadow: 0 6px 18px rgba(45,157,120,.15); }
+.seg-box-icon  { font-size: 1.7rem; line-height: 1; }
+.seg-box-info  { flex: 1; }
+.seg-box-num   { font-size: 1.45rem; font-weight: 800; font-family: var(--mono); line-height: 1; }
+.seg-box--riesgo    .seg-box-num { color: var(--red); }
+.seg-box--superados .seg-box-num { color: var(--accent); }
+.seg-box-label { font-size: .76rem; color: var(--text-muted); margin-top: .2rem; }
+.seg-box-cta   { font-size: .68rem; color: var(--text-muted); white-space: nowrap; }
+
+/* Modal de seguimiento */
+.seg-modal {
+  display: none; position: fixed; inset: 0; z-index: 10600;
+  background: rgba(0,0,0,.60); backdrop-filter: blur(4px);
+  align-items: center; justify-content: center; padding: 1rem;
+}
+.seg-modal-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 14px; width: 100%; max-width: 640px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.4);
+  display: flex; flex-direction: column; max-height: 85vh; overflow: hidden;
+}
+.seg-modal-header {
+  padding: 1.1rem 1.4rem .85rem; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: .75rem; flex-shrink: 0;
+}
+.seg-modal-titlewrap { flex: 1; }
+.seg-modal-icon     { font-size: 1.3rem; }
+.seg-modal-title    { font-weight: 700; font-size: .97rem; }
+.seg-modal-subtitle { font-size: .72rem; color: var(--text-muted); margin-top: .1rem; }
+.seg-modal-close    { background: none; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer; }
+.seg-modal-body     { overflow-y: auto; padding: .9rem 1.1rem; display: flex; flex-direction: column; gap: .5rem; }
+.seg-empty          { text-align: center; padding: 1.6rem 0; color: var(--text-muted); font-size: .82rem; }
+
+/* Filas de alumno dentro del modal */
+.seg-item      { background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: .55rem .75rem; display: flex; align-items: center; gap: .6rem; }
+.seg-item-info { flex: 1; min-width: 0; }
+.seg-item-name { font-weight: 600; font-size: .84rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seg-item-meta { font-size: .71rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seg-item-lastconn { font-size: .68rem; color: var(--text-muted); margin-top: .15rem; font-family: var(--mono); }
+.seg-lastconn-val { font-weight: 600; }
+.seg-dias--danger { color: var(--red); }
+.seg-dias--warn   { color: var(--amber); }
+.seg-btn-ver      { font-size: .7rem; }
+.seg-btn-wa       { font-size: .7rem; white-space: nowrap; }
+.seg-btn-wa--disabled { font-size: .7rem; opacity: .3; cursor: default; white-space: nowrap; }
 </style>
 
 <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
@@ -110,6 +168,33 @@ html.light .header-btns .btn.btn-g-primary:hover {
 </div>
 
 {% if alumnos %}
+<!-- ══════════════════════════════════════════════════════════════
+     PANELES DE SEGUIMIENTO — alumnos en riesgo / alumnos que superaron
+══════════════════════════════════════════════════════════════════ -->
+<div class="d-flex gap-3 flex-wrap seg-boxes">
+
+  <div id="box-riesgo" class="seg-box seg-box--riesgo" onclick="abrirPopupSeguimiento('riesgo')"
+       tabindex="0" role="button" title="Ver alumnos en riesgo">
+    <span class="seg-box-icon">🚨</span>
+    <div class="seg-box-info">
+      <div class="seg-box-num" id="box-riesgo-num">—</div>
+      <div class="seg-box-label">Alumnos en riesgo</div>
+    </div>
+    <span class="seg-box-cta">Ver detalle →</span>
+  </div>
+
+  <div id="box-superados" class="seg-box seg-box--superados" onclick="abrirPopupSeguimiento('superados')"
+       tabindex="0" role="button" title="Ver alumnos que superaron el curso">
+    <span class="seg-box-icon">🏆</span>
+    <div class="seg-box-info">
+      <div class="seg-box-num" id="box-superados-num">—</div>
+      <div class="seg-box-label">Alumnos que superaron el curso</div>
+    </div>
+    <span class="seg-box-cta">Ver detalle →</span>
+  </div>
+
+</div>
+
 <!-- Zona de peligro — poco visible, al margen -->
 <div style="margin-top:2rem;text-align:right;">
   <details style="display:inline-block;">
@@ -126,6 +211,23 @@ html.light .header-btns .btn.btn-g-primary:hover {
   </details>
 </div>
 {% endif %}
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL — Popup de seguimiento (alumnos en riesgo / superados)
+══════════════════════════════════════════════════════════════════ -->
+<div id="modal-seguimiento" class="seg-modal" onclick="if(event.target===this)cerrarPopupSeguimiento()">
+  <div class="seg-modal-card">
+    <div class="seg-modal-header">
+      <span id="ms-icono" class="seg-modal-icon"></span>
+      <div class="seg-modal-titlewrap">
+        <div id="ms-titulo" class="seg-modal-title"></div>
+        <div id="ms-subtitulo" class="seg-modal-subtitle"></div>
+      </div>
+      <button onclick="cerrarPopupSeguimiento()" class="seg-modal-close">✕</button>
+    </div>
+    <div id="ms-lista" class="seg-modal-body"></div>
+  </div>
+</div>
 
 <!-- Alertas -->
 {% for err in errores %}
@@ -877,7 +979,12 @@ html.light .header-btns .btn.btn-g-primary:hover {
           <tr data-search="{{ nombre_val|lower }} {{ curso_val|lower }}"
               data-curso="{{ curso_val }}"
               data-estado="{{ 'supera' if a['supera_75'] == 1 else 'no_supera' }}"
-              data-exam-modo="{{ (examenes_val.split('/')|length) if examenes_val and examenes_val != '0' else 1 }}">
+              data-exam-modo="{{ (examenes_val.split('/')|length) if examenes_val and examenes_val != '0' else 1 }}"
+              data-id="{{ a['id'] }}"
+              data-progreso="{{ a['progreso'] }}"
+              data-ffin="{{ a['fecha_fin'] if a['fecha_fin'] else '' }}"
+              data-nollamar="{{ 1 if a['no_llamar'] and a['no_llamar'] != 0 else 0 }}"
+              data-wa-href="{{ url_for('formacion.whatsapp_alumno', alumno_id=a['id']) if a['telefono'] else '' }}">
 
             <td data-label="Curso" style="max-width:160px;">
               {% if curso_val %}
@@ -2776,5 +2883,182 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape' && document.getElementById('modal-import').style.display === 'flex')
     cerrarModalImport();
 });
+
+// ══════════════════════════════════════════════════════════════════
+// PANELES DE SEGUIMIENTO — alumnos en riesgo / alumnos que superaron
+// ══════════════════════════════════════════════════════════════════
+// Criterio "en riesgo": no supera el 75% de exámenes Y su curso finaliza
+// en menos de DIAS_ALERTA_RIESGO días (o ya finalizó), o no tiene fecha fin.
+// Se excluyen los marcados como "NO PARTICIPA".
+// Ajustable cambiando la constante siguiente:
+var DIAS_ALERTA_RIESGO = 15;
+
+function _diasRestantesSeg(ffin) {
+  if (!ffin) return null;
+  var partes = ffin.split('-');
+  if (partes.length !== 3) return null;
+  var hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  var f = new Date(parseInt(partes[0], 10), parseInt(partes[1], 10) - 1, parseInt(partes[2], 10));
+  return Math.round((f - hoy) / 86400000);
+}
+
+function _escSeg(t) {
+  return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function _recalcularSeguimiento() {
+  var filas = document.querySelectorAll('#tbody-alumnos tr[data-id]');
+  var enRiesgo = [];
+  var superados = [];
+
+  filas.forEach(function (tr) {
+    var id = tr.dataset.id;
+    var nombreSpan = document.getElementById('nombre-span-' + id);
+    var nombre = nombreSpan ? nombreSpan.textContent.trim() : ('Alumno #' + id);
+    var curso = tr.dataset.curso || '—';
+    var progreso = parseFloat(tr.dataset.progreso) || 0;
+    var ffin = tr.dataset.ffin || '';
+    var estado = tr.dataset.estado;
+    var noLlamar = tr.dataset.nollamar === '1';
+    var waHref = tr.dataset.waHref || '';
+    var dias = _diasRestantesSeg(ffin);
+
+    var item = { id: id, nombre: nombre, curso: curso, progreso: progreso, dias: dias, waHref: waHref };
+
+    if (estado === 'supera') {
+      superados.push(item);
+    } else if (!noLlamar && (dias === null || dias <= DIAS_ALERTA_RIESGO)) {
+      enRiesgo.push(item);
+    }
+  });
+
+  enRiesgo.sort(function (a, b) {
+    var da = (a.dias === null) ? 9999 : a.dias;
+    var db = (b.dias === null) ? 9999 : b.dias;
+    return da - db;
+  });
+  superados.sort(function (a, b) { return b.progreso - a.progreso; });
+
+  window._segRiesgo = enRiesgo;
+  window._segSuperados = superados;
+
+  var elR = document.getElementById('box-riesgo-num');
+  var elS = document.getElementById('box-superados-num');
+  if (elR) elR.textContent = enRiesgo.length;
+  if (elS) elS.textContent = superados.length;
+}
+
+function _filaSeguimiento(item, tipo) {
+  var diasTxt, diasClass;
+  if (item.dias === null) {
+    diasTxt = 'Sin fecha fin'; diasClass = '';
+  } else if (item.dias < 0) {
+    diasTxt = 'Venció hace ' + Math.abs(item.dias) + (Math.abs(item.dias) === 1 ? ' día' : ' días'); diasClass = 'seg-dias--danger';
+  } else if (item.dias === 0) {
+    diasTxt = 'Finaliza hoy'; diasClass = 'seg-dias--danger';
+  } else {
+    diasTxt = 'Quedan ' + item.dias + ' días'; diasClass = item.dias <= 5 ? 'seg-dias--warn' : '';
+  }
+
+  var waBtn = item.waHref
+    ? '<a href="' + item.waHref + '" target="_blank" class="btn btn-g-success btn-sm seg-btn-wa" title="Enviar WhatsApp">💬 WhatsApp</a>'
+    : '<span class="btn btn-g-ghost btn-sm seg-btn-wa--disabled" title="Sin teléfono registrado">💬 Sin tel.</span>';
+
+  var div = document.createElement('div');
+  div.className = 'seg-item';
+  div.innerHTML =
+    '<div class="seg-item-info">' +
+      '<div class="seg-item-name">' + _escSeg(item.nombre) + '</div>' +
+      '<div class="seg-item-meta">' +
+        _escSeg(item.curso) + ' · ' + item.progreso.toFixed(0) + '%' +
+        (tipo === 'riesgo' ? ' · <span class="' + diasClass + '">' + diasTxt + '</span>' : '') +
+      '</div>' +
+      '<div class="seg-item-lastconn" id="seg-lastconn-' + item.id + '">Última conexión: <span class="seg-lastconn-val">cargando…</span></div>' +
+    '</div>' +
+    '<button type="button" class="btn btn-g-ghost btn-sm seg-btn-ver" title="Ver en la tabla" onclick="_verEnTablaSeg(\'' + item.id + '\')">🔎</button>' +
+    waBtn;
+  return div;
+}
+
+function _cargarUltimasConexiones(items) {
+  items.forEach(function (item) {
+    fetch('/formacion/historial_alumno/' + item.id)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var el = document.getElementById('seg-lastconn-' + item.id);
+        if (!el) return;
+        var val = el.querySelector('.seg-lastconn-val');
+        if (!data || !data.length) {
+          if (val) val.textContent = 'sin registros';
+          return;
+        }
+        var ultima = data[data.length - 1];
+        var fechaTxt = ultima.fecha_import ? fmtFechaCorta(ultima.fecha_import) : 'sin registros';
+        if (val) val.textContent = fechaTxt;
+      })
+      .catch(function () {
+        var el = document.getElementById('seg-lastconn-' + item.id);
+        var val = el ? el.querySelector('.seg-lastconn-val') : null;
+        if (val) val.textContent = 'error al cargar';
+      });
+  });
+}
+
+function abrirPopupSeguimiento(tipo) {
+  var lista = document.getElementById('ms-lista');
+  lista.innerHTML = '';
+  var items = (tipo === 'riesgo' ? window._segRiesgo : window._segSuperados) || [];
+
+  document.getElementById('ms-icono').textContent = tipo === 'riesgo' ? '🚨' : '🏆';
+  document.getElementById('ms-titulo').textContent = tipo === 'riesgo' ? 'Alumnos en riesgo' : 'Alumnos que superaron el curso';
+  document.getElementById('ms-subtitulo').textContent =
+    items.length + (items.length === 1 ? ' alumno' : ' alumnos') +
+    (tipo === 'riesgo'
+      ? ' · no superan el 75% y su curso finaliza en ' + DIAS_ALERTA_RIESGO + ' días o menos (o ya finalizó)'
+      : ' · ≥75% de exámenes superados');
+
+  if (!items.length) {
+    lista.innerHTML = '<div class="seg-empty">' +
+      (tipo === 'riesgo' ? 'Ningún alumno en riesgo ahora mismo 🎉' : 'Todavía no hay alumnos que hayan superado el curso') +
+      '</div>';
+  } else {
+    items.forEach(function (item) { lista.appendChild(_filaSeguimiento(item, tipo)); });
+    _cargarUltimasConexiones(items);
+  }
+
+  document.getElementById('modal-seguimiento').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarPopupSeguimiento() {
+  document.getElementById('modal-seguimiento').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function _verEnTablaSeg(id) {
+  cerrarPopupSeguimiento();
+  var tr = document.querySelector('#tbody-alumnos tr[data-id="' + id + '"]');
+  if (!tr) return;
+  // Quita filtros y muestra todas las filas para asegurar que la fila sea visible
+  if (typeof inputBuscar !== 'undefined') inputBuscar.value = '';
+  if (typeof selCurso !== 'undefined') selCurso.value = '';
+  if (typeof selEstado !== 'undefined') selEstado.value = '';
+  if (typeof selPerPage !== 'undefined') selPerPage.value = '9999';
+  if (typeof render === 'function') render();
+  setTimeout(function () {
+    tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    var prevBg = tr.style.background;
+    tr.style.transition = 'background .3s';
+    tr.style.background = 'rgba(212,160,23,.18)';
+    setTimeout(function () { tr.style.background = prevBg; }, 1800);
+  }, 60);
+}
+
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && document.getElementById('modal-seguimiento').style.display === 'flex')
+    cerrarPopupSeguimiento();
+});
+
+document.addEventListener('DOMContentLoaded', _recalcularSeguimiento);
 </script>
 {% endblock %}
