@@ -1919,6 +1919,12 @@ async function toggleNoLlamar(checked) {
   const badge = document.getElementById('badge-nollamar-' + _maAlumno.id);
   if (badge) badge.style.display = nuevo ? 'inline-block' : 'none';
 
+  // Actualizar el data-attribute de la fila para que los recuadros de
+  // seguimiento (en riesgo / superados) reflejen el cambio al instante
+  const tr = document.querySelector('#tbody-alumnos tr[data-id="' + _maAlumno.id + '"]');
+  if (tr) tr.dataset.nollamar = nuevo ? '1' : '0';
+  if (typeof _recalcularSeguimiento === 'function') _recalcularSeguimiento();
+
   try {
     await fetch('/formacion/alumno/no_llamar/' + _maAlumno.id, {
       method: 'POST',
@@ -1931,6 +1937,8 @@ async function toggleNoLlamar(checked) {
     chk.checked = !nuevo;
     _maAlumno.no_llamar = nuevo ? 0 : 1;
     if (badge) badge.style.display = nuevo ? 'none' : 'inline-block';
+    if (tr) tr.dataset.nollamar = nuevo ? '0' : '1';
+    if (typeof _recalcularSeguimiento === 'function') _recalcularSeguimiento();
     console.error('Error guardando no_llamar:', e);
   }
 }
@@ -2892,10 +2900,11 @@ document.addEventListener('keydown', function(e) {
 // ══════════════════════════════════════════════════════════════════
 // PANELES DE SEGUIMIENTO — alumnos en riesgo / alumnos que superaron
 // ══════════════════════════════════════════════════════════════════
-// Criterio "en riesgo": progreso por debajo del 75% (estado no OK).
-// Se excluyen los marcados como "NO PARTICIPA". La fecha de fin del
-// curso NO filtra quién aparece; solo se usa para ordenar por urgencia
-// dentro de la lista.
+// Criterio "en riesgo": Estado no OK (supera_75 = 0, % de exámenes < 75%).
+// Criterio "superados": Estado OK (supera_75 = 1).
+// Los alumnos marcados "NO PARTICIPA" (no_llamar) quedan excluidos de
+// AMBAS estadísticas. La fecha de fin del curso NO filtra quién aparece;
+// solo se usa para ordenar por urgencia dentro de la lista de riesgo.
 
 function _diasRestantesSeg(ffin) {
   if (!ffin) return null;
@@ -2933,12 +2942,13 @@ function _recalcularSeguimiento() {
 
     var item = { id: id, nombre: nombre, curso: curso, progreso: progreso, dias: dias, waHref: waHref };
 
-    // "En riesgo": estado no OK, es decir progreso por debajo del 75%.
-    // Un alumno con progreso >= 75% nunca se considera en riesgo, y uno
-    // por debajo del 75% SIEMPRE aparece (no se filtra por fecha de fin).
-    if (progreso < 75 && !noLlamar) {
+    // Los marcados "NO LLAMAR" no cuentan en ninguna estadística (ni riesgo ni superados).
+    // "En riesgo": Estado no OK (supera_75 = 0). "Superados": Estado OK (supera_75 = 1).
+    if (noLlamar) {
+      // excluido de las estadísticas
+    } else if (estado !== 'supera') {
       enRiesgo.push(item);
-    } else if (estado === 'supera') {
+    } else {
       superados.push(item);
     }
   });
@@ -3004,8 +3014,8 @@ function abrirPopupSeguimiento(tipo) {
   document.getElementById('ms-subtitulo').textContent =
     items.length + (items.length === 1 ? ' alumno' : ' alumnos') +
     (tipo === 'riesgo'
-      ? ' · progreso por debajo del 75% (estado no OK)'
-      : ' · ≥75% de exámenes superados');
+      ? ' · estado no OK (excluye a los marcados "no llamar")'
+      : ' · ≥75% de exámenes superados (excluye a los marcados "no llamar")');
 
   if (!items.length) {
     lista.innerHTML = '<div class="seg-empty">' +
