@@ -73,6 +73,7 @@ html.light .header-btns .btn.btn-g-primary:hover {
 .seg-box--riesgo    .seg-box-num { color: var(--red); }
 .seg-box--superados .seg-box-num { color: var(--accent); }
 .seg-box-label { font-size: .76rem; color: var(--text-muted); margin-top: .2rem; }
+.seg-box-curso { font-size: .68rem; color: var(--text-muted); margin-top: .15rem; opacity: .75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seg-box-cta   { font-size: .68rem; color: var(--text-muted); white-space: nowrap; }
 
 /* Modal de seguimiento */
@@ -178,6 +179,7 @@ html.light .header-btns .btn.btn-g-primary:hover {
     <div class="seg-box-info">
       <div class="seg-box-num" id="box-riesgo-num">—</div>
       <div class="seg-box-label">Alumnos en riesgo</div>
+      <div class="seg-box-curso" id="box-riesgo-curso"></div>
     </div>
     <span class="seg-box-cta">Ver detalle →</span>
   </div>
@@ -188,6 +190,7 @@ html.light .header-btns .btn.btn-g-primary:hover {
     <div class="seg-box-info">
       <div class="seg-box-num" id="box-superados-num">—</div>
       <div class="seg-box-label">Alumnos que superaron el curso</div>
+      <div class="seg-box-curso" id="box-superados-curso"></div>
     </div>
     <span class="seg-box-cta">Ver detalle →</span>
   </div>
@@ -2889,11 +2892,10 @@ document.addEventListener('keydown', function(e) {
 // ══════════════════════════════════════════════════════════════════
 // PANELES DE SEGUIMIENTO — alumnos en riesgo / alumnos que superaron
 // ══════════════════════════════════════════════════════════════════
-// Criterio "en riesgo": no supera el 75% de exámenes Y su curso finaliza
-// en menos de DIAS_ALERTA_RIESGO días (o ya finalizó), o no tiene fecha fin.
-// Se excluyen los marcados como "NO PARTICIPA".
-// Ajustable cambiando la constante siguiente:
-var DIAS_ALERTA_RIESGO = 15;
+// Criterio "en riesgo": progreso por debajo del 75% (estado no OK).
+// Se excluyen los marcados como "NO PARTICIPA". La fecha de fin del
+// curso NO filtra quién aparece; solo se usa para ordenar por urgencia
+// dentro de la lista.
 
 function _diasRestantesSeg(ffin) {
   if (!ffin) return null;
@@ -2931,10 +2933,10 @@ function _recalcularSeguimiento() {
 
     var item = { id: id, nombre: nombre, curso: curso, progreso: progreso, dias: dias, waHref: waHref };
 
-    // "En riesgo": progreso por debajo del 75%. Un alumno al 100% (o >=75%)
-    // nunca se considera en riesgo, aunque su estado de exámenes (supera_75)
-    // sea distinto.
-    if (progreso < 75 && !noLlamar && (dias === null || dias <= DIAS_ALERTA_RIESGO)) {
+    // "En riesgo": estado no OK, es decir progreso por debajo del 75%.
+    // Un alumno con progreso >= 75% nunca se considera en riesgo, y uno
+    // por debajo del 75% SIEMPRE aparece (no se filtra por fecha de fin).
+    if (progreso < 75 && !noLlamar) {
       enRiesgo.push(item);
     } else if (estado === 'supera') {
       superados.push(item);
@@ -2955,6 +2957,12 @@ function _recalcularSeguimiento() {
   var elS = document.getElementById('box-superados-num');
   if (elR) elR.textContent = enRiesgo.length;
   if (elS) elS.textContent = superados.length;
+
+  var cursoActivo = (typeof selCurso !== 'undefined' && selCurso.value) ? selCurso.value : 'Todos los cursos';
+  var elRC = document.getElementById('box-riesgo-curso');
+  var elSC = document.getElementById('box-superados-curso');
+  if (elRC) { elRC.textContent = cursoActivo; elRC.title = cursoActivo; }
+  if (elSC) { elSC.textContent = cursoActivo; elSC.title = cursoActivo; }
 }
 
 function _filaSeguimiento(item, tipo) {
@@ -2996,7 +3004,7 @@ function abrirPopupSeguimiento(tipo) {
   document.getElementById('ms-subtitulo').textContent =
     items.length + (items.length === 1 ? ' alumno' : ' alumnos') +
     (tipo === 'riesgo'
-      ? ' · progreso por debajo del 75% y su curso finaliza en ' + DIAS_ALERTA_RIESGO + ' días o menos (o ya finalizó)'
+      ? ' · progreso por debajo del 75% (estado no OK)'
       : ' · ≥75% de exámenes superados');
 
   if (!items.length) {
